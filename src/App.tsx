@@ -723,6 +723,10 @@ function App() {
     });
     workletNode.port.onmessage = (e) => {
        const tc = e.data.tc;
+       // Skip updating local engine from worklet if we just performed a P2P jam-sync
+       // to avoid old TC from the worklet pipe overwriting the fresh sync.
+       if (Date.now() - lastSyncTimeRef.current < 300) return;
+       
        // Sync back to local engine state for markers etc
        if (engineRef.current) engineRef.current.setManualTimecode(tc);
        if (isVisualSlateRef.current) setSlateTime(tc);
