@@ -24,9 +24,9 @@ function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [fpsIndex, setFpsIndex] = useState(2); // Default 25
   const [volume, setVolume] = useState(0.5);
-  // Remove displayTime state as we'll use a ref-based component for performance
-  // const [displayTime, setDisplayTime] = useState('00:00:00:00');
-  const displayRef = useRef<HTMLDivElement>(null);
+  // Using Canvas for GPU-accelerated, ultra-smooth TC display
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const displayRef = useRef<HTMLDivElement>(null); // Keep for compatibility if needed, but primary is canvas
   const [syncStatus, setSyncStatus] = useState<{ offset: number, latency: number } | null>(null);
   const [syncMode, setSyncMode] = useState<SyncMode>('network');
   const [isPreparing, setIsPreparing] = useState(false);
@@ -703,28 +703,68 @@ function App() {
     setIsRunning(true);
   };
 
-  // UI Animation loop using requestAnimationFrame
+  // UI Animation loop using requestAnimationFrame (GPU Canvas optimized)
   useEffect(() => {
-    if (!isRunning) return;
-
     let rafId: number;
-    let lastUpdateTC = '';
-
-    const updateUI = () => {
-      if (engineRef.current) {
-        const tc = engineRef.current.getTimecodeString();
-        if (displayRef.current && tc !== lastUpdateTC) {
-          displayRef.current.innerText = tc;
-          lastUpdateTC = tc;
-        }
-        if (isVisualSlate) setSlateTime(tc);
-      }
-      rafId = requestAnimationFrame(updateUI);
-    };
+    let lastTC = '';
     
-    rafId = requestAnimationFrame(updateUI);
+    const render = () => {
+      const canvas = canvasRef.current;
+      const engine = engineRef.current;
+      if (!canvas || !engine) {
+        rafId = requestAnimationFrame(render);
+        return;
+      }
+
+      const tc = engine.getTimecodeString();
+      if (!isRunning && tc === lastTC) {
+         rafId = requestAnimationFrame(render);
+         return;
+      }
+      lastTC = tc;
+
+      const ctx = canvas.getContext('2d', { alpha: true });
+      if (!ctx) return;
+
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      
+      // Ensure canvas size matches its display size * DPR
+      if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+      }
+
+      const w = rect.width;
+      const h = rect.height;
+
+      // Clear
+      ctx.clearRect(0, 0, w, h);
+
+      // Draw Timecode
+      const fontSize = isMobile ? h * 0.7 : h * 0.85;
+      ctx.font = `900 ${fontSize}px 'JetBrains Mono', monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Neon Glow (GPU accelerated shadow)
+      ctx.shadowColor = 'rgba(59, 130, 246, 0.6)';
+      ctx.shadowBlur = isMobile ? 15 : 40;
+      ctx.fillStyle = '#fafafa';
+      
+      ctx.fillText(tc, w / 2, h / 2);
+      
+      // Secondary sharper glow
+      ctx.shadowBlur = 5;
+      ctx.fillText(tc, w / 2, h / 2);
+
+      rafId = requestAnimationFrame(render);
+    };
+
+    rafId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(rafId);
-  }, [isRunning, isVisualSlate]);
+  }, [isRunning, isMobile]);
 
   const stopEngine = () => {
     if (scriptNodeRef.current) {
@@ -779,7 +819,7 @@ function App() {
         {(isMobile ? activeTab === 'main' : true) && (
           <div className="tab-pane main-pane">
             <div className="timecode-card-pro" onClick={() => setIsVisualSlate(true)}>
-              <div className="time-display" ref={displayRef}>00:00:00:00</div>
+              <canvas ref={canvasRef} className="time-canvas" />
               <div className="info-strip-pro">
                 <span className="info-label">FPS: {FPS_OPTIONS[fpsIndex].label}</span>
                 <span className="info-label">LVL: {outputLevel.toUpperCase()}</span>
