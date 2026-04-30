@@ -349,6 +349,41 @@ header {
   50% { opacity: 0.4; }
 }
 
+/* ── Mobile Quick Mark Buttons ── */
+.mobile-marker-section {
+  margin-top: 8px;
+}
+
+.marker-buttons-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.btn-mark-large {
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 24px 12px;
+  font-size: 0.85rem;
+  font-weight: 900;
+  color: #000;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.2s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.btn-mark-large:active {
+  transform: scale(0.96);
+  opacity: 0.9;
+}
+
+.btn-mark-large.red { background: #ff3b71; box-shadow: 0 4px 15px rgba(255, 59, 113, 0.3); }
+.btn-mark-large.blue { background: #3b82f6; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3); }
+.btn-mark-large.green { background: #10b981; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
+.btn-mark-large.yellow { background: #f59e0b; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3); }
+
 /* ── Control Sections ── */
 .control-section {
   display: flex;

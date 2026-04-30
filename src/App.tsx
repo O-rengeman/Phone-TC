@@ -1060,6 +1060,18 @@ function App() {
                 </>
               )}
             </div>
+            
+            {isMobile && (
+              <div className="control-section mobile-marker-section">
+                <label className="section-label">QUICK MARK</label>
+                <div className="marker-buttons-grid">
+                  <button className="btn-mark-large red" onClick={() => addMarker('Red')}>RED</button>
+                  <button className="btn-mark-large blue" onClick={() => addMarker('Blue')}>BLUE</button>
+                  <button className="btn-mark-large green" onClick={() => addMarker('Green')}>GREEN</button>
+                  <button className="btn-mark-large yellow" onClick={() => addMarker('Yellow')}>YELLOW</button>
+                </div>
+              </div>
+            )}
 
             <div className="marker-section-pro">
               <div className="marker-header">
