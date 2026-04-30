@@ -506,8 +506,12 @@ function App() {
             peerSyncRef.current.broadcast(msg);
           }
           lastSyncTimeRef.current = Date.now();
-        } else if (engineRef.current && (syncMode !== 'p2p' || p2pRole === 'master')) {
-          engineRef.current.syncWithOffset(offset);
+        } else if (engineRef.current) {
+          if (syncMode === 'p2p' && p2pRole === 'master' && p2pSyncSource === 'manual') {
+            engineRef.current.setManualTimecode(manualTimecode);
+          } else {
+            engineRef.current.syncWithOffset(offset);
+          }
           setDisplayTime(engineRef.current.getTimecodeString());
         }
       }
