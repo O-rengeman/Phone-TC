@@ -683,17 +683,10 @@ function App() {
         h: currentTC[0], m: currentTC[1], s: currentTC[2], f: currentTC[3]
       }
     });
-
-    let lastUpdateTC = '';
     workletNode.port.onmessage = (e) => {
        const tc = e.data.tc;
        // Sync back to local engine state for markers etc
        if (engineRef.current) engineRef.current.setManualTimecode(tc);
-       
-       if (displayRef.current && tc !== lastUpdateTC) {
-          displayRef.current.innerText = tc;
-          lastUpdateTC = tc;
-       }
        if (isVisualSlate) setSlateTime(tc);
     };
 
@@ -735,6 +728,7 @@ function App() {
 
   const stopEngine = () => {
     if (scriptNodeRef.current) {
+      (scriptNodeRef.current as any).port.onmessage = null;
       scriptNodeRef.current.disconnect();
       scriptNodeRef.current = null;
     }
