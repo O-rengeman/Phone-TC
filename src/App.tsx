@@ -303,6 +303,10 @@ function App() {
     setMarkers([newMarker, ...markers]); // 最新を上に表示し、全件保持する
   };
 
+  const removeMarker = (id: number) => {
+    setMarkers(markers.filter(m => m.id !== id));
+  };
+
   const exportToEDL = () => {
     if (markers.length === 0) return;
 
@@ -1091,7 +1095,10 @@ function App() {
                         <div className={`color-dot ${m.color.toLowerCase()}`}></div>
                         <span className="m-tc">{m.tc}</span>
                       </div>
-                      <span className="m-time">{m.time}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span className="m-time">{m.time}</span>
+                        <button className="btn-delete-marker" onClick={() => removeMarker(m.id)}>×</button>
+                      </div>
                     </div>
                   ))
                 )}
