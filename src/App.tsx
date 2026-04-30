@@ -854,6 +854,7 @@ function App() {
         {(isMobile ? activeTab === 'main' : true) && (
           <div className="tab-pane main-pane">
             <div className="timecode-card-pro" onClick={() => setIsVisualSlate(true)}>
+              <canvas ref={canvasRef} className="time-canvas" />
               <div className="info-strip-pro">
                 <span className="info-label">FPS: {FPS_OPTIONS[fpsIndex].label}</span>
                 <span className="info-label">LVL: {outputLevel.toUpperCase()}</span>
@@ -864,7 +865,6 @@ function App() {
                   </span>
                 )}
               </div>
-              <canvas ref={canvasRef} className="time-canvas" />
             </div>
 
             {isMobile && (

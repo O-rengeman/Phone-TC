@@ -303,8 +303,8 @@ header {
   justify-content: center;
   gap: 10px;
   opacity: 0.8;
-  margin-top: 12px;
-  margin-bottom: 4px;
+  margin-top: -5px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
   max-width: 100%;
 }
