@@ -55,6 +55,12 @@ function App() {
   }, []);
   const [userBits, setUserBits] = useState('00000000');
   const [isVisualSlate, setIsVisualSlate] = useState(false);
+  const isVisualSlateRef = useRef(false);
+  
+  useEffect(() => {
+    isVisualSlateRef.current = isVisualSlate;
+  }, [isVisualSlate]);
+
   const [markers, setMarkers] = useState<{ id: number, tc: string, time: string, color: 'Red' | 'Blue' | 'Green' | 'Yellow' }[]>([]);
   const [outputLevel, setOutputLevel] = useState<'mic' | 'line'>('line');
 
@@ -687,7 +693,7 @@ function App() {
        const tc = e.data.tc;
        // Sync back to local engine state for markers etc
        if (engineRef.current) engineRef.current.setManualTimecode(tc);
-       if (isVisualSlate) setSlateTime(tc);
+       if (isVisualSlateRef.current) setSlateTime(tc);
     };
 
     if (outputMode === 'mono-l') {
