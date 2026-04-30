@@ -22,6 +22,8 @@ type SyncMode = 'system' | 'network' | 'p2p';
 
 function App() {
   const [isRunning, setIsRunning] = useState(false);
+  const isRunningRef = useRef(false);
+  useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
   const [fpsIndex, setFpsIndex] = useState(2); // Default 25
   const [volume, setVolume] = useState(0.5);
   // Using Canvas for GPU-accelerated, ultra-smooth TC display
@@ -170,72 +172,63 @@ function App() {
           const now = performance.now();
           const rtt = now - (msg.clientTimestamp || now);
           
-          // Packet loss protection: ignore RTTs that are unreasonably large (>5s)
-          // or negative (corrupted timestamp)
           if (rtt < 0 || rtt > 5000) {
             setP2pStatus(`SKIP (bad RTT ${rtt.toFixed(0)}ms)`);
             return;
           }
           
           const oneWayLatency = rtt / 2;
-          
-          setRttHistory(prev => {
-            const next = [...prev, rtt].slice(-15);
-            return next;
-          });
+          setRttHistory(prev => [...prev, rtt].slice(-15));
 
-          // Calculate drift BEFORE deciding whether to sync
+          // Auto-follow Master state
+          if (msg.isRunning && !isRunningRef.current) startEngine();
+          if (!msg.isRunning && isRunningRef.current) stopEngine();
+          
+          // Auto-sync FPS
+          const matchedFpsIndex = FPS_OPTIONS.findIndex(f => f.value === msg.fps);
+          if (matchedFpsIndex !== -1 && matchedFpsIndex !== fpsIndex) setFpsIndex(matchedFpsIndex);
+
           const diff = engineRef.current.getDiffSeconds(msg.masterTimecode);
           setMasterDrift(diff);
 
-          // Latency protection: Only sync if RTT is stable
           const avgRtt = rttHistory.length > 0 ? rttHistory.reduce((a, b) => a + b) / rttHistory.length : rtt;
           const isRttStable = rtt <= avgRtt * 1.5 || rtt < 80;
 
-          // Ultra-tight sync conditions: diff >= 0.03s (approx 1 frame) OR 15 seconds
           const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
           const shouldSync = (Math.abs(diff) >= 0.03 && isRttStable) || timeSinceLastSync >= 15000;
 
           if (shouldSync) {
-            engineRef.current.jamSyncDirect(
-              msg.masterTimecode, 
-              oneWayLatency, 
-              msg.isRunning
-            );
+            engineRef.current.jamSyncDirect(msg.masterTimecode, oneWayLatency, msg.isRunning);
             lastSyncTimeRef.current = Date.now();
           }
 
-          if (!isRunning) {
+          if (!isRunningRef.current) {
             if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
           }
           const bestRtt = rttHistory.length > 0 ? Math.min(...rttHistory, rtt) : rtt;
-          setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (RTT ${rtt.toFixed(0)}ms / MIN ${bestRtt.toFixed(0)}ms)`);
+          setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (RTT ${rtt.toFixed(0)}ms)`);
 
-          // Report back to master
           peerSyncRef.current?.send({
             type: 'report',
-            masterTimecode: '',
-            masterTimestamp: 0,
-            fps: 0,
-            isDropFrame: false,
-            isRunning: false,
-            rtt: bestRtt,
-            drift: diff
+            masterTimecode: '', masterTimestamp: 0, fps: 0, isDropFrame: false, isRunning: false,
+            rtt: bestRtt, drift: diff
           });
         } else if (msg.type === 'heartbeat' && !isHost) {
-          // Heartbeat: update drift display, sync only if needed
           const diff = engineRef.current.getDiffSeconds(msg.masterTimecode);
           setMasterDrift(diff);
+
+          // Auto-follow Master state in heartbeat too
+          if (msg.isRunning && !isRunningRef.current) startEngine();
+          if (!msg.isRunning && isRunningRef.current) stopEngine();
 
           const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
           const shouldSync = Math.abs(diff) >= 0.03 || timeSinceLastSync >= 15000;
 
           if (shouldSync) {
-            // Heartbeat sync is coarse (assume 30ms avg latency if unknown)
             engineRef.current.jamSyncDirect(msg.masterTimecode, 0.03, msg.isRunning);
             lastSyncTimeRef.current = Date.now();
           }
-          if (!isRunning) {
+          if (!isRunningRef.current) {
             if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
           }
           setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (HB)`);
@@ -1093,15 +1086,15 @@ function App() {
             <button 
               className={`btn-main-action ${isRunning ? 'running danger' : ''}`} 
               onClick={handleStartStop}
-              disabled={isPreparing}
+              disabled={isPreparing || p2pRole === 'client'}
             >
               <div className="btn-icon"></div>
               <div className="btn-text">
-                {isRunning ? 'STOP' : isPreparing ? 'PREP...' : isPaused ? 'RESUME' : 'START'}
+                {p2pRole === 'client' ? 'FOLLOWING MASTER' : (isRunning ? 'STOP' : isPreparing ? 'PREP...' : isPaused ? 'RESUME' : 'START')}
               </div>
             </button>
             {isRunning && (
-              <button className="btn-main-action pause" onClick={handlePause}>
+              <button className="btn-main-action pause" onClick={handlePause} disabled={p2pRole === 'client'}>
                 <div className="btn-text">PAUSE</div>
               </button>
             )}
