@@ -192,9 +192,9 @@ function App() {
           const avgRtt = rttHistory.length > 0 ? rttHistory.reduce((a, b) => a + b) / rttHistory.length : rtt;
           const isRttStable = rtt <= avgRtt * 1.5 || rtt < 80;
 
-          // Sync conditions: diff >= 0.1s OR 15 seconds since last sync
+          // Ultra-tight sync conditions: diff >= 0.03s (approx 1 frame) OR 15 seconds
           const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
-          const shouldSync = (Math.abs(diff) >= 0.1 && isRttStable) || timeSinceLastSync >= 15000;
+          const shouldSync = (Math.abs(diff) >= 0.03 && isRttStable) || timeSinceLastSync >= 15000;
 
           if (shouldSync) {
             engineRef.current.jamSyncDirect(
@@ -228,7 +228,7 @@ function App() {
           setMasterDrift(diff);
 
           const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
-          const shouldSync = Math.abs(diff) >= 0.2 || timeSinceLastSync >= 15000;
+          const shouldSync = Math.abs(diff) >= 0.03 || timeSinceLastSync >= 15000;
 
           if (shouldSync) {
             // Heartbeat sync is coarse (assume 30ms avg latency if unknown)
@@ -419,8 +419,8 @@ function App() {
         const diff = masterDrift !== null ? Math.abs(masterDrift) : 0;
         const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
         
-        // Δ > 0.1s or 15s interval
-        if (diff >= 0.1 || timeSinceLastSync >= 15000) {
+        // Δ > 0.03s or 15s interval
+        if (diff >= 0.03 || timeSinceLastSync >= 15000) {
           // Packet Loss Countermeasure: Send a burst of 3 requests
           const sendSync = (delay = 0) => {
             setTimeout(() => {
