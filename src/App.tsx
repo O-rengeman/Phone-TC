@@ -554,74 +554,160 @@ function App() {
     const ctx = audioCtxRef.current;
     if (ctx.state === 'suspended') await ctx.resume();
 
-    const engine = engineRef.current!;
+    // Define Worklet Script inline for compatibility and speed
+    const workletCode = `
+      class LtcProcessor extends AudioWorkletProcessor {
+        constructor(options) {
+          super();
+          this.settings = options.processorOptions;
+          this.phase = 1;
+          this.frameCount = 0;
+          this.sampleOffset = 0;
+          this.currentFrameSamples = null;
+          
+          // Initial TC setup
+          this.hours = this.settings.h;
+          this.minutes = this.settings.m;
+          this.seconds = this.settings.s;
+          this.frames = this.settings.f;
+        }
+
+        addFrame() {
+          this.frames++;
+          if (this.frames >= this.settings.fps) {
+            this.frames = 0;
+            this.seconds++;
+            if (this.seconds >= 60) {
+              this.seconds = 0;
+              this.minutes++;
+              if (this.minutes >= 60) {
+                this.minutes = 0;
+                this.hours++;
+                if (this.hours >= 24) this.hours = 0;
+              }
+            }
+          }
+          // Basic Drop Frame support (simplified for worklet)
+          if (this.settings.isDrop && this.frames < 2 && this.seconds === 0 && this.minutes % 10 !== 0) {
+             this.frames = 2;
+          }
+          
+          this.port.postMessage({ 
+            tc: \`\${String(this.hours).padStart(2, '0')}:\${String(this.minutes).padStart(2, '0')}:\${String(this.seconds).padStart(2, '0')}:\${String(this.frames).padStart(2, '0')}\`
+          });
+        }
+
+        generateBits() {
+          const bits = new Array(80).fill(0);
+          const f = this.frames, s = this.seconds, m = this.minutes, h = this.hours;
+          const setBits = (arr, start, count, val) => {
+            for (let i = 0; i < count; i++) arr[start + i] = (val >> i) & 1;
+          };
+          setBits(bits, 0, 4, f % 10); setBits(bits, 8, 2, Math.floor(f / 10));
+          bits[10] = this.settings.isDrop ? 1 : 0;
+          setBits(bits, 16, 4, s % 10); setBits(bits, 24, 3, Math.floor(s / 10));
+          setBits(bits, 32, 4, m % 10); setBits(bits, 40, 3, Math.floor(m / 10));
+          setBits(bits, 48, 4, h % 10); setBits(bits, 56, 2, Math.floor(h / 10));
+          // User bits
+          for (let i = 0; i < 8; i++) setBits(bits, 4 + (i * 8), 4, parseInt(this.settings.ubit[i], 16) || 0);
+          const sync = [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1];
+          for (let i = 0; i < 16; i++) bits[64 + i] = sync[i];
+          return bits;
+        }
+
+        process(inputs, outputs) {
+          const outputL = outputs[0][0];
+          const outputR = outputs[0][1];
+          const input = inputs[0] ? inputs[0][0] : null;
+          if (!outputL) return true;
+
+          for (let i = 0; i < outputL.length; i++) {
+            if (!this.currentFrameSamples || this.sampleOffset >= this.currentFrameSamples.length) {
+              const bits = this.generateBits();
+              const sr = sampleRate;
+              const nextEnd = Math.floor((this.frameCount + 1) * sr * this.settings.fpsDen / this.settings.fpsNum);
+              const curStart = Math.floor(this.frameCount * sr * this.settings.fpsDen / this.settings.fpsNum);
+              const count = nextEnd - curStart;
+              this.currentFrameSamples = new Float32Array(count);
+              const spb = count / 80;
+              let sIdx = 0;
+              for (let b = 0; b < 80; b++) {
+                const bit = bits[b];
+                const bEnd = Math.round((b + 1) * spb);
+                const bMid = Math.round((b + 0.5) * spb);
+                this.phase *= -1;
+                while (sIdx < bEnd && sIdx < count) {
+                  if (bit === 1 && sIdx === bMid) this.phase *= -1;
+                  this.currentFrameSamples[sIdx] = this.phase * this.settings.volume;
+                  sIdx++;
+                }
+              }
+              this.sampleOffset = 0;
+              this.frameCount++;
+              this.addFrame();
+            }
+            const s = this.currentFrameSamples[this.sampleOffset];
+            outputL[i] = s;
+            if (outputR) outputR[i] = this.settings.mode === 'stereo' ? s : (input ? input[i] : 0);
+            this.sampleOffset++;
+          }
+          return true;
+        }
+      }
+      registerProcessor('ltc-processor', LtcProcessor);
+    `;
+
+    const blob = new Blob([workletCode], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
     
-    // Setup Audio Input for mono-l mode (Pass-through)
-    let inputSource: MediaStreamAudioSourceNode | null = null;
+    try {
+      await ctx.audioWorklet.addModule(url);
+    } catch (e) {
+      console.error('Worklet addition failed', e);
+      return;
+    }
+
+    const currentTC = engineRef.current!.getTimecodeString().split(':').map(Number);
+    const workletNode = new AudioWorkletNode(ctx, 'ltc-processor', {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      outputChannelCount: [2],
+      processorOptions: {
+        fps: FPS_OPTIONS[fpsIndex].value,
+        isDrop: FPS_OPTIONS[fpsIndex].drop,
+        fpsNum: FPS_OPTIONS[fpsIndex].fpsNum,
+        fpsDen: FPS_OPTIONS[fpsIndex].fpsDen,
+        volume: outputLevel === 'line' ? volume : volume * 0.1,
+        ubit: userBits,
+        mode: outputMode,
+        h: currentTC[0], m: currentTC[1], s: currentTC[2], f: currentTC[3]
+      }
+    });
+
+    let lastUpdateTC = '';
+    workletNode.port.onmessage = (e) => {
+       const tc = e.data.tc;
+       // Sync back to local engine state for markers etc
+       if (engineRef.current) engineRef.current.setManualTimecode(tc);
+       
+       if (displayRef.current && tc !== lastUpdateTC) {
+          displayRef.current.innerText = tc;
+          lastUpdateTC = tc;
+       }
+       if (isVisualSlate) setSlateTime(tc);
+    };
+
     if (outputMode === 'mono-l') {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        inputSource = ctx.createMediaStreamSource(stream);
-      } catch (err) {
-        console.warn('Microphone access denied for R-Audio mode');
-      }
+        const inputSource = ctx.createMediaStreamSource(stream);
+        inputSource.connect(workletNode);
+      } catch (err) { console.warn('Mic access denied'); }
     }
 
-    const scriptNode = ctx.createScriptProcessor(2048, 1, 2);
-    let currentFrameSamples: Float32Array | null = null;
-    let sampleOffset = 0;
-
-    scriptNode.onaudioprocess = (e) => {
-      const outputL = e.outputBuffer.getChannelData(0);
-      const outputR = e.outputBuffer.getChannelData(1);
-      const input = e.inputBuffer.getChannelData(0);
-
-      for (let i = 0; i < outputL.length; i++) {
-        if (!currentFrameSamples || sampleOffset >= currentFrameSamples.length) {
-          currentFrameSamples = engine.generateFrameSamples();
-          sampleOffset = 0;
-          // UI update is handled by requestAnimationFrame for performance
-        }
-        
-        const tcSample = currentFrameSamples[sampleOffset];
-        outputL[i] = tcSample;
-        
-        if (outputMode === 'stereo') {
-          outputR[i] = tcSample;
-        } else {
-          // Pass-through microphone to Right channel
-          outputR[i] = input[i] || 0;
-        }
-        
-        sampleOffset++;
-      }
-    };
-
-    // UI Animation loop using requestAnimationFrame
-    let rafId: number;
-    const updateUI = () => {
-      if (engineRef.current) {
-        const tc = engineRef.current.getTimecodeString();
-        if (displayRef.current) {
-          displayRef.current.innerText = tc;
-        }
-        // Only update slateTime state when the overlay is visible to save CPU
-        if (isVisualSlate) {
-          setSlateTime(tc);
-        }
-      }
-      rafId = requestAnimationFrame(updateUI);
-    };
-    rafId = requestAnimationFrame(updateUI);
-    
-    if (inputSource) inputSource.connect(scriptNode);
-    scriptNode.connect(ctx.destination);
-    scriptNodeRef.current = scriptNode;
+    workletNode.connect(ctx.destination);
+    (scriptNodeRef as any).current = workletNode; // Reuse ref for simplicity
     setIsRunning(true);
-
-    return () => {
-      cancelAnimationFrame(rafId);
-    };
   };
 
   const stopEngine = () => {
