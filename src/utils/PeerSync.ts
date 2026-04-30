@@ -31,7 +31,7 @@ export class PeerSync {
   private generateShortId(): string {
     const chars = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // Confusion-prone I, O removed
     let result = '';
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return result;
@@ -71,9 +71,7 @@ export class PeerSync {
 
   public connect(peerId: string) {
     if (!this.peer) return;
-    const conn = this.peer.connect(peerId, {
-      reliable: false // Use unreliable (UDP-style) for low latency TC
-    });
+    const conn = this.peer.connect(peerId);
     this.onStatusCallback(`CONNECTING TO ${peerId}...`);
     this.handleConnection(conn);
   }
@@ -101,6 +99,11 @@ export class PeerSync {
     conn.on('close', () => {
       this.onStatusCallback('CONNECTION CLOSED');
       this.connections = this.connections.filter(c => c !== conn);
+    });
+
+    conn.on('error', (err: any) => {
+      console.error('Connection error:', err);
+      this.onStatusCallback(`CONN ERROR: ${err.type || 'FAILED'}`);
     });
   }
 
