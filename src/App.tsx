@@ -200,6 +200,15 @@ function App() {
           if (shouldSync) {
             engineRef.current.jamSyncDirect(msg.masterTimecode, oneWayLatency, msg.isRunning);
             lastSyncTimeRef.current = Date.now();
+            
+            // Critical: Also sync the AudioWorklet if it's running
+            if (scriptNodeRef.current) {
+              const tc = engineRef.current.getTimecodeString().split(':').map(Number);
+              (scriptNodeRef.current as any).port?.postMessage({
+                type: 'jam',
+                h: tc[0], m: tc[1], s: tc[2], f: tc[3]
+              });
+            }
           }
 
           const bestRtt = rttHistory.length > 0 ? Math.min(...rttHistory, rtt) : rtt;
@@ -224,6 +233,14 @@ function App() {
           if (shouldSync) {
             engineRef.current.jamSyncDirect(msg.masterTimecode, 0.03, msg.isRunning);
             lastSyncTimeRef.current = Date.now();
+
+            if (scriptNodeRef.current) {
+              const tc = engineRef.current.getTimecodeString().split(':').map(Number);
+              (scriptNodeRef.current as any).port?.postMessage({
+                type: 'jam',
+                h: tc[0], m: tc[1], s: tc[2], f: tc[3]
+              });
+            }
           }
           setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (HB)`);
 
@@ -573,16 +590,24 @@ function App() {
         constructor(options) {
           super();
           this.settings = options.processorOptions;
+          this.hours = this.settings.h;
+          this.minutes = this.settings.m;
+          this.seconds = this.settings.s;
+          this.frames = this.settings.f;
           this.phase = 1;
           this.frameCount = 0;
           this.sampleOffset = 0;
           this.currentFrameSamples = null;
           
-          // Initial TC setup
-          this.hours = this.settings.h;
-          this.minutes = this.settings.m;
-          this.seconds = this.settings.s;
-          this.frames = this.settings.f;
+          this.port.onmessage = (e) => {
+            if (e.data.type === 'jam') {
+              this.hours = e.data.h;
+              this.minutes = e.data.m;
+              this.seconds = e.data.s;
+              this.frames = e.data.f;
+              this.currentFrameSamples = null; // Force regeneration
+            }
+          };
         }
 
         addFrame() {
