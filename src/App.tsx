@@ -22,8 +22,6 @@ type SyncMode = 'system' | 'network' | 'p2p';
 
 function App() {
   const [isRunning, setIsRunning] = useState(false);
-  const isRunningRef = useRef(false);
-  useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
   const [fpsIndex, setFpsIndex] = useState(2); // Default 25
   const [volume, setVolume] = useState(0.5);
   // Using Canvas for GPU-accelerated, ultra-smooth TC display
@@ -172,75 +170,73 @@ function App() {
           const now = performance.now();
           const rtt = now - (msg.clientTimestamp || now);
           
+          // Packet loss protection: ignore RTTs that are unreasonably large (>5s)
+          // or negative (corrupted timestamp)
           if (rtt < 0 || rtt > 5000) {
             setP2pStatus(`SKIP (bad RTT ${rtt.toFixed(0)}ms)`);
             return;
           }
           
           const oneWayLatency = rtt / 2;
-          setRttHistory(prev => [...prev, rtt].slice(-15));
-
-          // Auto-follow Master state
-          if (msg.isRunning && !isRunningRef.current) startEngine();
-          if (!msg.isRunning && isRunningRef.current) stopEngine();
           
-          // Auto-sync FPS
-          const matchedFpsIndex = FPS_OPTIONS.findIndex(f => f.value === msg.fps);
-          if (matchedFpsIndex !== -1 && matchedFpsIndex !== fpsIndex) setFpsIndex(matchedFpsIndex);
+          setRttHistory(prev => {
+            const next = [...prev, rtt].slice(-15);
+            return next;
+          });
 
+          // Calculate drift BEFORE deciding whether to sync
           const diff = engineRef.current.getDiffSeconds(msg.masterTimecode);
           setMasterDrift(diff);
 
+          // Latency protection: Only sync if RTT is stable
           const avgRtt = rttHistory.length > 0 ? rttHistory.reduce((a, b) => a + b) / rttHistory.length : rtt;
           const isRttStable = rtt <= avgRtt * 1.5 || rtt < 80;
 
+          // Ultra-tight sync conditions: diff >= 0.03s (approx 1 frame) OR 15 seconds
           const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
           const shouldSync = (Math.abs(diff) >= 0.03 && isRttStable) || timeSinceLastSync >= 15000;
 
           if (shouldSync) {
-            engineRef.current.jamSyncDirect(msg.masterTimecode, oneWayLatency, msg.isRunning);
+            engineRef.current.jamSyncDirect(
+              msg.masterTimecode, 
+              oneWayLatency, 
+              msg.isRunning
+            );
             lastSyncTimeRef.current = Date.now();
-            
-            // Critical: Also sync the AudioWorklet if it's running
-            if (scriptNodeRef.current) {
-              const tc = engineRef.current.getTimecodeString().split(':').map(Number);
-              (scriptNodeRef.current as any).port?.postMessage({
-                type: 'jam',
-                h: tc[0], m: tc[1], s: tc[2], f: tc[3]
-              });
-            }
           }
 
+          if (!isRunning) {
+            if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
+          }
           const bestRtt = rttHistory.length > 0 ? Math.min(...rttHistory, rtt) : rtt;
-          setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (RTT ${rtt.toFixed(0)}ms)`);
+          setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (RTT ${rtt.toFixed(0)}ms / MIN ${bestRtt.toFixed(0)}ms)`);
 
+          // Report back to master
           peerSyncRef.current?.send({
             type: 'report',
-            masterTimecode: '', masterTimestamp: 0, fps: 0, isDropFrame: false, isRunning: false,
-            rtt: bestRtt, drift: diff
+            masterTimecode: '',
+            masterTimestamp: 0,
+            fps: 0,
+            isDropFrame: false,
+            isRunning: false,
+            rtt: bestRtt,
+            drift: diff
           });
         } else if (msg.type === 'heartbeat' && !isHost) {
+          // Heartbeat: update drift display, sync only if needed
           const diff = engineRef.current.getDiffSeconds(msg.masterTimecode);
           setMasterDrift(diff);
-
-          // Auto-follow Master state in heartbeat too
-          if (msg.isRunning && !isRunningRef.current) startEngine();
-          if (!msg.isRunning && isRunningRef.current) stopEngine();
 
           const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
           const shouldSync = Math.abs(diff) >= 0.03 || timeSinceLastSync >= 15000;
 
           if (shouldSync) {
+            // Heartbeat sync is coarse (assume 30ms avg latency if unknown)
             engineRef.current.jamSyncDirect(msg.masterTimecode, 0.03, msg.isRunning);
             lastSyncTimeRef.current = Date.now();
-
-            if (scriptNodeRef.current) {
-              const tc = engineRef.current.getTimecodeString().split(':').map(Number);
-              (scriptNodeRef.current as any).port?.postMessage({
-                type: 'jam',
-                h: tc[0], m: tc[1], s: tc[2], f: tc[3]
-              });
-            }
+          }
+          if (!isRunning) {
+            if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
           }
           setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (HB)`);
 
@@ -400,6 +396,7 @@ function App() {
     if (engineRef.current && p2pRole === 'master' && !isRunning && !isPaused) {
       try {
         engineRef.current.setManualTimecode(manualTimecode);
+        if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
       } catch (e) {
         // Ignore invalid formats while typing
       }
@@ -476,6 +473,10 @@ function App() {
         console.log('Background network time sync...');
         const result = await TimeSync.sync(1);
         setSyncStatus(result);
+        if (engineRef.current && p2pRole !== 'master') {
+           // Gently nudge the engine if offset changed significantly
+           // For now, we just update the status, engine uses it in next jamSync/start
+        }
       } catch (e) {
         console.warn('Background sync failed');
       }
@@ -551,6 +552,7 @@ function App() {
           } else {
             engineRef.current.syncWithOffset(offset);
           }
+          if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
         }
       }
 
@@ -590,24 +592,16 @@ function App() {
         constructor(options) {
           super();
           this.settings = options.processorOptions;
-          this.hours = this.settings.h;
-          this.minutes = this.settings.m;
-          this.seconds = this.settings.s;
-          this.frames = this.settings.f;
           this.phase = 1;
           this.frameCount = 0;
           this.sampleOffset = 0;
           this.currentFrameSamples = null;
           
-          this.port.onmessage = (e) => {
-            if (e.data.type === 'jam') {
-              this.hours = e.data.h;
-              this.minutes = e.data.m;
-              this.seconds = e.data.s;
-              this.frames = e.data.f;
-              this.currentFrameSamples = null; // Force regeneration
-            }
-          };
+          // Initial TC setup
+          this.hours = this.settings.h;
+          this.minutes = this.settings.m;
+          this.seconds = this.settings.s;
+          this.frames = this.settings.f;
         }
 
         addFrame() {
@@ -723,10 +717,6 @@ function App() {
     });
     workletNode.port.onmessage = (e) => {
        const tc = e.data.tc;
-       // Skip updating local engine from worklet if we just performed a P2P jam-sync
-       // to avoid old TC from the worklet pipe overwriting the fresh sync.
-       if (Date.now() - lastSyncTimeRef.current < 300) return;
-       
        // Sync back to local engine state for markers etc
        if (engineRef.current) engineRef.current.setManualTimecode(tc);
        if (isVisualSlateRef.current) setSlateTime(tc);
@@ -748,6 +738,7 @@ function App() {
   // UI Animation loop using requestAnimationFrame (GPU Canvas optimized)
   useEffect(() => {
     let rafId: number;
+    let lastTC = '';
     
     const render = () => {
       const canvas = canvasRef.current;
@@ -758,6 +749,12 @@ function App() {
       }
 
       const tc = engine.getTimecodeString();
+      if (!isRunning && tc === lastTC) {
+         rafId = requestAnimationFrame(render);
+         return;
+      }
+      lastTC = tc;
+
       const ctx = canvas.getContext('2d', { alpha: true });
       if (!ctx) return;
 
@@ -800,7 +797,7 @@ function App() {
 
     rafId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(rafId);
-  }, [isMobile]);
+  }, [isRunning, isMobile]);
 
   const stopEngine = () => {
     if (scriptNodeRef.current) {
@@ -808,6 +805,7 @@ function App() {
       scriptNodeRef.current.disconnect();
       scriptNodeRef.current = null;
     }
+    if (displayRef.current && engineRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
     setIsRunning(false);
   };
 
@@ -1095,15 +1093,15 @@ function App() {
             <button 
               className={`btn-main-action ${isRunning ? 'running danger' : ''}`} 
               onClick={handleStartStop}
-              disabled={isPreparing || p2pRole === 'client'}
+              disabled={isPreparing}
             >
               <div className="btn-icon"></div>
               <div className="btn-text">
-                {p2pRole === 'client' ? 'FOLLOWING MASTER' : (isRunning ? 'STOP' : isPreparing ? 'PREP...' : isPaused ? 'RESUME' : 'START')}
+                {isRunning ? 'STOP' : isPreparing ? 'PREP...' : isPaused ? 'RESUME' : 'START'}
               </div>
             </button>
             {isRunning && (
-              <button className="btn-main-action pause" onClick={handlePause} disabled={p2pRole === 'client'}>
+              <button className="btn-main-action pause" onClick={handlePause}>
                 <div className="btn-text">PAUSE</div>
               </button>
             )}
