@@ -228,10 +228,12 @@ function App() {
           setMasterDrift(diff);
 
           const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
-          const shouldSync = Math.abs(diff) >= 0.03 || timeSinceLastSync >= 15000;
+          
+          // Persistent drift check: only sync if drift is > 0.03s for 3 consecutive beats (if HB)
+          // For HB, we are less aggressive to avoid jitter-induced jumps
+          const shouldSync = Math.abs(diff) >= 0.05 || timeSinceLastSync >= 15000;
 
           if (shouldSync) {
-            // Heartbeat sync is coarse (assume 30ms avg latency if unknown)
             engineRef.current.jamSyncDirect(msg.masterTimecode, 0.03, msg.isRunning);
             lastSyncTimeRef.current = Date.now();
           }
@@ -443,7 +445,7 @@ function App() {
       }
     }, 1000);
 
-    // High-frequency Heartbeat for Master
+    // High-frequency Heartbeat for Master (10Hz for extreme reliability)
     let hbInterval: any;
     if (isHost) {
       hbInterval = setInterval(() => {
@@ -455,7 +457,7 @@ function App() {
           isDropFrame: FPS_OPTIONS[fpsIndex].drop,
           isRunning: isRunning
         });
-      }, 200); // 5Hz Heartbeat
+      }, 100); // 10Hz Heartbeat
     }
 
     return () => {
@@ -735,10 +737,8 @@ function App() {
     setIsRunning(true);
   };
 
-  // UI Animation loop using requestAnimationFrame (GPU Canvas optimized)
   useEffect(() => {
     let rafId: number;
-    let lastTC = '';
     
     const render = () => {
       const canvas = canvasRef.current;
@@ -749,12 +749,14 @@ function App() {
       }
 
       const tc = engine.getTimecodeString();
-      if (!isRunning && tc === lastTC) {
-         rafId = requestAnimationFrame(render);
-         return;
+      
+      // Update Slate Time (state) for overlay components (QR, etc)
+      // Only update when needed to avoid React re-renders unless necessary
+      if (isVisualSlateRef.current && slateTime !== tc) {
+        setSlateTime(tc);
       }
-      lastTC = tc;
 
+      // Draw Logic
       const ctx = canvas.getContext('2d', { alpha: true });
       if (!ctx) return;
 
