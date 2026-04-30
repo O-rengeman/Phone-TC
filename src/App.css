@@ -384,6 +384,31 @@ header {
 .btn-mark-large.green { background: #10b981; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
 .btn-mark-large.yellow { background: #f59e0b; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3); }
 
+/* ── Recording Indicator (Red Border) ── */
+.app-container.is-recording::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 4px #ff3b71;
+  z-index: 9999;
+  animation: pulse-recording 2s infinite ease-in-out;
+}
+
+@keyframes pulse-recording {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: inset 0 0 0 4px #ff3b71;
+  }
+  50% {
+    opacity: 0.6;
+    box-shadow: inset 0 0 0 2px #ff3b71;
+  }
+}
+
 /* ── Control Sections ── */
 .control-section {
   display: flex;

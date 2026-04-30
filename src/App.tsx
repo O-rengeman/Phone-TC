@@ -824,7 +824,7 @@ function App() {
   };
 
   return (
-    <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'}`}>
+    <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
       {!isLoaded && (
         <div className="splash-screen">
           <div className="splash-content">
