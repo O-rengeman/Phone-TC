@@ -24,7 +24,9 @@ function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [fpsIndex, setFpsIndex] = useState(2); // Default 25
   const [volume, setVolume] = useState(0.5);
-  const [displayTime, setDisplayTime] = useState('00:00:00:00');
+  // Remove displayTime state as we'll use a ref-based component for performance
+  // const [displayTime, setDisplayTime] = useState('00:00:00:00');
+  const displayRef = useRef<HTMLDivElement>(null);
   const [syncStatus, setSyncStatus] = useState<{ offset: number, latency: number } | null>(null);
   const [syncMode, setSyncMode] = useState<SyncMode>('network');
   const [isPreparing, setIsPreparing] = useState(false);
@@ -38,6 +40,7 @@ function App() {
   const [autoUserBits, setAutoUserBits] = useState(true);
   const [isSlateFlashing, setIsSlateFlashing] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [slateTime, setSlateTime] = useState('00:00:00:00');
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoaded(true), 1800);
@@ -98,14 +101,15 @@ function App() {
       fpsDen: FPS_OPTIONS[fpsIndex].fpsDen
     };
     engineRef.current = new LtcEngine(settings);
-    setDisplayTime(engineRef.current.getTimecodeString());
+    // Initial update
+    if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
   }, []);
 
   // Update FPS/Volume
   useEffect(() => {
     if (engineRef.current) {
       engineRef.current.setFps(FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
-      setDisplayTime(engineRef.current.getTimecodeString());
+      if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
     }
   }, [fpsIndex]);
 
@@ -192,7 +196,7 @@ function App() {
           }
 
           if (!isRunning) {
-            setDisplayTime(engineRef.current.getTimecodeString());
+            if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
           }
           const bestRtt = rttHistory.length > 0 ? Math.min(...rttHistory, rtt) : rtt;
           setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (RTT ${bestRtt.toFixed(0)}ms)`);
@@ -221,7 +225,7 @@ function App() {
             lastSyncTimeRef.current = Date.now();
           }
           if (!isRunning) {
-            setDisplayTime(engineRef.current.getTimecodeString());
+            if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
           }
           setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (HB)`);
 
@@ -276,9 +280,10 @@ function App() {
   }, [outputLevel, volume]);
 
   const addMarker = (color: 'Red' | 'Blue' | 'Green' | 'Yellow') => {
+    const currentTC = engineRef.current ? engineRef.current.getTimecodeString() : '00:00:00:00';
     const newMarker = {
       id: Date.now(),
-      tc: displayTime,
+      tc: currentTC,
       time: new Date().toLocaleTimeString(),
       color: color
     };
@@ -380,7 +385,7 @@ function App() {
     if (engineRef.current && p2pRole === 'master' && !isRunning && !isPaused) {
       try {
         engineRef.current.setManualTimecode(manualTimecode);
-        setDisplayTime(engineRef.current.getTimecodeString());
+        if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
       } catch (e) {
         // Ignore invalid formats while typing
       }
@@ -515,7 +520,7 @@ function App() {
           } else {
             engineRef.current.syncWithOffset(offset);
           }
-          setDisplayTime(engineRef.current.getTimecodeString());
+          if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
         }
       }
 
@@ -575,7 +580,7 @@ function App() {
         if (!currentFrameSamples || sampleOffset >= currentFrameSamples.length) {
           currentFrameSamples = engine.generateFrameSamples();
           sampleOffset = 0;
-          setTimeout(() => setDisplayTime(engine.getTimecodeString()), 0);
+          // UI update is handled by requestAnimationFrame for performance
         }
         
         const tcSample = currentFrameSamples[sampleOffset];
@@ -592,10 +597,31 @@ function App() {
       }
     };
 
+    // UI Animation loop using requestAnimationFrame
+    let rafId: number;
+    const updateUI = () => {
+      if (engineRef.current) {
+        const tc = engineRef.current.getTimecodeString();
+        if (displayRef.current) {
+          displayRef.current.innerText = tc;
+        }
+        // Only update slateTime state when the overlay is visible to save CPU
+        if (isVisualSlate) {
+          setSlateTime(tc);
+        }
+      }
+      rafId = requestAnimationFrame(updateUI);
+    };
+    rafId = requestAnimationFrame(updateUI);
+    
     if (inputSource) inputSource.connect(scriptNode);
     scriptNode.connect(ctx.destination);
     scriptNodeRef.current = scriptNode;
     setIsRunning(true);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
   };
 
   const stopEngine = () => {
@@ -649,7 +675,7 @@ function App() {
         {(isMobile ? activeTab === 'main' : true) && (
           <div className="tab-pane main-pane">
             <div className="timecode-card-pro" onClick={() => setIsVisualSlate(true)}>
-              <div className="time-display">{displayTime}</div>
+              <div className="time-display" ref={displayRef}>00:00:00:00</div>
               <div className="info-strip-pro">
                 <span className="info-label">FPS: {FPS_OPTIONS[fpsIndex].label}</span>
                 <span className="info-label">LVL: {outputLevel.toUpperCase()}</span>
@@ -917,12 +943,12 @@ function App() {
 
       {isVisualSlate && (
         <div className={`visual-slate-overlay ${isSlateFlashing ? 'flashing' : ''}`} onClick={handleSlateClick}>
-          <div className="slate-tc">{displayTime}</div>
+          <div className="slate-tc">{slateTime}</div>
           <div className="slate-info">
             {FPS_OPTIONS[fpsIndex].label} FPS | UBIT: {userBits}
           </div>
           <div className="slate-qr">
-            <QRCodeCanvas value={displayTime} size={256} level="L" includeMargin={true} />
+            <QRCodeCanvas value={slateTime} size={256} level="L" includeMargin={true} />
           </div>
           <div className="slate-close">TAP FOR CLAPPER / LONG PRESS TO CLOSE</div>
           <button style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', color: '#666', fontSize: '2rem' }} onClick={(e) => { e.stopPropagation(); setIsVisualSlate(false); }}>×</button>
