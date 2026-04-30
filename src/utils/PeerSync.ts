@@ -71,7 +71,9 @@ export class PeerSync {
 
   public connect(peerId: string) {
     if (!this.peer) return;
-    const conn = this.peer.connect(peerId);
+    const conn = this.peer.connect(peerId, {
+      reliable: false // Use unreliable (UDP-style) for low latency TC
+    });
     this.onStatusCallback(`CONNECTING TO ${peerId}...`);
     this.handleConnection(conn);
   }

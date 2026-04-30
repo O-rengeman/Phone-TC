@@ -180,7 +180,7 @@ function App() {
           const oneWayLatency = rtt / 2;
           
           setRttHistory(prev => {
-            const next = [...prev, rtt].slice(-10);
+            const next = [...prev, rtt].slice(-15);
             return next;
           });
 
@@ -188,9 +188,13 @@ function App() {
           const diff = engineRef.current.getDiffSeconds(msg.masterTimecode);
           setMasterDrift(diff);
 
-          // Sync conditions: diff >= 0.2s OR 15 seconds since last sync
+          // Latency protection: Only sync if RTT is stable
+          const avgRtt = rttHistory.length > 0 ? rttHistory.reduce((a, b) => a + b) / rttHistory.length : rtt;
+          const isRttStable = rtt <= avgRtt * 1.5 || rtt < 80;
+
+          // Sync conditions: diff >= 0.1s OR 15 seconds since last sync
           const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
-          const shouldSync = diff >= 0.2 || timeSinceLastSync >= 15000;
+          const shouldSync = (Math.abs(diff) >= 0.1 && isRttStable) || timeSinceLastSync >= 15000;
 
           if (shouldSync) {
             engineRef.current.jamSyncDirect(
@@ -205,7 +209,7 @@ function App() {
             if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
           }
           const bestRtt = rttHistory.length > 0 ? Math.min(...rttHistory, rtt) : rtt;
-          setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (RTT ${bestRtt.toFixed(0)}ms)`);
+          setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (RTT ${rtt.toFixed(0)}ms / MIN ${bestRtt.toFixed(0)}ms)`);
 
           // Report back to master
           peerSyncRef.current?.send({
@@ -224,10 +228,11 @@ function App() {
           setMasterDrift(diff);
 
           const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
-          const shouldSync = diff >= 0.2 || timeSinceLastSync >= 15000;
+          const shouldSync = Math.abs(diff) >= 0.2 || timeSinceLastSync >= 15000;
 
           if (shouldSync) {
-            engineRef.current.jamSyncDirect(msg.masterTimecode, 0, msg.isRunning);
+            // Heartbeat sync is coarse (assume 30ms avg latency if unknown)
+            engineRef.current.jamSyncDirect(msg.masterTimecode, 0.03, msg.isRunning);
             lastSyncTimeRef.current = Date.now();
           }
           if (!isRunning) {
@@ -404,45 +409,59 @@ function App() {
     setSyncMode('p2p');
   };
 
-  // Periodic Heartbeat & Sync Requests (Optimized for aggressive sync)
+  // Periodic Heartbeat & Sync Requests (Optimized for low latency & packet loss)
   useEffect(() => {
     if (!peerSyncRef.current) return;
 
+    // Control interval for checking status
     const interval = setInterval(() => {
-      if (isHost) {
-        // Master broadcasts coarse heartbeats every second
-        const msg: SyncMessage = {
+      if (!isHost && p2pRole === 'client') {
+        const diff = masterDrift !== null ? Math.abs(masterDrift) : 0;
+        const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
+        
+        // Δ > 0.1s or 15s interval
+        if (diff >= 0.1 || timeSinceLastSync >= 15000) {
+          // Packet Loss Countermeasure: Send a burst of 3 requests
+          const sendSync = (delay = 0) => {
+            setTimeout(() => {
+              peerSyncRef.current?.broadcast({
+                type: 'sync-request',
+                masterTimecode: '',
+                masterTimestamp: 0,
+                fps: 0,
+                isDropFrame: false,
+                isRunning: false,
+                clientTimestamp: performance.now()
+              });
+            }, delay);
+          };
+          
+          sendSync(0);
+          sendSync(100);
+          sendSync(200);
+        }
+      }
+    }, 1000);
+
+    // High-frequency Heartbeat for Master
+    let hbInterval: any;
+    if (isHost) {
+      hbInterval = setInterval(() => {
+        peerSyncRef.current?.broadcast({
           type: 'heartbeat',
           masterTimecode: engineRef.current!.getTimecodeString(),
           masterTimestamp: Date.now(),
           fps: FPS_OPTIONS[fpsIndex].value,
           isDropFrame: FPS_OPTIONS[fpsIndex].drop,
           isRunning: isRunning
-        };
-        peerSyncRef.current?.broadcast(msg);
-      } else if (p2pRole === 'client') {
-        // Client checks drift and requests sync if needed
-        const diff = masterDrift !== null ? Math.abs(masterDrift) : 0;
-        const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
-        
-        // Δ > 0.2s or 15s interval
-        if (diff >= 0.2 || timeSinceLastSync >= 15000) {
-          const msg: SyncMessage = {
-            type: 'sync-request',
-            masterTimecode: '',
-            masterTimestamp: 0,
-            fps: 0,
-            isDropFrame: false,
-            isRunning: false,
-            clientTimestamp: performance.now()
-          };
-          peerSyncRef.current?.broadcast(msg);
-          console.log(`Aggressive P2P Resync: Drift=${diff.toFixed(3)}s, SinceLast=${(timeSinceLastSync/1000).toFixed(1)}s`);
-        }
-      }
-    }, 1000); // Check every second for better responsiveness
+        });
+      }, 200); // 5Hz Heartbeat
+    }
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (hbInterval) clearInterval(hbInterval);
+    };
   }, [isHost, p2pRole, fpsIndex, masterDrift, isRunning]);
 
   // Periodic Network Sync
