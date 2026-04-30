@@ -1,114 +1,266 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
+import { LtcEngine } from './utils/LtcEngine';
+import type { LtcSettings } from './utils/LtcEngine';
+import { TimeSync } from './utils/TimeSync';
+import { PeerSync } from './utils/PeerSync';
+import type { SyncMessage } from './utils/PeerSync';
 import { QRCodeCanvas } from 'qrcode.react';
-
-// Hooks & Core
-import { useTimecode } from './hooks/useTimecode';
-import { usePeerSync } from './hooks/usePeerSync';
-import { FPS_OPTIONS, ControlPanel } from './components/ControlPanel';
-
-// Components
-import { TimecodeCanvas } from './components/TimecodeCanvas';
-import { SyncDashboard } from './components/SyncDashboard';
-
 import './App.css';
 
-export default function App() {
-  // --- UI & Environment State ---
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-  const [activeTab, setActiveTab] = useState<'main' | 'sync' | 'tools'>('main');
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [isVisualSlate, setIsVisualSlate] = useState(false);
-  const [isSlateFlashing, setIsSlateFlashing] = useState(false);
-  const [slateTime, setSlateTime] = useState('00:00:00:00');
-  const [markers, setMarkers] = useState<{ id: number, tc: string, time: string, color: 'Red' | 'Blue' | 'Green' | 'Yellow' }[]>([]);
+const FPS_OPTIONS = [
+  { label: '23.976', value: 23.976, drop: false, fpsNum: 24000, fpsDen: 1001 },
+  { label: '24', value: 24, drop: false, fpsNum: 24000, fpsDen: 1000 },
+  { label: '25', value: 25, drop: false, fpsNum: 25000, fpsDen: 1000 },
+  { label: '29.97', value: 29.97, drop: false, fpsNum: 30000, fpsDen: 1001 },
+  { label: '29.97 DF', value: 29.97, drop: true, fpsNum: 30000, fpsDen: 1001 },
+  { label: '30', value: 30, drop: false, fpsNum: 30000, fpsDen: 1000 },
+];
 
-  // --- Settings State ---
-  const [fpsIndex, setFpsIndex] = useState(2); // 25 fps default
+type SyncMode = 'system' | 'network' | 'p2p';
+
+function App() {
+  const [isRunning, setIsRunning] = useState(false);
+  const [fpsIndex, setFpsIndex] = useState(2); // Default 25
   const [volume, setVolume] = useState(0.5);
-  const [outputLevel, setOutputLevel] = useState<'mic' | 'line'>('line');
+  // Using Canvas for GPU-accelerated, ultra-smooth TC display
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const displayRef = useRef<HTMLDivElement>(null); // Keep for compatibility if needed, but primary is canvas
+  const [syncStatus, setSyncStatus] = useState<{ offset: number, latency: number } | null>(null);
+  const [syncMode, setSyncMode] = useState<SyncMode>('network');
+  const [isPreparing, setIsPreparing] = useState(false);
+  const [manualTimecode, setManualTimecode] = useState('00:00:00:00');
+  const [p2pRole, setP2pRole] = useState<'master' | 'client' | null>(null);
+  const [activeTab, setActiveTab] = useState<'main' | 'sync' | 'tools'>('main');
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  
+  // New States for Advanced Features
   const [outputMode, setOutputMode] = useState<'stereo' | 'mono-l'>('stereo');
-  const [userBits, setUserBits] = useState('00000000');
   const [autoUserBits, setAutoUserBits] = useState(true);
+  const [isSlateFlashing, setIsSlateFlashing] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [slateTime, setSlateTime] = useState('00:00:00:00');
 
-  // --- Core Hooks ---
-  const {
-    isRunning,
-    isPaused,
-    manualTimecode,
-    masterDrift,
-    engineRef,
-    smartClockRef,
-    startEngine,
-    stopEngine,
-    togglePause,
-    applyPrecisionSync,
-    applyCoarseSync,
-    updateSettings,
-    setManualTime
-  } = useTimecode();
-
-  const {
-    peerId,
-    p2pStatus,
-    p2pRole,
-    setupMaster,
-    setupClient,
-    joinSession,
-    requestSyncBurst,
-    sendReport
-  } = usePeerSync({
-    fps: FPS_OPTIONS[fpsIndex].value,
-    isDropFrame: FPS_OPTIONS[fpsIndex].drop,
-    isRunning,
-    getCurrentTimecode: () => engineRef.current?.getTimecodeString() || '00:00:00:00',
-    onPrecisionSync: (msg, rtt) => {
-      const decision = applyPrecisionSync(rtt, msg.masterTimecode, msg.isRunning);
-      sendReport(decision.bestRtt || rtt, masterDrift || 0);
-    },
-    onCoarseSync: (msg) => {
-      applyCoarseSync(msg.masterTimecode, msg.isRunning);
-    },
-    onClientReport: () => {
-      // Could log client status here if needed
-    }
-  });
-
-  // --- Lifecycle & Side Effects ---
   useEffect(() => {
     const timer = setTimeout(() => setIsLoaded(true), 1800);
     return () => clearTimeout(timer);
   }, []);
-
+  
+  // Resize handler
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+  const [userBits, setUserBits] = useState('00000000');
+  const [isVisualSlate, setIsVisualSlate] = useState(false);
+  const isVisualSlateRef = useRef(false);
+  
+  useEffect(() => {
+    isVisualSlateRef.current = isVisualSlate;
+  }, [isVisualSlate]);
 
+  const [markers, setMarkers] = useState<{ id: number, tc: string, time: string, color: 'Red' | 'Blue' | 'Green' | 'Yellow' }[]>([]);
+  const [outputLevel, setOutputLevel] = useState<'mic' | 'line'>('line');
+
+  // P2P States
+  const [peerId, setPeerId] = useState<string>('');
+  const [targetId, setTargetId] = useState<string>('');
+  const [p2pStatus, setP2pStatus] = useState<string>('P2P DISCONNECTED');
+  const [isHost, setIsHost] = useState(false);
+  const [rttHistory, setRttHistory] = useState<number[]>([]);
+  const [isPaused, setIsPaused] = useState(false);
+  const [p2pSyncSource, setP2pSyncSource] = useState<'manual' | 'network'>('manual');
+  const [masterDrift, setMasterDrift] = useState<number | null>(null); // Drift in seconds from master
+  const [clients, setClients] = useState<Record<string, { rtt: number, drift: number, lastSeen: number }>>({});
+
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const engineRef = useRef<LtcEngine | null>(null);
+  const scriptNodeRef = useRef<ScriptProcessorNode | null>(null);
+  const peerSyncRef = useRef<PeerSync | null>(null);
+  const lastSyncTimeRef = useRef<number>(Date.now()); // Track last forced sync time
+
+  // Mobile Initialization
   useEffect(() => {
     const initMobile = async () => {
       try {
         await StatusBar.setStyle({ style: Style.Dark });
         await ScreenOrientation.lock({ orientation: 'portrait' });
-      } catch (e) { /* non-mobile */ }
+      } catch (e) {
+        console.log('Not running on a mobile device');
+      }
     };
     initMobile();
   }, []);
 
-  // Update engine when settings change
+  // Initialize engine
   useEffect(() => {
-    updateSettings({
+    const settings: LtcSettings = {
       fps: FPS_OPTIONS[fpsIndex].value,
-      isDropFrame: FPS_OPTIONS[fpsIndex].drop,
+      sampleRate: 48000,
       volume: outputLevel === 'line' ? volume : volume * 0.1,
-      userBits,
-      outputMode
-    });
-  }, [fpsIndex, volume, outputLevel, userBits, outputMode, updateSettings]);
+      isDropFrame: FPS_OPTIONS[fpsIndex].drop,
+      userBits: userBits,
+      outputMode: outputMode,
+      fpsNum: FPS_OPTIONS[fpsIndex].fpsNum,
+      fpsDen: FPS_OPTIONS[fpsIndex].fpsDen
+    };
+    engineRef.current = new LtcEngine(settings);
+    // Initial update
+    if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
+  }, []);
 
-  // Auto User Bits
+  // Update FPS/Volume
+  useEffect(() => {
+    if (engineRef.current) {
+      engineRef.current.setFps(FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
+      if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
+    }
+  }, [fpsIndex]);
+
+  useEffect(() => {
+    if (engineRef.current) engineRef.current.setVolume(volume);
+  }, [volume]);
+
+  const messageHandlerRef = useRef<(msg: SyncMessage) => void>(null);
+
+  // Update the message handler reference every render
+  useEffect(() => {
+    messageHandlerRef.current = (msg: SyncMessage) => {
+      if (engineRef.current) {
+        if (msg.type === 'sync-request' && isHost) {
+          // Master: Reply with current time and raw timestamp
+          const response: SyncMessage = {
+            type: 'sync-response',
+            masterTimecode: engineRef.current.getTimecodeString(),
+            masterTimestamp: performance.now(), // Sub-ms precision
+            fps: FPS_OPTIONS[fpsIndex].value,
+            isDropFrame: FPS_OPTIONS[fpsIndex].drop,
+            isRunning: isRunning,
+            clientTimestamp: msg.clientTimestamp
+          };
+          peerSyncRef.current?.send(response);
+          
+          // Identify client from connection if PeerSync provided it
+          if (msg.clientId) {
+             setClients(prev => ({
+               ...prev,
+               [msg.clientId!]: {
+                 ...prev[msg.clientId!] || { drift: 0 },
+                 lastSeen: Date.now(),
+                 rtt: msg.rtt || 0
+               }
+             }));
+          }
+        } else if (msg.type === 'report' && isHost) {
+          // Master: Update client status from report
+          if (msg.clientId) {
+            setClients(prev => ({
+              ...prev,
+              [msg.clientId!]: {
+                rtt: msg.rtt || 0,
+                drift: msg.drift || 0,
+                lastSeen: Date.now()
+              }
+            }));
+          }
+        } else if (msg.type === 'sync-response' && !isHost) {
+          // Client: Calculate RTT and adjust sync
+          const now = performance.now();
+          const rtt = now - (msg.clientTimestamp || now);
+          
+          // Packet loss protection: ignore RTTs that are unreasonably large (>5s)
+          // or negative (corrupted timestamp)
+          if (rtt < 0 || rtt > 5000) {
+            setP2pStatus(`SKIP (bad RTT ${rtt.toFixed(0)}ms)`);
+            return;
+          }
+          
+          const oneWayLatency = rtt / 2;
+          
+          setRttHistory(prev => {
+            const next = [...prev, rtt].slice(-15);
+            return next;
+          });
+
+          // Calculate drift BEFORE deciding whether to sync
+          const diff = engineRef.current.getDiffSeconds(msg.masterTimecode);
+          setMasterDrift(diff);
+
+          // Latency protection: Only sync if RTT is stable
+          const avgRtt = rttHistory.length > 0 ? rttHistory.reduce((a, b) => a + b) / rttHistory.length : rtt;
+          const isRttStable = rtt <= avgRtt * 1.5 || rtt < 80;
+
+          // Ultra-tight sync conditions: diff >= 0.03s (approx 1 frame) OR 15 seconds
+          const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
+          const shouldSync = (Math.abs(diff) >= 0.03 && isRttStable) || timeSinceLastSync >= 15000;
+
+          if (shouldSync) {
+            engineRef.current.jamSyncDirect(
+              msg.masterTimecode, 
+              oneWayLatency, 
+              msg.isRunning
+            );
+            lastSyncTimeRef.current = Date.now();
+          }
+
+          if (!isRunning) {
+            if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
+          }
+          const bestRtt = rttHistory.length > 0 ? Math.min(...rttHistory, rtt) : rtt;
+          setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (RTT ${rtt.toFixed(0)}ms / MIN ${bestRtt.toFixed(0)}ms)`);
+
+          // Report back to master
+          peerSyncRef.current?.send({
+            type: 'report',
+            masterTimecode: '',
+            masterTimestamp: 0,
+            fps: 0,
+            isDropFrame: false,
+            isRunning: false,
+            rtt: bestRtt,
+            drift: diff
+          });
+        } else if (msg.type === 'heartbeat' && !isHost) {
+          // Heartbeat: update drift display, sync only if needed
+          const diff = engineRef.current.getDiffSeconds(msg.masterTimecode);
+          setMasterDrift(diff);
+
+          const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
+          
+          // Persistent drift check: only sync if drift is > 0.03s for 3 consecutive beats (if HB)
+          // For HB, we are less aggressive to avoid jitter-induced jumps
+          const shouldSync = Math.abs(diff) >= 0.05 || timeSinceLastSync >= 15000;
+
+          if (shouldSync) {
+            engineRef.current.jamSyncDirect(msg.masterTimecode, 0.03, msg.isRunning);
+            lastSyncTimeRef.current = Date.now();
+          }
+          if (!isRunning) {
+            if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
+          }
+          setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (HB)`);
+
+          // Periodically report during heartbeat too
+          if (Date.now() % 5000 < 500) {
+             peerSyncRef.current?.send({
+                type: 'report',
+                masterTimecode: '',
+                masterTimestamp: 0,
+                fps: 0,
+                isDropFrame: false,
+                isRunning: false,
+                rtt: rttHistory.length > 0 ? Math.min(...rttHistory) : 0,
+                drift: diff
+             });
+          }
+        }
+      }
+    };
+  });
+
+  // Auto User Bits Logic
   useEffect(() => {
     if (autoUserBits) {
       const updateAutoUB = () => {
@@ -116,278 +268,873 @@ export default function App() {
         const mm = String(now.getMonth() + 1).padStart(2, '0');
         const dd = String(now.getDate()).padStart(2, '0');
         const yy = String(now.getFullYear()).slice(-2);
-        setUserBits(`${mm}${dd}${yy}01`);
+        const newUB = `${mm}${dd}${yy}01`;
+        setUserBits(newUB);
       };
       updateAutoUB();
+      // Also update periodically in case day changes during long session
       const interval = setInterval(updateAutoUB, 60000);
       return () => clearInterval(interval);
     }
   }, [autoUserBits]);
 
-  // Aggressive Sync check for client
+  // Update Engine with Pro features
   useEffect(() => {
-    let interval: any;
-    if (p2pRole === 'client') {
-      interval = setInterval(() => {
-        if (masterDrift !== null && smartClockRef.current.getNeedsAggressiveSync(masterDrift)) {
-          requestSyncBurst();
-        }
-      }, 500); // Check twice a second
+    if (engineRef.current) {
+      engineRef.current.setUserBits(userBits);
     }
-    return () => clearInterval(interval);
-  }, [p2pRole, masterDrift, smartClockRef, requestSyncBurst]);
+  }, [userBits]);
 
-  // --- Handlers ---
-  const handleStartStop = () => {
-    if (isRunning) {
-      stopEngine();
-    } else {
-      startEngine({
-        fps: FPS_OPTIONS[fpsIndex].value,
-        sampleRate: 48000,
-        volume: outputLevel === 'line' ? volume : volume * 0.1,
-        isDropFrame: FPS_OPTIONS[fpsIndex].drop,
-        userBits,
-        outputMode,
-        fpsNum: FPS_OPTIONS[fpsIndex].fpsNum,
-        fpsDen: FPS_OPTIONS[fpsIndex].fpsDen
-      }, () => {
-        // Worklet message fallback if needed, but TimecodeCanvas handles drawing.
-      });
+  useEffect(() => {
+    if (engineRef.current) {
+      const vol = outputLevel === 'line' ? volume : volume * 0.1;
+      engineRef.current.setVolume(vol);
     }
-  };
+  }, [outputLevel, volume]);
 
   const addMarker = (color: 'Red' | 'Blue' | 'Green' | 'Yellow') => {
     const currentTC = engineRef.current ? engineRef.current.getTimecodeString() : '00:00:00:00';
-    setMarkers(prev => [{
+    const newMarker = {
       id: Date.now(),
       tc: currentTC,
       time: new Date().toLocaleTimeString(),
-      color
-    }, ...prev]);
+      color: color
+    };
+    setMarkers([newMarker, ...markers]); // 最新を上に表示し、全件保持する
   };
 
   const exportToEDL = () => {
     if (markers.length === 0) return;
-    let edl = `TITLE: Phone-TC Session\nFCM: NON-DROP FRAME\n\n`;
-    markers.forEach((m, i) => {
-      const num = String(i + 1).padStart(3, '0');
-      edl += `${num}  AX       V     C        ${m.tc} ${m.tc} ${m.tc} ${m.tc}\n`;
-      edl += `* FROM CLIP NAME: Marker ${m.color}\n* TIME: ${m.time}\n\n`;
+
+    let edlContent = `TITLE: Logged Takes\nFCM: NON-DROP FRAME\n\n`;
+    const sortedMarkers = [...markers].reverse();
+    sortedMarkers.forEach((m, index) => {
+      const eventNum = String(index + 1).padStart(3, '0');
+      edlContent += `${eventNum}  AX       V     C        ${m.tc} ${m.tc} ${m.tc} ${m.tc}\n`;
+      edlContent += ` |C:ResolveColor${m.color} |M:Logged Take at ${m.time} |D:1\n\n`;
     });
-    const blob = new Blob([edl], { type: 'text/plain' });
+
+    const blob = new Blob([edlContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Markers_${new Date().toISOString().replace(/[:.]/g, '')}.edl`;
+    a.download = `PHONE_TC_${new Date().toISOString().slice(0, 10)}.edl`;
     a.click();
-    URL.revokeObjectURL(url);
   };
 
-  const triggerVisualSlate = () => {
-    setIsVisualSlate(true);
+  const exportToALE = () => {
+    if (markers.length === 0) return;
+    const dateStr = new Date().toISOString().slice(0,10);
+    let ale = `Heading\nFIELD_DELIM\tTABS\nVIDEO_FORMAT\t1080\nFPS\t${FPS_OPTIONS[fpsIndex].label}\n\nColumn\nName\tTracks\tStart\tEnd\tDescription\n\nData\n`;
+    markers.forEach((m, i) => {
+      ale += `MARKER_${markers.length - i}\tV\t${m.tc}\t${m.tc}\t${m.color} marker at ${m.time}\n`;
+    });
+
+    const blob = new Blob([ale], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `PHONE_TC_${dateStr}.ale`;
+    a.click();
+  };
+
+  const handleSlateClick = () => {
+    // Digital Clapper Logic
     setIsSlateFlashing(true);
-    setTimeout(() => setIsSlateFlashing(false), 200);
+    beep(1000, 0.1); // 1kHz sync beep
+    setTimeout(() => setIsSlateFlashing(false), 150);
   };
 
-  const handleTimecodeCanvasUpdate = useCallback((tc: string) => {
-    if (isVisualSlate) {
-      setSlateTime(tc);
+  const resetP2P = () => {
+    if (peerSyncRef.current) {
+      peerSyncRef.current.destroy();
+      peerSyncRef.current = null;
     }
-  }, [isVisualSlate]);
+    setP2pRole(null);
+    setIsHost(false);
+    setPeerId('');
+    if (syncMode === 'p2p') setSyncMode('network');
+    setP2pStatus('P2P RESET');
+  };
 
-  // --- Render ---
-  if (!isLoaded) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100dvh', background: '#000', color: '#fff', flexDirection: 'column', gap: '20px' }}>
-        <div style={{ width: '40px', height: '40px', border: '3px solid #333', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', letterSpacing: '4px' }}>INITIALIZING ENGINE</div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
+  // P2P Setup
+  const setupP2PMaster = async () => {
+    resetP2P();
+    setP2pRole('master');
+    setIsHost(true);
+    setSyncMode('p2p');
+    try {
+      const ps = new PeerSync(
+        (msg) => messageHandlerRef.current?.(msg),
+        (status) => setP2pStatus(status)
+      );
+      const id = await ps.initialize();
+      setPeerId(id);
+      peerSyncRef.current = ps;
+    } catch (e) {
+      setP2pStatus('PEER INIT FAILED');
+    }
+  };
 
-  // Common main content
-  const mainContent = (
-    <div className="tab-pane">
-      <div 
-        className="timecode-card-pro" 
-        onClick={triggerVisualSlate}
-      >
-        <TimecodeCanvas 
-          engineRef={engineRef} 
-          isRunning={isRunning} 
-          isMobile={isMobile} 
-          onTimeUpdate={handleTimecodeCanvasUpdate}
-        />
-      </div>
+  const setupP2PClient = async () => {
+    resetP2P();
+    setP2pRole('client');
+    setIsHost(false);
+    setSyncMode('p2p');
+    try {
+      const ps = new PeerSync(
+        (msg) => messageHandlerRef.current?.(msg),
+        (status) => setP2pStatus(status)
+      );
+      const id = await ps.initialize();
+      setPeerId(id);
+      peerSyncRef.current = ps;
+    } catch (e) {
+      setP2pStatus('PEER INIT FAILED');
+    }
+  };
 
-      {!isRunning && p2pRole !== 'client' && (
-        <div className="manual-tc-input-wrapper" style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
-          <input 
-            type="text" 
-            value={manualTimecode}
-            onChange={(e) => setManualTime(e.target.value)}
-            className="manual-tc-input"
-            style={{ 
-              background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', 
-              fontFamily: 'var(--font-mono)', fontSize: '1rem', padding: '8px', textAlign: 'center', borderRadius: '4px'
-            }}
-            placeholder="HH:MM:SS:FF"
-          />
-        </div>
-      )}
+  useEffect(() => {
+    if (engineRef.current && p2pRole === 'master' && !isRunning && !isPaused) {
+      try {
+        engineRef.current.setManualTimecode(manualTimecode);
+        if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
+      } catch (e) {
+        // Ignore invalid formats while typing
+      }
+    }
+  }, [manualTimecode, p2pRole, isRunning, isPaused]);
 
-      {p2pRole !== 'client' && (
-        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-          <button 
-            className={`btn-pill ${isRunning ? 'active' : ''}`} 
-            style={{ flex: 1, padding: '16px 0', background: isRunning ? '#ff3d71' : 'var(--primary)', color: '#000' }}
-            onClick={handleStartStop}
-          >
-            {isRunning ? 'STOP GENERATOR' : 'START GENERATOR'}
-          </button>
+  const joinSession = () => {
+    if (!peerSyncRef.current || !targetId) return;
+    peerSyncRef.current.connect(targetId);
+    setSyncMode('p2p');
+  };
+
+  // Periodic Heartbeat & Sync Requests (Optimized for low latency & packet loss)
+  useEffect(() => {
+    if (!peerSyncRef.current) return;
+
+    // Control interval for checking status
+    const interval = setInterval(() => {
+      if (!isHost && p2pRole === 'client') {
+        const diff = masterDrift !== null ? Math.abs(masterDrift) : 0;
+        const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
+        
+        // Δ > 0.03s or 15s interval
+        if (diff >= 0.03 || timeSinceLastSync >= 15000) {
+          // Packet Loss Countermeasure: Send a burst of 3 requests
+          const sendSync = (delay = 0) => {
+            setTimeout(() => {
+              peerSyncRef.current?.broadcast({
+                type: 'sync-request',
+                masterTimecode: '',
+                masterTimestamp: 0,
+                fps: 0,
+                isDropFrame: false,
+                isRunning: false,
+                clientTimestamp: performance.now()
+              });
+            }, delay);
+          };
           
-          <button 
-            className={`btn-pill ${isPaused ? 'active' : ''}`}
-            style={{ flex: 1, padding: '16px 0' }}
-            onClick={togglePause}
-            disabled={!isRunning}
-          >
-            {isPaused ? 'RESUME' : 'PAUSE'}
-          </button>
-        </div>
-      )}
+          sendSync(0);
+          sendSync(100);
+          sendSync(200);
+        }
+      }
+    }, 1000);
 
-      <div className="info-strip-pro" style={{ marginTop: '16px' }}>
-        <span className="info-label">{FPS_OPTIONS[fpsIndex].label} FPS</span>
-        <span className="info-label">|</span>
-        <span className="info-label">{outputLevel.toUpperCase()}</span>
-        <span className="info-label">|</span>
-        <span className="info-label">{outputMode.toUpperCase()}</span>
-      </div>
-    </div>
-  );
+    // High-frequency Heartbeat for Master (10Hz for extreme reliability)
+    let hbInterval: any;
+    if (isHost) {
+      hbInterval = setInterval(() => {
+        peerSyncRef.current?.broadcast({
+          type: 'heartbeat',
+          masterTimecode: engineRef.current!.getTimecodeString(),
+          masterTimestamp: Date.now(),
+          fps: FPS_OPTIONS[fpsIndex].value,
+          isDropFrame: FPS_OPTIONS[fpsIndex].drop,
+          isRunning: isRunning
+        });
+      }, 100); // 10Hz Heartbeat
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (hbInterval) clearInterval(hbInterval);
+    };
+  }, [isHost, p2pRole, fpsIndex, masterDrift, isRunning]);
+
+  // Periodic Network Sync
+  useEffect(() => {
+    if (syncMode !== 'network' || !isRunning) return;
+
+    const interval = setInterval(async () => {
+      try {
+        console.log('Background network time sync...');
+        const result = await TimeSync.sync(1);
+        setSyncStatus(result);
+        if (engineRef.current && p2pRole !== 'master') {
+           // Gently nudge the engine if offset changed significantly
+           // For now, we just update the status, engine uses it in next jamSync/start
+        }
+      } catch (e) {
+        console.warn('Background sync failed');
+      }
+    }, 30000); // Every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [syncMode, isRunning, p2pRole]);
+
+  const handleStartStop = async () => {
+    if (isRunning) {
+      setIsPaused(false); // Stop means fully reset
+      stopEngine();
+    } else {
+      // Create/Resume AudioContext IMMEDIATELY on user gesture
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
+      
+      // iOS Silent Sound Trick
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(0);
+      osc.stop(0.1);
+
+      if (engineRef.current) {
+        engineRef.current.updateSampleRate(ctx.sampleRate);
+      }
+      
+      await startSequence();
+    }
+  };
+
+  const startSequence = async () => {
+    setIsPreparing(true);
+    try {
+      let offset = 0;
+      
+      // Only sync if NOT resuming from pause
+      if (!isPaused) {
+        if (syncMode === 'network' || (syncMode === 'p2p' && p2pRole === 'master' && p2pSyncSource === 'network')) {
+          const result = await TimeSync.sync();
+          setSyncStatus(result);
+          offset = result.offset;
+        }
+
+        // P2P client: force immediate sync on START
+        if (engineRef.current && syncMode === 'p2p' && p2pRole === 'client') {
+          // Send an immediate sync request and wait briefly
+          if (peerSyncRef.current) {
+            const msg: SyncMessage = {
+              type: 'sync-request',
+              masterTimecode: '',
+              masterTimestamp: 0,
+              fps: 0,
+              isDropFrame: false,
+              isRunning: false,
+              clientTimestamp: performance.now()
+            };
+            peerSyncRef.current.broadcast(msg);
+          }
+          lastSyncTimeRef.current = Date.now();
+        } else if (engineRef.current) {
+          if (syncMode === 'p2p' && p2pRole === 'master' && p2pSyncSource === 'manual') {
+            engineRef.current.setManualTimecode(manualTimecode);
+          } else {
+            engineRef.current.syncWithOffset(offset);
+          }
+          if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
+        }
+      }
+
+      setIsPaused(false);
+      await startEngine();
+    } catch (err) {
+      console.error('Start sequence failed:', err);
+      alert('Start sequence failed. Please check your connection.');
+    } finally {
+      setIsPreparing(false);
+    }
+  };
+
+  const beep = (freq: number, duration: number) => {
+    if (!audioCtxRef.current) return;
+    const ctx = audioCtxRef.current;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = freq;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+  };
+
+  const startEngine = async () => {
+    if (!audioCtxRef.current) return;
+    const ctx = audioCtxRef.current;
+    if (ctx.state === 'suspended') await ctx.resume();
+
+    // Define Worklet Script inline for compatibility and speed
+    const workletCode = `
+      class LtcProcessor extends AudioWorkletProcessor {
+        constructor(options) {
+          super();
+          this.settings = options.processorOptions;
+          this.phase = 1;
+          this.frameCount = 0;
+          this.sampleOffset = 0;
+          this.currentFrameSamples = null;
+          
+          // Initial TC setup
+          this.hours = this.settings.h;
+          this.minutes = this.settings.m;
+          this.seconds = this.settings.s;
+          this.frames = this.settings.f;
+        }
+
+        addFrame() {
+          this.frames++;
+          if (this.frames >= this.settings.fps) {
+            this.frames = 0;
+            this.seconds++;
+            if (this.seconds >= 60) {
+              this.seconds = 0;
+              this.minutes++;
+              if (this.minutes >= 60) {
+                this.minutes = 0;
+                this.hours++;
+                if (this.hours >= 24) this.hours = 0;
+              }
+            }
+          }
+          // Basic Drop Frame support (simplified for worklet)
+          if (this.settings.isDrop && this.frames < 2 && this.seconds === 0 && this.minutes % 10 !== 0) {
+             this.frames = 2;
+          }
+          
+          this.port.postMessage({ 
+            tc: \`\${String(this.hours).padStart(2, '0')}:\${String(this.minutes).padStart(2, '0')}:\${String(this.seconds).padStart(2, '0')}:\${String(this.frames).padStart(2, '0')}\`
+          });
+        }
+
+        generateBits() {
+          const bits = new Array(80).fill(0);
+          const f = this.frames, s = this.seconds, m = this.minutes, h = this.hours;
+          const setBits = (arr, start, count, val) => {
+            for (let i = 0; i < count; i++) arr[start + i] = (val >> i) & 1;
+          };
+          setBits(bits, 0, 4, f % 10); setBits(bits, 8, 2, Math.floor(f / 10));
+          bits[10] = this.settings.isDrop ? 1 : 0;
+          setBits(bits, 16, 4, s % 10); setBits(bits, 24, 3, Math.floor(s / 10));
+          setBits(bits, 32, 4, m % 10); setBits(bits, 40, 3, Math.floor(m / 10));
+          setBits(bits, 48, 4, h % 10); setBits(bits, 56, 2, Math.floor(h / 10));
+          // User bits
+          for (let i = 0; i < 8; i++) setBits(bits, 4 + (i * 8), 4, parseInt(this.settings.ubit[i], 16) || 0);
+          const sync = [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1];
+          for (let i = 0; i < 16; i++) bits[64 + i] = sync[i];
+          return bits;
+        }
+
+        process(inputs, outputs) {
+          const outputL = outputs[0][0];
+          const outputR = outputs[0][1];
+          const input = inputs[0] ? inputs[0][0] : null;
+          if (!outputL) return true;
+
+          for (let i = 0; i < outputL.length; i++) {
+            if (!this.currentFrameSamples || this.sampleOffset >= this.currentFrameSamples.length) {
+              const bits = this.generateBits();
+              const sr = sampleRate;
+              const nextEnd = Math.floor((this.frameCount + 1) * sr * this.settings.fpsDen / this.settings.fpsNum);
+              const curStart = Math.floor(this.frameCount * sr * this.settings.fpsDen / this.settings.fpsNum);
+              const count = nextEnd - curStart;
+              this.currentFrameSamples = new Float32Array(count);
+              const spb = count / 80;
+              let sIdx = 0;
+              for (let b = 0; b < 80; b++) {
+                const bit = bits[b];
+                const bEnd = Math.round((b + 1) * spb);
+                const bMid = Math.round((b + 0.5) * spb);
+                this.phase *= -1;
+                while (sIdx < bEnd && sIdx < count) {
+                  if (bit === 1 && sIdx === bMid) this.phase *= -1;
+                  this.currentFrameSamples[sIdx] = this.phase * this.settings.volume;
+                  sIdx++;
+                }
+              }
+              this.sampleOffset = 0;
+              this.frameCount++;
+              this.addFrame();
+            }
+            const s = this.currentFrameSamples[this.sampleOffset];
+            outputL[i] = s;
+            if (outputR) outputR[i] = this.settings.mode === 'stereo' ? s : (input ? input[i] : 0);
+            this.sampleOffset++;
+          }
+          return true;
+        }
+      }
+      registerProcessor('ltc-processor', LtcProcessor);
+    `;
+
+    const blob = new Blob([workletCode], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    
+    try {
+      await ctx.audioWorklet.addModule(url);
+    } catch (e) {
+      console.error('Worklet addition failed', e);
+      return;
+    }
+
+    const currentTC = engineRef.current!.getTimecodeString().split(':').map(Number);
+    const workletNode = new AudioWorkletNode(ctx, 'ltc-processor', {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      outputChannelCount: [2],
+      processorOptions: {
+        fps: FPS_OPTIONS[fpsIndex].value,
+        isDrop: FPS_OPTIONS[fpsIndex].drop,
+        fpsNum: FPS_OPTIONS[fpsIndex].fpsNum,
+        fpsDen: FPS_OPTIONS[fpsIndex].fpsDen,
+        volume: outputLevel === 'line' ? volume : volume * 0.1,
+        ubit: userBits,
+        mode: outputMode,
+        h: currentTC[0], m: currentTC[1], s: currentTC[2], f: currentTC[3]
+      }
+    });
+    workletNode.port.onmessage = (e) => {
+       const tc = e.data.tc;
+       // Sync back to local engine state for markers etc
+       if (engineRef.current) engineRef.current.setManualTimecode(tc);
+       if (isVisualSlateRef.current) setSlateTime(tc);
+    };
+
+    if (outputMode === 'mono-l') {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const inputSource = ctx.createMediaStreamSource(stream);
+        inputSource.connect(workletNode);
+      } catch (err) { console.warn('Mic access denied'); }
+    }
+
+    workletNode.connect(ctx.destination);
+    (scriptNodeRef as any).current = workletNode; // Reuse ref for simplicity
+    setIsRunning(true);
+  };
+
+  useEffect(() => {
+    let rafId: number;
+    
+    const render = () => {
+      const canvas = canvasRef.current;
+      const engine = engineRef.current;
+      if (!canvas || !engine) {
+        rafId = requestAnimationFrame(render);
+        return;
+      }
+
+      const tc = engine.getTimecodeString();
+      
+      // Update Slate Time (state) for overlay components (QR, etc)
+      // Only update when needed to avoid React re-renders unless necessary
+      if (isVisualSlateRef.current && slateTime !== tc) {
+        setSlateTime(tc);
+      }
+
+      // Draw Logic
+      const ctx = canvas.getContext('2d', { alpha: true });
+      if (!ctx) return;
+
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      
+      // Ensure canvas size matches its display size * DPR
+      if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+      }
+
+      const w = rect.width;
+      const h = rect.height;
+
+      // Clear
+      ctx.clearRect(0, 0, w, h);
+
+      // Draw Timecode
+      const vw = window.innerWidth;
+      const baseSize = isMobile ? Math.min(vw * 0.12, 100) : vw * 0.065;
+      ctx.font = `900 ${baseSize}px 'JetBrains Mono', monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Neon Glow (GPU accelerated shadow)
+      ctx.shadowColor = 'rgba(255, 255, 255, 0.3)';
+      ctx.shadowBlur = isMobile ? 20 : 60;
+      ctx.fillStyle = '#fafafa';
+      
+      ctx.fillText(tc, w / 2, h / 2);
+      
+      // Secondary sharper glow
+      ctx.shadowBlur = 5;
+      ctx.fillText(tc, w / 2, h / 2);
+
+      rafId = requestAnimationFrame(render);
+    };
+
+    rafId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(rafId);
+  }, [isRunning, isMobile]);
+
+  const stopEngine = () => {
+    if (scriptNodeRef.current) {
+      (scriptNodeRef.current as any).port.onmessage = null;
+      scriptNodeRef.current.disconnect();
+      scriptNodeRef.current = null;
+    }
+    if (displayRef.current && engineRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
+    setIsRunning(false);
+  };
+
+  const handlePause = () => {
+    if (isRunning && engineRef.current) {
+      setIsPaused(true);
+      setManualTimecode(engineRef.current.getTimecodeString());
+      stopEngine();
+    }
+  };
 
   return (
-    <div className={`app-container ${!isMobile ? 'desktop-view' : ''}`}>
+    <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'}`}>
+      {!isLoaded && (
+        <div className="splash-screen">
+          <div className="splash-content">
+            <div className="splash-logo">LTC SYNC PRO</div>
+            <div className="splash-loader">
+              <div className="loader-bar"></div>
+            </div>
+            <div className="splash-status">INITIALIZING PRO SYSTEMS...</div>
+          </div>
+        </div>
+      )}
       <header>
         <div className="logo-area">
-          <div className="logo">PHONE TC</div>
-          <div className="version">PRO ENGINE</div>
+          <div className="logo">LTC SYNC PRO</div>
+          <div className="version">v1.3</div>
         </div>
         <div className={`status-badge-compact ${isRunning ? 'active' : ''}`}>
-          {isRunning ? (isPaused ? 'PAUSED' : 'TX ACTIVE') : 'STANDBY'}
+          {isRunning ? 'LTC OUT' : isPreparing ? 'SYNCING' : 'READY'}
         </div>
       </header>
 
-      {isMobile ? (
-        <>
-          <div className="tab-bar">
-            <button className={activeTab === 'main' ? 'active' : ''} onClick={() => setActiveTab('main')}>MAIN</button>
-            <button className={activeTab === 'sync' ? 'active' : ''} onClick={() => setActiveTab('sync')}>SYNC</button>
-            <button className={activeTab === 'tools' ? 'active' : ''} onClick={() => setActiveTab('tools')}>TOOLS</button>
-          </div>
-
-          <div className="tab-content">
-            {activeTab === 'main' && mainContent}
-            {activeTab === 'sync' && (
-              <SyncDashboard 
-                p2pRole={p2pRole} p2pStatus={p2pStatus} peerId={peerId} masterDrift={masterDrift}
-                onSetupMaster={setupMaster} onSetupClient={setupClient} onJoinSession={joinSession}
-              />
-            )}
-            {activeTab === 'tools' && (
-              <ControlPanel 
-                fpsIndex={fpsIndex} setFpsIndex={setFpsIndex}
-                volume={volume} setVolume={setVolume}
-                outputLevel={outputLevel} setOutputLevel={setOutputLevel}
-                outputMode={outputMode} setOutputMode={setOutputMode}
-                userBits={userBits} setUserBits={setUserBits}
-                autoUserBits={autoUserBits} setAutoUserBits={setAutoUserBits}
-              />
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="desktop-dashboard">
-          <div className="sync-pane">
-            <SyncDashboard 
-              p2pRole={p2pRole} p2pStatus={p2pStatus} peerId={peerId} masterDrift={masterDrift}
-              onSetupMaster={setupMaster} onSetupClient={setupClient} onJoinSession={joinSession}
-            />
-          </div>
-          
-          <div className="main-pane">
-            {mainContent}
-          </div>
-
-          <div className="tools-pane">
-             <ControlPanel 
-                fpsIndex={fpsIndex} setFpsIndex={setFpsIndex}
-                volume={volume} setVolume={setVolume}
-                outputLevel={outputLevel} setOutputLevel={setOutputLevel}
-                outputMode={outputMode} setOutputMode={setOutputMode}
-                userBits={userBits} setUserBits={setUserBits}
-                autoUserBits={autoUserBits} setAutoUserBits={setAutoUserBits}
-              />
-          </div>
-        </div>
+      {isMobile && (
+        <nav className="tab-bar">
+          <button className={activeTab === 'main' ? 'active' : ''} onClick={() => setActiveTab('main')}>MAIN</button>
+          <button className={activeTab === 'sync' ? 'active' : ''} onClick={() => setActiveTab('sync')}>SYNC</button>
+          <button className={activeTab === 'tools' ? 'active' : ''} onClick={() => setActiveTab('tools')}>TOOLS</button>
+        </nav>
       )}
 
-      {/* Markers fixed footer */}
-      <div className="fixed-footer" style={{ padding: '12px 20px', background: 'var(--panel)', borderTop: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-          <button className="btn-pill" style={{ flex: 1, borderLeft: '4px solid #ff3d71' }} onClick={() => addMarker('Red')}>MARK R</button>
-          <button className="btn-pill" style={{ flex: 1, borderLeft: '4px solid #00e5ff' }} onClick={() => addMarker('Blue')}>MARK B</button>
-          <button className="btn-pill" style={{ flex: 1, borderLeft: '4px solid #00e676' }} onClick={() => addMarker('Green')}>MARK G</button>
-          <button className="btn-pill" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)' }} onClick={exportToEDL}>EXPORT EDL</button>
-        </div>
-        <div className="marker-scroll" style={{ maxHeight: '80px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {markers.length === 0 ? (
-            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textAlign: 'center', padding: '8px' }}>NO MARKERS RECORDED</div>
-          ) : (
-            markers.map(m => (
-              <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
-                <span style={{ color: m.color === 'Red' ? '#ff3d71' : m.color === 'Blue' ? '#00e5ff' : '#00e676' }}>{m.time}</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>{m.tc}</span>
+      <main className={isMobile ? 'tab-content' : 'desktop-dashboard'}>
+        {(isMobile ? activeTab === 'main' : true) && (
+          <div className="tab-pane main-pane">
+            <div className="timecode-card-pro" onClick={() => setIsVisualSlate(true)}>
+              <canvas ref={canvasRef} className="time-canvas" />
+              <div className="info-strip-pro">
+                <span className="info-label">FPS: {FPS_OPTIONS[fpsIndex].label}</span>
+                <span className="info-label">LVL: {outputLevel.toUpperCase()}</span>
+                <span className="info-label">UBIT: {userBits}</span>
+                {p2pRole === 'client' && masterDrift !== null && (
+                  <span className={`info-label ${masterDrift >= 0.5 ? 'warn' : 'ok'}`}>
+                    Δ {masterDrift < 0.01 ? '<0.01' : masterDrift.toFixed(2)}s
+                  </span>
+                )}
               </div>
-            ))
-          )}
-        </div>
-      </div>
+            </div>
 
-      {/* Visual Slate Overlay */}
+            {isMobile && (
+              <>
+                <div className="control-section">
+                  <label className="section-label">FRAME RATE</label>
+                  <div className="fps-grid-compact">
+                    {FPS_OPTIONS.map((opt, i) => (
+                      <button 
+                        key={opt.label} 
+                        className={`btn-pill ${fpsIndex === i ? 'active' : ''}`}
+                        onClick={() => setFpsIndex(i)}
+                        disabled={isRunning}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="control-section">
+                  <label className="section-label">OUTPUT VOLUME & LEVEL</label>
+                  <div className="volume-row">
+                    <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} />
+                    <div className="level-toggle">
+                      <button className={outputLevel === 'mic' ? 'active' : ''} onClick={() => setOutputLevel('mic')}>MIC</button>
+                      <button className={outputLevel === 'line' ? 'active' : ''} onClick={() => setOutputLevel('line')}>LINE</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="control-section">
+                  <label className="section-label">OUTPUT MODE (FOR DSLR SYNC)</label>
+                  <div className="sync-toggle-pro">
+                    <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => setOutputMode('stereo')}>STEREO TC</button>
+                    <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => setOutputMode('mono-l')}>L-TC / R-AUDIO</button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {(isMobile ? activeTab === 'sync' : true) && (
+          <div className="tab-pane sync-pane">
+            <div className="control-section">
+              <label className="section-label">SYNC METHOD</label>
+              <div className="sync-toggle-pro">
+                {['system', 'network', 'p2p'].map((m) => (
+                  <button 
+                    key={m}
+                    className={syncMode === m ? 'active' : ''}
+                    onClick={() => setSyncMode(m as SyncMode)}
+                    disabled={isRunning || (m === 'p2p' && !p2pRole)}
+                  >
+                    {m.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              {syncStatus && syncMode === 'network' && (
+                <div className="sync-detail">Latency: {syncStatus.latency.toFixed(1)}ms | Offset: {syncStatus.offset.toFixed(1)}ms</div>
+              )}
+            </div>
+
+            <div className="control-section">
+              <label className="section-label">P2P NETWORK</label>
+              {!p2pRole ? (
+                <div className="p2p-init-pro">
+                  <button onClick={setupP2PMaster}>CREATE MASTER</button>
+                  <button onClick={setupP2PClient}>JOIN AS CLIENT</button>
+                </div>
+              ) : (
+                <div className="p2p-panel-pro">
+                  <div className="p2p-header">
+                    <span className="role-tag">{p2pRole.toUpperCase()}</span>
+                    <button className="btn-small" onClick={resetP2P}>RESET</button>
+                  </div>
+                  {p2pRole === 'master' && (
+                    <div className="p2p-master-box">
+                      <div className="id-display">ID: <span>{peerId || '...'}</span></div>
+                      
+                      <div className="control-section">
+                        <label className="section-label">START SOURCE</label>
+                        <div className="sync-toggle-pro">
+                          <button 
+                            className={p2pSyncSource === 'manual' ? 'active' : ''} 
+                            onClick={() => setP2pSyncSource('manual')}
+                            disabled={isRunning}
+                          >
+                            MANUAL TC
+                          </button>
+                          <button 
+                            className={p2pSyncSource === 'network' ? 'active' : ''} 
+                            onClick={() => setP2pSyncSource('network')}
+                            disabled={isRunning}
+                          >
+                            NETWORK TIME
+                          </button>
+                        </div>
+                      </div>
+
+                      {p2pSyncSource === 'manual' && (
+                        <div className="start-tc-input">
+                          <label>START TC</label>
+                          <input value={manualTimecode} onChange={e => setManualTimecode(e.target.value)} disabled={isRunning} />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {p2pRole === 'client' && (
+                    <div className="p2p-client-box">
+                      <input placeholder="ENTER MASTER ID" value={targetId} onChange={e => setTargetId(e.target.value)} />
+                      <button onClick={joinSession}>LINK</button>
+                    </div>
+                  )}
+                  <div className={`p2p-status-mini ${p2pStatus.includes('ERROR') ? 'error' : ''}`}>{p2pStatus}</div>
+                </div>
+              )}
+            </div>
+
+            {!isMobile && (
+              <div className="control-section">
+                <label className="section-label">FRAME RATE</label>
+                <div className="fps-grid-compact">
+                  {FPS_OPTIONS.map((opt, i) => (
+                    <button 
+                      key={opt.label} 
+                      className={`btn-pill ${fpsIndex === i ? 'active' : ''}`}
+                      onClick={() => setFpsIndex(i)}
+                      disabled={isRunning}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {(isMobile ? activeTab === 'tools' : true) && (
+          <div className="tab-pane tools-pane">
+            {isHost && Object.keys(clients).length > 0 && (
+              <div className="control-section clients-list-section">
+                <label className="section-label">CONNECTED CLIENTS ({Object.keys(clients).length})</label>
+                <div className="clients-grid">
+                  {Object.entries(clients).map(([id, stats]) => {
+                    const isOffline = Date.now() - stats.lastSeen > 30000;
+                    return (
+                      <div key={id} className={`client-card ${isOffline ? 'offline' : ''}`}>
+                        <div className="client-id">{id}</div>
+                        <div className="client-stats">
+                          <span className="stat">RTT: {stats.rtt.toFixed(0)}ms</span>
+                          <span className={`stat ${stats.drift >= 0.5 ? 'drift-warn' : ''}`}>
+                            Δ: {stats.drift.toFixed(2)}s
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="tools-grid-pro">
+              <div className="tool-card span-2">
+                <label>USER BITS (HEX)</label>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input value={userBits} onChange={e => setUserBits(e.target.value.toUpperCase())} maxLength={8} disabled={autoUserBits} />
+                  <button className={`btn-pill ${autoUserBits ? 'active' : ''}`} onClick={() => setAutoUserBits(!autoUserBits)}>AUTO (DATE)</button>
+                </div>
+              </div>
+              {!isMobile && (
+                <>
+                  <div className="tool-card span-2">
+                    <label className="section-label">OUTPUT VOLUME & LEVEL</label>
+                    <div className="volume-row">
+                      <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} />
+                      <div className="level-toggle">
+                        <button className={outputLevel === 'mic' ? 'active' : ''} onClick={() => setOutputLevel('mic')}>MIC</button>
+                        <button className={outputLevel === 'line' ? 'active' : ''} onClick={() => setOutputLevel('line')}>LINE</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="tool-card span-2">
+                    <label className="section-label">OUTPUT MODE (FOR DSLR SYNC)</label>
+                    <div className="sync-toggle-pro">
+                      <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => setOutputMode('stereo')}>STEREO TC</button>
+                      <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => setOutputMode('mono-l')}>L-TC / R-AUDIO</button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="marker-section-pro">
+              <div className="marker-header">
+                <label>LOGGED TAKES</label>
+                <div className="export-group">
+                  <button className="btn-export-pro" onClick={exportToEDL} disabled={markers.length === 0}>EDL</button>
+                  <button className="btn-export-pro" onClick={exportToALE} disabled={markers.length === 0}>ALE</button>
+                </div>
+              </div>
+              <div className="marker-scroll">
+                {markers.length === 0 ? (
+                  <div className="empty-msg">NO MARKERS RECORDED</div>
+                ) : (
+                  markers.map(m => (
+                    <div key={m.id} className="marker-row-pro">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div className={`color-dot ${m.color.toLowerCase()}`}></div>
+                        <span className="m-tc">{m.tc}</span>
+                      </div>
+                      <span className="m-time">{m.time}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      <footer className="fixed-footer">
+        <div className="footer-buttons">
+          <div className="footer-left">
+            <button 
+              className={`btn-main-action ${isRunning ? 'running danger' : ''}`} 
+              onClick={handleStartStop}
+              disabled={isPreparing}
+            >
+              <div className="btn-icon"></div>
+              <div className="btn-text">
+                {isRunning ? 'STOP' : isPreparing ? 'PREP...' : isPaused ? 'RESUME' : 'START'}
+              </div>
+            </button>
+            {isRunning && (
+              <button className="btn-main-action pause" onClick={handlePause}>
+                <div className="btn-text">PAUSE</div>
+              </button>
+            )}
+          </div>
+          <div className="footer-right">
+            <div className="mark-label">MARK</div>
+            <div className="mark-colors-container">
+              <button className="btn-mark-color red" onClick={() => addMarker('Red')} title="Red Marker"></button>
+              <button className="btn-mark-color blue" onClick={() => addMarker('Blue')} title="Blue Marker"></button>
+              <button className="btn-mark-color green" onClick={() => addMarker('Green')} title="Green Marker"></button>
+              <button className="btn-mark-color yellow" onClick={() => addMarker('Yellow')} title="Yellow Marker"></button>
+            </div>
+          </div>
+        </div>
+      </footer>
+
       {isVisualSlate && (
-        <div 
-          className={`visual-slate-overlay ${isSlateFlashing ? 'flash' : ''}`}
-          onClick={() => setIsVisualSlate(false)}
-        >
+        <div className={`visual-slate-overlay ${isSlateFlashing ? 'flashing' : ''}`} onClick={handleSlateClick}>
+          <div className="slate-tc">{slateTime}</div>
           <div className="slate-info">
-            <span>FPS: {FPS_OPTIONS[fpsIndex].label}</span>
-            <span>UB: {userBits}</span>
+            {FPS_OPTIONS[fpsIndex].label} FPS | UBIT: {userBits}
           </div>
-          
-          <TimecodeCanvas 
-            engineRef={engineRef} 
-            isRunning={isRunning} 
-            isMobile={isMobile}
-            isVisualSlate={true}
-          />
-          
           <div className="slate-qr">
-            <QRCodeCanvas 
-              value={slateTime} 
-              size={isMobile ? 120 : 200}
-              bgColor="#ffffff"
-              fgColor="#000000"
-              level="M"
-            />
+            <QRCodeCanvas value={slateTime} size={256} level="L" includeMargin={true} />
           </div>
-          
-          <div className="slate-close">TAP TO CLOSE</div>
+          <div className="slate-close">TAP FOR CLAPPER / LONG PRESS TO CLOSE</div>
+          <button style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', color: '#666', fontSize: '2rem' }} onClick={(e) => { e.stopPropagation(); setIsVisualSlate(false); }}>×</button>
         </div>
       )}
     </div>
   );
-}
+};
+
+export default App;
