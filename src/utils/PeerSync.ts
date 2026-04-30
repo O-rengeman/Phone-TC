@@ -41,9 +41,18 @@ export class PeerSync {
     return new Promise((resolve, reject) => {
       try {
         const shortId = this.generateShortId();
-        // Use global Peer object from CDN
+        // Use global Peer object from CDN with ICE servers for NAT traversal
         this.peer = new Peer(shortId, {
-          debug: 2
+          debug: 2,
+          config: {
+            'iceServers': [
+              { 'urls': 'stun:stun.l.google.com:19302' },
+              { 'urls': 'stun:stun1.l.google.com:19302' },
+              { 'urls': 'stun:stun2.l.google.com:19302' },
+              { 'urls': 'stun:stun3.l.google.com:19302' },
+              { 'urls': 'stun:stun4.l.google.com:19302' },
+            ]
+          }
         });
 
         this.peer.on('open', (id: string) => {
