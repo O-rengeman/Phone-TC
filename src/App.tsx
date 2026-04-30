@@ -710,11 +710,35 @@ function App() {
     setIsRunning(true);
   };
 
+  // UI Animation loop using requestAnimationFrame
+  useEffect(() => {
+    if (!isRunning) return;
+
+    let rafId: number;
+    let lastUpdateTC = '';
+
+    const updateUI = () => {
+      if (engineRef.current) {
+        const tc = engineRef.current.getTimecodeString();
+        if (displayRef.current && tc !== lastUpdateTC) {
+          displayRef.current.innerText = tc;
+          lastUpdateTC = tc;
+        }
+        if (isVisualSlate) setSlateTime(tc);
+      }
+      rafId = requestAnimationFrame(updateUI);
+    };
+    
+    rafId = requestAnimationFrame(updateUI);
+    return () => cancelAnimationFrame(rafId);
+  }, [isRunning, isVisualSlate]);
+
   const stopEngine = () => {
     if (scriptNodeRef.current) {
       scriptNodeRef.current.disconnect();
       scriptNodeRef.current = null;
     }
+    if (displayRef.current && engineRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
     setIsRunning(false);
   };
 
