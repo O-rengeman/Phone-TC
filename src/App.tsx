@@ -335,6 +335,7 @@ function App() {
     setP2pRole(null);
     setIsHost(false);
     setPeerId('');
+    if (syncMode === 'p2p') setSyncMode('network');
     setP2pStatus('P2P RESET');
   };
 
@@ -343,6 +344,7 @@ function App() {
     resetP2P();
     setP2pRole('master');
     setIsHost(true);
+    setSyncMode('p2p');
     try {
       const ps = new PeerSync(
         (msg) => messageHandlerRef.current?.(msg),
@@ -360,6 +362,7 @@ function App() {
     resetP2P();
     setP2pRole('client');
     setIsHost(false);
+    setSyncMode('p2p');
     try {
       const ps = new PeerSync(
         (msg) => messageHandlerRef.current?.(msg),
