@@ -743,14 +743,15 @@ function App() {
       ctx.clearRect(0, 0, w, h);
 
       // Draw Timecode
-      const fontSize = isMobile ? h * 0.7 : h * 0.85;
-      ctx.font = `900 ${fontSize}px 'JetBrains Mono', monospace`;
+      const vw = window.innerWidth;
+      const baseSize = isMobile ? Math.min(vw * 0.12, 100) : vw * 0.065;
+      ctx.font = `900 ${baseSize}px 'JetBrains Mono', monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
       // Neon Glow (GPU accelerated shadow)
-      ctx.shadowColor = 'rgba(59, 130, 246, 0.6)';
-      ctx.shadowBlur = isMobile ? 15 : 40;
+      ctx.shadowColor = 'rgba(255, 255, 255, 0.3)';
+      ctx.shadowBlur = isMobile ? 20 : 60;
       ctx.fillStyle = '#fafafa';
       
       ctx.fillText(tc, w / 2, h / 2);

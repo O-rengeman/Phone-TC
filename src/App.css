@@ -183,7 +183,7 @@ header {
 
 /* Desktop Specific Adjustments */
 .desktop-view .timecode-card-pro {
-  padding: 20px;
+  padding: 0;
   background: transparent;
   border: none;
   box-shadow: none;
@@ -192,7 +192,7 @@ header {
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 350px;
+  height: 240px;
   aspect-ratio: auto;
 }
 
