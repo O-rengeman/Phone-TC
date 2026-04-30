@@ -138,48 +138,59 @@ header {
 .desktop-dashboard {
   flex: 1;
   display: grid;
-  grid-template-columns: 420px 1fr 480px;
+  grid-template-columns: 280px 1fr 300px;
   grid-template-areas: "side-l center side-r";
   gap: 0;
   padding: 0;
-  overflow: hidden; /* Container itself doesn't scroll */
-  background: 
-    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px),
-    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px);
-  background-size: 40px 40px;
+  overflow: hidden;
+  background: #000;
+  background-image: 
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 80%),
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 40px 40px, 40px 40px;
 }
 
 .desktop-dashboard .main-pane { 
   grid-area: center; 
-  padding: 40px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
   border-left: 1px solid var(--border);
   border-right: 1px solid var(--border);
+  position: relative;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 70%);
 }
 
 .desktop-dashboard .sync-pane { 
   grid-area: side-l; 
-  padding: 24px;
+  padding: 32px 24px;
   border-right: 1px solid var(--border);
-  background: rgba(0,0,0,0.4);
+  background: rgba(10, 10, 10, 0.7);
+  backdrop-filter: blur(20px);
   overflow-y: auto;
 }
 
 .desktop-dashboard .tools-pane { 
   grid-area: side-r; 
-  padding: 24px;
-  background: rgba(0,0,0,0.4);
+  padding: 32px 24px;
+  background: rgba(10, 10, 10, 0.7);
+  backdrop-filter: blur(20px);
   overflow-y: auto;
 }
 
 /* Desktop Specific Adjustments */
 .desktop-view .timecode-card-pro {
-  padding: 80px 40px;
+  padding: 40px;
   background: transparent;
   border: none;
   box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .desktop-view .timecode-card-pro::before {
@@ -187,10 +198,22 @@ header {
 }
 
 .desktop-view .time-display {
-  font-size: 10rem;
-  margin-bottom: 30px;
-  text-shadow: 0 0 50px rgba(255,255,255,0.15);
-  letter-spacing: -4px;
+  font-size: 6.5vw;
+  margin-bottom: 0;
+  text-shadow: 0 0 80px var(--primary-glow);
+  letter-spacing: -1px;
+  font-weight: 900;
+  padding: 0;
+  animation: tc-glow 4s ease-in-out infinite;
+  white-space: nowrap;
+  width: auto;
+  text-align: center;
+  overflow: visible;
+}
+
+@keyframes tc-glow {
+  0%, 100% { text-shadow: 0 0 100px var(--primary-glow); }
+  50% { text-shadow: 0 0 140px var(--primary-glow), 0 0 40px rgba(255,255,255,0.2); }
 }
 
 .desktop-view .meta-info .badge {
@@ -209,7 +232,9 @@ header {
 
 .desktop-view .fixed-footer {
   border-top: 1px solid var(--border);
-  padding: 20px 40px 30px;
+  padding: 30px 60px 40px;
+  background: rgba(5, 5, 5, 0.8);
+  backdrop-filter: blur(10px);
 }
 
 /* Desktop Font & Size Boost */
@@ -235,7 +260,22 @@ header {
 
 .desktop-view .btn-pill {
   font-size: 0.85rem;
-  padding: 12px 6px;
+  padding: 14px 8px;
+}
+
+.desktop-view .btn-mark-color {
+  width: 50px;
+  height: 50px;
+}
+
+.desktop-view .footer-buttons {
+  max-width: 800px;
+  gap: 20px;
+}
+
+.desktop-view .btn-main-action {
+  padding: 20px 40px;
+  font-size: 1.1rem;
 }
 
 .desktop-view .btn-export-pro {
@@ -764,6 +804,8 @@ input[type="range"] {
   justify-content: center;
   max-width: 100%;
   overflow: hidden;
+  position: relative;
+  z-index: 10;
 }
 
 .desktop-view .fixed-footer {

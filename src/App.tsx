@@ -653,43 +653,46 @@ function App() {
                   </span>
                 )}
               </div>
-              <div className="tap-hint">TAP FOR VISUAL SLATE / QR SYNC</div>
             </div>
 
-            <div className="control-section">
-              <label className="section-label">FRAME RATE</label>
-              <div className="fps-grid-compact">
-                {FPS_OPTIONS.map((opt, i) => (
-                  <button 
-                    key={opt.label} 
-                    className={`btn-pill ${fpsIndex === i ? 'active' : ''}`}
-                    onClick={() => setFpsIndex(i)}
-                    disabled={isRunning}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="control-section">
-              <label className="section-label">OUTPUT VOLUME & LEVEL</label>
-              <div className="volume-row">
-                <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} />
-                <div className="level-toggle">
-                  <button className={outputLevel === 'mic' ? 'active' : ''} onClick={() => setOutputLevel('mic')}>MIC</button>
-                  <button className={outputLevel === 'line' ? 'active' : ''} onClick={() => setOutputLevel('line')}>LINE</button>
+            {isMobile && (
+              <>
+                <div className="control-section">
+                  <label className="section-label">FRAME RATE</label>
+                  <div className="fps-grid-compact">
+                    {FPS_OPTIONS.map((opt, i) => (
+                      <button 
+                        key={opt.label} 
+                        className={`btn-pill ${fpsIndex === i ? 'active' : ''}`}
+                        onClick={() => setFpsIndex(i)}
+                        disabled={isRunning}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="control-section">
-              <label className="section-label">OUTPUT MODE (FOR DSLR SYNC)</label>
-              <div className="sync-toggle-pro">
-                <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => setOutputMode('stereo')}>STEREO TC</button>
-                <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => setOutputMode('mono-l')}>L-TC / R-AUDIO</button>
-              </div>
-            </div>
+                <div className="control-section">
+                  <label className="section-label">OUTPUT VOLUME & LEVEL</label>
+                  <div className="volume-row">
+                    <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} />
+                    <div className="level-toggle">
+                      <button className={outputLevel === 'mic' ? 'active' : ''} onClick={() => setOutputLevel('mic')}>MIC</button>
+                      <button className={outputLevel === 'line' ? 'active' : ''} onClick={() => setOutputLevel('line')}>LINE</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="control-section">
+                  <label className="section-label">OUTPUT MODE (FOR DSLR SYNC)</label>
+                  <div className="sync-toggle-pro">
+                    <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => setOutputMode('stereo')}>STEREO TC</button>
+                    <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => setOutputMode('mono-l')}>L-TC / R-AUDIO</button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -769,6 +772,24 @@ function App() {
                 </div>
               )}
             </div>
+
+            {!isMobile && (
+              <div className="control-section">
+                <label className="section-label">FRAME RATE</label>
+                <div className="fps-grid-compact">
+                  {FPS_OPTIONS.map((opt, i) => (
+                    <button 
+                      key={opt.label} 
+                      className={`btn-pill ${fpsIndex === i ? 'active' : ''}`}
+                      onClick={() => setFpsIndex(i)}
+                      disabled={isRunning}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -804,6 +825,28 @@ function App() {
                   <button className={`btn-pill ${autoUserBits ? 'active' : ''}`} onClick={() => setAutoUserBits(!autoUserBits)}>AUTO (DATE)</button>
                 </div>
               </div>
+              {!isMobile && (
+                <>
+                  <div className="tool-card span-2">
+                    <label className="section-label">OUTPUT VOLUME & LEVEL</label>
+                    <div className="volume-row">
+                      <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} />
+                      <div className="level-toggle">
+                        <button className={outputLevel === 'mic' ? 'active' : ''} onClick={() => setOutputLevel('mic')}>MIC</button>
+                        <button className={outputLevel === 'line' ? 'active' : ''} onClick={() => setOutputLevel('line')}>LINE</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="tool-card span-2">
+                    <label className="section-label">OUTPUT MODE (FOR DSLR SYNC)</label>
+                    <div className="sync-toggle-pro">
+                      <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => setOutputMode('stereo')}>STEREO TC</button>
+                      <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => setOutputMode('mono-l')}>L-TC / R-AUDIO</button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="marker-section-pro">
