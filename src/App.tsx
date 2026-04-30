@@ -202,9 +202,6 @@ function App() {
             lastSyncTimeRef.current = Date.now();
           }
 
-          if (!isRunningRef.current) {
-            if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
-          }
           const bestRtt = rttHistory.length > 0 ? Math.min(...rttHistory, rtt) : rtt;
           setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (RTT ${rtt.toFixed(0)}ms)`);
 
@@ -227,9 +224,6 @@ function App() {
           if (shouldSync) {
             engineRef.current.jamSyncDirect(msg.masterTimecode, 0.03, msg.isRunning);
             lastSyncTimeRef.current = Date.now();
-          }
-          if (!isRunningRef.current) {
-            if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
           }
           setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (HB)`);
 
@@ -389,7 +383,6 @@ function App() {
     if (engineRef.current && p2pRole === 'master' && !isRunning && !isPaused) {
       try {
         engineRef.current.setManualTimecode(manualTimecode);
-        if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
       } catch (e) {
         // Ignore invalid formats while typing
       }
@@ -466,10 +459,6 @@ function App() {
         console.log('Background network time sync...');
         const result = await TimeSync.sync(1);
         setSyncStatus(result);
-        if (engineRef.current && p2pRole !== 'master') {
-           // Gently nudge the engine if offset changed significantly
-           // For now, we just update the status, engine uses it in next jamSync/start
-        }
       } catch (e) {
         console.warn('Background sync failed');
       }
@@ -545,7 +534,6 @@ function App() {
           } else {
             engineRef.current.syncWithOffset(offset);
           }
-          if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
         }
       }
 
@@ -731,7 +719,6 @@ function App() {
   // UI Animation loop using requestAnimationFrame (GPU Canvas optimized)
   useEffect(() => {
     let rafId: number;
-    let lastTC = '';
     
     const render = () => {
       const canvas = canvasRef.current;
@@ -742,12 +729,6 @@ function App() {
       }
 
       const tc = engine.getTimecodeString();
-      if (!isRunning && tc === lastTC) {
-         rafId = requestAnimationFrame(render);
-         return;
-      }
-      lastTC = tc;
-
       const ctx = canvas.getContext('2d', { alpha: true });
       if (!ctx) return;
 
@@ -790,7 +771,7 @@ function App() {
 
     rafId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(rafId);
-  }, [isRunning, isMobile]);
+  }, [isMobile]);
 
   const stopEngine = () => {
     if (scriptNodeRef.current) {
@@ -798,7 +779,6 @@ function App() {
       scriptNodeRef.current.disconnect();
       scriptNodeRef.current = null;
     }
-    if (displayRef.current && engineRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
     setIsRunning(false);
   };
 

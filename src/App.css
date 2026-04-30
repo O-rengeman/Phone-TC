@@ -266,7 +266,7 @@ header {
 .tab-pane {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   max-width: 100%;
   overflow-x: hidden;
   min-width: 0;
@@ -289,6 +289,7 @@ header {
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  margin-bottom: 8px;
 }
 
 .time-canvas {
@@ -303,7 +304,8 @@ header {
   justify-content: center;
   gap: 10px;
   opacity: 0.8;
-  margin-bottom: 10px;
+  margin-top: -6px;
+  margin-bottom: 8px;
   flex-wrap: wrap;
   max-width: 100%;
 }
