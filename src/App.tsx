@@ -39,14 +39,9 @@ function App() {
   const [outputMode, setOutputMode] = useState<'stereo' | 'mono-l'>('stereo');
   const [autoUserBits, setAutoUserBits] = useState(true);
   const [isSlateFlashing, setIsSlateFlashing] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
   const [slateTime, setSlateTime] = useState('00:00:00:00');
 
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoaded(true), 1800);
-    return () => clearTimeout(timer);
-  }, []);
-  
+
   // Resize handler
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -825,17 +820,6 @@ function App() {
 
   return (
     <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
-      {!isLoaded && (
-        <div className="splash-screen">
-          <div className="splash-content">
-            <div className="splash-logo">LTC SYNC PRO</div>
-            <div className="splash-loader">
-              <div className="loader-bar"></div>
-            </div>
-            <div className="splash-status">INITIALIZING PRO SYSTEMS...</div>
-          </div>
-        </div>
-      )}
       <header>
         <div className="logo-area">
           <div className="logo">LTC SYNC PRO</div>
