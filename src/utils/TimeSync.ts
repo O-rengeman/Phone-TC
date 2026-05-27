@@ -1,6 +1,7 @@
 export interface TimeSyncResult {
-  offset: number; // Offset in milliseconds (Network Time - Local Time)
-  latency: number; // Network latency (one-way)
+  offset: number;
+  latency: number;
+  fromCache?: boolean;
 }
 
 const TIME_SERVERS = [
@@ -8,11 +9,10 @@ const TIME_SERVERS = [
   'https://timeapi.io/api/Time/current/zone?timeZone=UTC',
 ];
 
+const NTP_CACHE_KEY = 'ltc-ntp-cache';
+const NTP_CACHE_TTL_MS = 3600000; // 1 hour
+
 export class TimeSync {
-  /**
-   * Fetches the network time and calculates the offset compared to the local clock.
-   * Tries multiple servers if one fails.
-   */
   public static async sync(samplesPerServer: number = 2): Promise<TimeSyncResult> {
     let bestSample: TimeSyncResult | null = null;
 
@@ -26,24 +26,21 @@ export class TimeSync {
             mode: 'cors'
           });
           const end = performance.now();
-          
+
           if (!response.ok) continue;
-          
+
           const data = await response.json();
-          // Extract time and ensure it's treated as UTC
           let serverTime: number;
           if (data.dateTime) {
-            // timeapi.io format (dateTime is already UTC ISO string)
             serverTime = new Date(data.dateTime + (data.dateTime.endsWith('Z') ? '' : 'Z')).getTime();
           } else if (data.datetime) {
-            // worldtimeapi format
             serverTime = new Date(data.datetime).getTime();
           } else {
             continue;
           }
           const rtt = end - start;
           const latency = rtt / 2;
-          
+
           const estimatedServerTimeAtArrival = serverTime + latency;
           const localTimeAtArrival = Date.now();
           const offset = estimatedServerTimeAtArrival - localTimeAtArrival;
@@ -51,22 +48,41 @@ export class TimeSync {
           if (!bestSample || latency < bestSample.latency) {
             bestSample = { offset, latency };
           }
-          
-          // If we got a good sample, we can potentially break early from this server
-          if (latency < 50) break; 
+
+          if (latency < 50) break;
         } catch (err) {
           console.warn(`Sample from ${server} failed:`, err);
         }
       }
-      
-      // If we found a successful sync from any server, we can stop
+
       if (bestSample) break;
     }
 
     if (!bestSample) {
+      const cached = TimeSync.loadCache();
+      if (cached) return { ...cached, fromCache: true };
       throw new Error('All time servers failed to respond.');
     }
 
+    TimeSync.saveCache(bestSample);
     return bestSample;
+  }
+
+  private static saveCache(result: TimeSyncResult): void {
+    try {
+      localStorage.setItem(NTP_CACHE_KEY, JSON.stringify({ ...result, savedAt: Date.now() }));
+    } catch { /* ignore */ }
+  }
+
+  private static loadCache(): TimeSyncResult | null {
+    try {
+      const raw = localStorage.getItem(NTP_CACHE_KEY);
+      if (!raw) return null;
+      const { offset, latency, savedAt } = JSON.parse(raw);
+      if (Date.now() - savedAt > NTP_CACHE_TTL_MS) return null;
+      return { offset, latency };
+    } catch {
+      return null;
+    }
   }
 }

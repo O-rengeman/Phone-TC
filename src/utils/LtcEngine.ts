@@ -241,6 +241,31 @@ export class LtcEngine {
   }
 
   /**
+   * Smooth sync: instant jump for large drift (>0.5s), frame-by-frame nudge for small drift.
+   * Avoids audible discontinuities when drift is minor.
+   */
+  public softSync(masterTcStr: string, oneWayLatencyMs: number, isMasterRunning: boolean): void {
+    const diff = this.getDiffSeconds(masterTcStr);
+    if (diff > 0.5) {
+      this.jamSyncDirect(masterTcStr, oneWayLatencyMs, isMasterRunning);
+      return;
+    }
+    try {
+      const masterTc = Timecode(masterTcStr, this.settings.fps, this.settings.isDropFrame);
+      if (isMasterRunning && oneWayLatencyMs > 0) {
+        const elapsedFrames = Math.round(oneWayLatencyMs * this.fpsNum / (1000 * this.fpsDen));
+        masterTc.add(elapsedFrames);
+      }
+      const frameDiff = masterTc.frameCount - this.currentTimecode.frameCount;
+      if (frameDiff !== 0) {
+        this.currentTimecode.add(frameDiff > 0 ? 1 : -1);
+      }
+    } catch {
+      this.jamSyncDirect(masterTcStr, oneWayLatencyMs, isMasterRunning);
+    }
+  }
+
+  /**
    * Only applies jamSync if the difference exceeds the given threshold in seconds.
    * Returns true if sync was applied.
    */

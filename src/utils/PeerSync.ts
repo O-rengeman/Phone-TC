@@ -19,6 +19,7 @@ export class PeerSync {
   private connections: any[] = [];
   private onMessageCallback: (msg: SyncMessage) => void;
   private onStatusCallback: (status: string) => void;
+  private lossRate: number = 0;
 
   constructor(
     onMessage: (msg: SyncMessage) => void,
@@ -113,9 +114,13 @@ export class PeerSync {
     });
   }
 
+  public setLossRate(rate: number): void {
+    this.lossRate = Math.max(0, Math.min(1, rate));
+  }
+
   public send(msg: SyncMessage) {
     this.connections.forEach(conn => {
-      if (conn.open) {
+      if (conn.open && Math.random() >= this.lossRate) {
         conn.send(msg);
       }
     });

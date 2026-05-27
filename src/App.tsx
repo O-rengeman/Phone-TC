@@ -19,6 +19,9 @@ const FPS_OPTIONS = [
 ];
 
 type SyncMode = 'system' | 'network' | 'p2p';
+type ToastLevel = 'info' | 'warn' | 'error';
+type Toast = { id: number; msg: string; level: ToastLevel };
+type Marker = { id: number; tc: string; time: string; color: 'Red' | 'Blue' | 'Green' | 'Yellow'; reelName: string };
 
 function App() {
   const [isRunning, setIsRunning] = useState(false);
@@ -56,7 +59,13 @@ function App() {
     isVisualSlateRef.current = isVisualSlate;
   }, [isVisualSlate]);
 
-  const [markers, setMarkers] = useState<{ id: number, tc: string, time: string, color: 'Red' | 'Blue' | 'Green' | 'Yellow' }[]>([]);
+  const [markers, setMarkers] = useState<Marker[]>(() => {
+    try {
+      const saved = localStorage.getItem('ltc-markers');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [defaultReelName, setDefaultReelName] = useState('A001');
   const [outputLevel, setOutputLevel] = useState<'mic' | 'line'>('line');
 
   // P2P States
@@ -69,12 +78,23 @@ function App() {
   const [p2pSyncSource, setP2pSyncSource] = useState<'manual' | 'network'>('manual');
   const [masterDrift, setMasterDrift] = useState<number | null>(null); // Drift in seconds from master
   const [clients, setClients] = useState<Record<string, { rtt: number, drift: number, lastSeen: number }>>({});
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [packetLossRate, setPacketLossRate] = useState(0);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const engineRef = useRef<LtcEngine | null>(null);
   const scriptNodeRef = useRef<ScriptProcessorNode | null>(null);
   const peerSyncRef = useRef<PeerSync | null>(null);
   const lastSyncTimeRef = useRef<number>(Date.now()); // Track last forced sync time
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const [vuLevel, setVuLevel] = useState(0);
+
+  const addToast = (msg: string, level: ToastLevel = 'info') => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, msg, level }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  };
 
   // Mobile Initialization
   useEffect(() => {
@@ -192,9 +212,9 @@ function App() {
           const shouldSync = (Math.abs(diff) >= 0.03 && isRttStable) || timeSinceLastSync >= 15000;
 
           if (shouldSync) {
-            engineRef.current.jamSyncDirect(
-              msg.masterTimecode, 
-              oneWayLatency, 
+            engineRef.current.softSync(
+              msg.masterTimecode,
+              oneWayLatency,
               msg.isRunning
             );
             lastSyncTimeRef.current = Date.now();
@@ -229,7 +249,7 @@ function App() {
           const shouldSync = Math.abs(diff) >= 0.05 || timeSinceLastSync >= 15000;
 
           if (shouldSync) {
-            engineRef.current.jamSyncDirect(msg.masterTimecode, 0.03, msg.isRunning);
+            engineRef.current.softSync(msg.masterTimecode, 0.03, msg.isRunning);
             lastSyncTimeRef.current = Date.now();
           }
           if (!isRunning) {
@@ -273,6 +293,13 @@ function App() {
     }
   }, [autoUserBits]);
 
+  // Persist markers to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('ltc-markers', JSON.stringify(markers));
+    } catch { /* ignore */ }
+  }, [markers]);
+
   // Update Engine with Pro features
   useEffect(() => {
     if (engineRef.current) {
@@ -289,13 +316,14 @@ function App() {
 
   const addMarker = (color: 'Red' | 'Blue' | 'Green' | 'Yellow') => {
     const currentTC = engineRef.current ? engineRef.current.getTimecodeString() : '00:00:00:00';
-    const newMarker = {
+    const newMarker: Marker = {
       id: Date.now(),
       tc: currentTC,
       time: new Date().toLocaleTimeString(),
-      color: color
+      color,
+      reelName: defaultReelName
     };
-    setMarkers([newMarker, ...markers]); // 最新を上に表示し、全件保持する
+    setMarkers(prev => [newMarker, ...prev]);
   };
 
   const removeMarker = (id: number) => {
@@ -305,12 +333,14 @@ function App() {
   const exportToEDL = () => {
     if (markers.length === 0) return;
 
-    let edlContent = `TITLE: Logged Takes\nFCM: NON-DROP FRAME\n\n`;
+    const fcm = FPS_OPTIONS[fpsIndex].drop ? 'DROP FRAME' : 'NON-DROP FRAME';
+    let edlContent = `TITLE: Logged Takes\nFCM: ${fcm}\n\n`;
     const sortedMarkers = [...markers].reverse();
     sortedMarkers.forEach((m, index) => {
       const eventNum = String(index + 1).padStart(3, '0');
-      edlContent += `${eventNum}  AX       V     C        ${m.tc} ${m.tc} ${m.tc} ${m.tc}\n`;
-      edlContent += ` |C:ResolveColor${m.color} |M:Logged Take at ${m.time} |D:1\n\n`;
+      const reel = (m.reelName || 'AX').substring(0, 8).padEnd(8);
+      edlContent += `${eventNum}  ${reel} V     C        ${m.tc} ${m.tc} ${m.tc} ${m.tc}\n`;
+      edlContent += ` |C:ResolveColor${m.color} |M:${m.reelName || 'AX'} at ${m.time} |D:1\n\n`;
     });
 
     const blob = new Blob([edlContent], { type: 'text/plain' });
@@ -319,6 +349,7 @@ function App() {
     a.href = url;
     a.download = `PHONE_TC_${new Date().toISOString().slice(0, 10)}.edl`;
     a.click();
+    URL.revokeObjectURL(url);
   };
 
   const exportToALE = () => {
@@ -372,6 +403,7 @@ function App() {
       peerSyncRef.current = ps;
     } catch (e) {
       setP2pStatus('PEER INIT FAILED');
+      addToast('P2P INIT FAILED — CHECK NETWORK', 'error');
     }
   };
 
@@ -390,6 +422,7 @@ function App() {
       peerSyncRef.current = ps;
     } catch (e) {
       setP2pStatus('PEER INIT FAILED');
+      addToast('P2P CLIENT INIT FAILED — CHECK NETWORK', 'error');
     }
   };
 
@@ -465,6 +498,35 @@ function App() {
     };
   }, [isHost, p2pRole, fpsIndex, masterDrift, isRunning]);
 
+  // Sync packetLossRate into PeerSync (dev only)
+  useEffect(() => {
+    peerSyncRef.current?.setLossRate(packetLossRate);
+  }, [packetLossRate]);
+
+  // VU meter RAF loop for mono-l mic input
+  useEffect(() => {
+    if (!isRunning || outputMode !== 'mono-l') {
+      setVuLevel(0);
+      return;
+    }
+    let rafId: number;
+    const update = () => {
+      if (analyserRef.current) {
+        const data = new Float32Array(analyserRef.current.fftSize);
+        analyserRef.current.getFloatTimeDomainData(data);
+        let peak = 0;
+        for (let i = 0; i < data.length; i++) {
+          const abs = Math.abs(data[i]);
+          if (abs > peak) peak = abs;
+        }
+        setVuLevel(peak);
+      }
+      rafId = requestAnimationFrame(update);
+    };
+    rafId = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(rafId);
+  }, [isRunning, outputMode]);
+
   // Periodic Network Sync
   useEffect(() => {
     if (syncMode !== 'network' || !isRunning) return;
@@ -510,10 +572,14 @@ function App() {
       osc.start(0);
       osc.stop(0.1);
 
+      if (ctx.sampleRate !== 48000 && ctx.sampleRate !== 44100) {
+        addToast(`SAMPLE RATE: ${ctx.sampleRate}Hz — LTC TIMING MAY DRIFT`, 'warn');
+      }
+
       if (engineRef.current) {
         engineRef.current.updateSampleRate(ctx.sampleRate);
       }
-      
+
       await startSequence();
     }
   };
@@ -526,9 +592,16 @@ function App() {
       // Only sync if NOT resuming from pause
       if (!isPaused) {
         if (syncMode === 'network' || (syncMode === 'p2p' && p2pRole === 'master' && p2pSyncSource === 'network')) {
-          const result = await TimeSync.sync();
-          setSyncStatus(result);
-          offset = result.offset;
+          try {
+            const result = await TimeSync.sync();
+            setSyncStatus(result);
+            offset = result.offset;
+            if (result.fromCache) {
+              addToast('NTP SERVERS UNREACHABLE — USING CACHED OFFSET', 'warn');
+            }
+          } catch {
+            addToast('NTP SYNC FAILED — USING SYSTEM CLOCK', 'error');
+          }
         }
 
         // P2P client: force immediate sync on START
@@ -561,7 +634,7 @@ function App() {
       await startEngine();
     } catch (err) {
       console.error('Start sequence failed:', err);
-      alert('Start sequence failed. Please check your connection.');
+      addToast('START FAILED — CHECK CONNECTION', 'error');
     } finally {
       setIsPreparing(false);
     }
@@ -726,9 +799,16 @@ function App() {
     if (outputMode === 'mono-l') {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micStreamRef.current = stream;
         const inputSource = ctx.createMediaStreamSource(stream);
-        inputSource.connect(workletNode);
-      } catch (err) { console.warn('Mic access denied'); }
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        inputSource.connect(analyser);
+        analyser.connect(workletNode);
+        analyserRef.current = analyser;
+      } catch (err) {
+        addToast('MIC ACCESS DENIED — CHECK BROWSER PERMISSIONS', 'error');
+      }
     }
 
     workletNode.connect(ctx.destination);
@@ -806,6 +886,12 @@ function App() {
       scriptNodeRef.current.disconnect();
       scriptNodeRef.current = null;
     }
+    analyserRef.current = null;
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
+    }
+    setVuLevel(0);
     if (displayRef.current && engineRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
     setIsRunning(false);
   };
@@ -891,6 +977,14 @@ function App() {
                     <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => setOutputMode('mono-l')}>L-TC / R-AUDIO</button>
                   </div>
                 </div>
+                {outputMode === 'mono-l' && (
+                  <div className="control-section vu-meter-container">
+                    <label className="vu-label">MIC INPUT LEVEL {!isRunning && '(START TO MONITOR)'}</label>
+                    <div className="vu-bar-track">
+                      <div className="vu-bar-fill" style={{ width: `${Math.min(vuLevel * 120, 100)}%` }} />
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -973,6 +1067,23 @@ function App() {
               )}
             </div>
 
+            {import.meta.env.DEV && (
+              <div className="control-section dev-panel">
+                <label className="section-label dev-label">DEV: PACKET LOSS SIM</label>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input
+                    type="range" min="0" max="0.5" step="0.01"
+                    value={packetLossRate}
+                    onChange={e => setPacketLossRate(parseFloat(e.target.value))}
+                    style={{ flex: 1 }}
+                  />
+                  <span style={{ fontSize: '0.7rem', color: '#666', minWidth: '30px', fontFamily: 'var(--font-mono)' }}>
+                    {(packetLossRate * 100).toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+            )}
+
             {!isMobile && (
               <div className="control-section">
                 <label className="section-label">FRAME RATE</label>
@@ -1025,6 +1136,15 @@ function App() {
                   <button className={`btn-pill ${autoUserBits ? 'active' : ''}`} onClick={() => setAutoUserBits(!autoUserBits)}>AUTO (DATE)</button>
                 </div>
               </div>
+              <div className="tool-card span-2">
+                <label>DEFAULT REEL NAME</label>
+                <input
+                  value={defaultReelName}
+                  onChange={e => setDefaultReelName(e.target.value.toUpperCase())}
+                  maxLength={8}
+                  placeholder="A001"
+                />
+              </div>
               {!isMobile && (
                 <>
                   <div className="tool-card span-2">
@@ -1045,6 +1165,14 @@ function App() {
                       <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => setOutputMode('mono-l')}>L-TC / R-AUDIO</button>
                     </div>
                   </div>
+                  {outputMode === 'mono-l' && (
+                    <div className="tool-card span-2 vu-meter-container">
+                      <label className="vu-label">MIC INPUT LEVEL {!isRunning && '(START TO MONITOR)'}</label>
+                      <div className="vu-bar-track">
+                        <div className="vu-bar-fill" style={{ width: `${Math.min(vuLevel * 120, 100)}%` }} />
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -1122,6 +1250,12 @@ function App() {
           </div>
         </div>
       </footer>
+
+      <div className="toast-container" aria-live="polite">
+        {toasts.map(t => (
+          <div key={t.id} className={`toast toast-${t.level}`}>{t.msg}</div>
+        ))}
+      </div>
 
       {isVisualSlate && (
         <div className={`visual-slate-overlay ${isSlateFlashing ? 'flashing' : ''}`} onClick={handleSlateClick}>
