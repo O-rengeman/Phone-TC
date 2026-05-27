@@ -51,5 +51,7 @@
 	<array>
 		<string>audio</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app requires microphone access to record reference audio on the right channel while outputting timecode on the left channel.</string>
 </dict>
 </plist>
