@@ -7,7 +7,9 @@ import { TimeSync } from './utils/TimeSync';
 import { PeerSync } from './utils/PeerSync';
 import type { SyncMessage } from './utils/PeerSync';
 import { QRCodeCanvas } from 'qrcode.react';
+import { TimecodeNativeBridge } from './utils/TimecodeNativeBridge';
 import './App.css';
+
 
 const FPS_OPTIONS = [
   { label: '23.976', value: 23.976, drop: false, fpsNum: 24000, fpsDen: 1001 },
@@ -822,6 +824,7 @@ function App() {
     workletNode.connect(ctx.destination);
     (scriptNodeRef as any).current = workletNode; // Reuse ref for simplicity
     setIsRunning(true);
+    TimecodeNativeBridge.startBackgroundMode();
   };
 
   useEffect(() => {
@@ -836,6 +839,7 @@ function App() {
       }
 
       const tc = engine.getTimecodeString();
+      TimecodeNativeBridge.updatePlaybackStatus(isRunning, tc);
       
       // Update Slate Time (state) for overlay components (QR, etc)
       // Only update when needed to avoid React re-renders unless necessary
@@ -902,6 +906,7 @@ function App() {
     setVuLevel(0);
     if (displayRef.current && engineRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
     setIsRunning(false);
+    TimecodeNativeBridge.stopBackgroundMode();
   };
 
   const handlePause = () => {
