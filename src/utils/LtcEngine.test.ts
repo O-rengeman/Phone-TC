@@ -8,6 +8,7 @@ const settings: LtcSettings = {
   volume: 1,
   isDropFrame: false,
   userBits: '00000000',
+  outputMode: 'stereo',
 };
 
 // At 30fps integer: fpsNum=30000, fpsDen=1000
