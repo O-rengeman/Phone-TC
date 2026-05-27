@@ -79,7 +79,9 @@ export class TimeSync {
       const raw = localStorage.getItem(NTP_CACHE_KEY);
       if (!raw) return null;
       const { offset, latency, savedAt } = JSON.parse(raw);
-      if (Date.now() - savedAt > NTP_CACHE_TTL_MS) return null;
+      if (typeof offset !== 'number' || !isFinite(offset) || Math.abs(offset) > 86400000) return null;
+      if (typeof latency !== 'number' || !isFinite(latency) || latency < 0) return null;
+      if (typeof savedAt !== 'number' || Date.now() - savedAt > NTP_CACHE_TTL_MS) return null;
       return { offset, latency };
     } catch {
       return null;

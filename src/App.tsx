@@ -62,7 +62,9 @@ function App() {
   const [markers, setMarkers] = useState<Marker[]>(() => {
     try {
       const saved = localStorage.getItem('ltc-markers');
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed : [];
     } catch { return []; }
   });
   const [defaultReelName, setDefaultReelName] = useState('A001');
@@ -333,14 +335,18 @@ function App() {
   const exportToEDL = () => {
     if (markers.length === 0) return;
 
+    const sanitize = (s: string) => s.replace(/[\r\n\t]/g, '');
     const fcm = FPS_OPTIONS[fpsIndex].drop ? 'DROP FRAME' : 'NON-DROP FRAME';
     let edlContent = `TITLE: Logged Takes\nFCM: ${fcm}\n\n`;
     const sortedMarkers = [...markers].reverse();
     sortedMarkers.forEach((m, index) => {
       const eventNum = String(index + 1).padStart(3, '0');
-      const reel = (m.reelName || 'AX').substring(0, 8).padEnd(8);
-      edlContent += `${eventNum}  ${reel} V     C        ${m.tc} ${m.tc} ${m.tc} ${m.tc}\n`;
-      edlContent += ` |C:ResolveColor${m.color} |M:${m.reelName || 'AX'} at ${m.time} |D:1\n\n`;
+      const reel = sanitize(m.reelName || 'AX').substring(0, 8).padEnd(8);
+      const tc = sanitize(m.tc);
+      const reelLabel = sanitize(m.reelName || 'AX');
+      const time = sanitize(m.time);
+      edlContent += `${eventNum}  ${reel} V     C        ${tc} ${tc} ${tc} ${tc}\n`;
+      edlContent += ` |C:ResolveColor${m.color} |M:${reelLabel} at ${time} |D:1\n\n`;
     });
 
     const blob = new Blob([edlContent], { type: 'text/plain' });
@@ -500,7 +506,9 @@ function App() {
 
   // Sync packetLossRate into PeerSync (dev only)
   useEffect(() => {
-    peerSyncRef.current?.setLossRate(packetLossRate);
+    if (import.meta.env.DEV) {
+      peerSyncRef.current?.setLossRate(packetLossRate);
+    }
   }, [packetLossRate]);
 
   // VU meter RAF loop for mono-l mic input
