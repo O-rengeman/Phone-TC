@@ -9,6 +9,8 @@ import type { SyncMessage } from './utils/PeerSync';
 import { QRCodeCanvas } from 'qrcode.react';
 import { TimecodeNativeBridge } from './utils/TimecodeNativeBridge';
 import { DriftMonitor, formatSyncAge } from './utils/DriftMonitor';
+import { estimateMinutesRemaining, trimSamples, formatDuration } from './utils/battery';
+import type { BatterySample } from './utils/battery';
 import type { DriftStatus } from './utils/DriftMonitor';
 import { buildEdl, buildAle } from './utils/export';
 import type { Marker } from './utils/export';
@@ -28,6 +30,17 @@ const FPS_OPTIONS = [
 type SyncMode = 'system' | 'network' | 'p2p';
 type ToastLevel = 'info' | 'warn' | 'error';
 type Toast = { id: number; msg: string; level: ToastLevel };
+
+type BatteryLike = {
+  level: number;
+  charging: boolean;
+  addEventListener: (type: string, cb: () => void) => void;
+  removeEventListener: (type: string, cb: () => void) => void;
+};
+
+const MARKER_HEX: Record<string, string> = {
+  Red: '#ff3b40', Blue: '#3b82f6', Green: '#22c55e', Yellow: '#f59e0b',
+};
 
 function App() {
   const [isRunning, setIsRunning] = useState(false);
@@ -98,6 +111,65 @@ function App() {
   const [stopHoldPct, setStopHoldPct] = useState(0);
   const [showGuide, setShowGuide] = useState(false);
   const [isResyncing, setIsResyncing] = useState(false);
+  // Battery readout: level, charging state and an estimated time-to-empty so
+  // operators know whether the phone will last the shoot.
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+  const [isCharging, setIsCharging] = useState(false);
+  const [batteryEta, setBatteryEta] = useState<number | null>(null);
+  const batterySamplesRef = useRef<BatterySample[]>([]);
+  // Transient confirmation shown when a marker is logged.
+  const [markerFlash, setMarkerFlash] = useState<{ tc: string; color: string; count: number } | null>(null);
+  const markerFlashTimerRef = useRef<number | null>(null);
+
+  // Subscribe to the Battery Status API where available (Android/Chromium).
+  // iOS Safari lacks it, so the readout simply stays hidden there.
+  useEffect(() => {
+    const nav = navigator as Navigator & { getBattery?: () => Promise<BatteryLike> };
+    if (!nav.getBattery) return;
+    let batt: BatteryLike | null = null;
+    let cancelled = false;
+    const onLevel = () => {
+      if (!batt) return;
+      setBatteryLevel(batt.level);
+      setIsCharging(batt.charging);
+      if (batt.charging) {
+        batterySamplesRef.current = [];
+        setBatteryEta(null);
+        return;
+      }
+      const now = Date.now();
+      const buf = trimSamples([...batterySamplesRef.current, { level: batt.level, at: now }], now, 15 * 60_000);
+      batterySamplesRef.current = buf;
+      setBatteryEta(estimateMinutesRemaining(buf));
+    };
+    const onCharging = () => {
+      if (!batt) return;
+      setIsCharging(batt.charging);
+      if (batt.charging) {
+        batterySamplesRef.current = [];
+        setBatteryEta(null);
+      }
+    };
+    nav.getBattery().then((b) => {
+      if (cancelled) return;
+      batt = b;
+      setBatteryLevel(b.level);
+      setIsCharging(b.charging);
+      b.addEventListener('levelchange', onLevel);
+      b.addEventListener('chargingchange', onCharging);
+    }).catch(() => { /* battery info unavailable */ });
+    return () => {
+      cancelled = true;
+      if (batt) {
+        batt.removeEventListener('levelchange', onLevel);
+        batt.removeEventListener('chargingchange', onCharging);
+      }
+    };
+  }, []);
+
+  useEffect(() => () => {
+    if (markerFlashTimerRef.current !== null) clearTimeout(markerFlashTimerRef.current);
+  }, []);
   const stopHoldRafRef = useRef<number | null>(null);
   const stopHoldStartRef = useRef(0);
   const [p2pSyncSource, setP2pSyncSource] = useState<'manual' | 'network'>('manual');
@@ -421,6 +493,15 @@ function App() {
       reelName: defaultReelName
     };
     setMarkers(prev => [newMarker, ...prev]);
+
+    // Confirmation feedback: brief on-screen flash + haptic so the operator
+    // knows the mark registered without staring at the list.
+    setMarkerFlash({ tc: currentTC, color, count: markers.length + 1 });
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(40);
+    }
+    if (markerFlashTimerRef.current !== null) clearTimeout(markerFlashTimerRef.current);
+    markerFlashTimerRef.current = window.setTimeout(() => setMarkerFlash(null), 1300);
   };
 
   const removeMarker = (id: number) => {
@@ -1037,6 +1118,14 @@ function App() {
             <span className="status-meta-sep">·</span>
             <span>{syncMode.toUpperCase()}</span>
           </div>
+          {batteryLevel !== null && (
+            <div className={`batt-chip ${batteryLevel <= 0.15 && !isCharging ? 'low' : ''}`}>
+              <span className="batt-pct">{isCharging ? '⚡' : ''}{Math.round(batteryLevel * 100)}%</span>
+              {!isCharging && isRunning && batteryEta !== null && (
+                <span className="batt-eta">{formatDuration(batteryEta)}</span>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -1392,6 +1481,13 @@ function App() {
         )}
       </main>
 
+      {markerFlash && (
+        <div className="marker-flash" style={{ borderColor: MARKER_HEX[markerFlash.color] }}>
+          <span className="mf-dot" style={{ background: MARKER_HEX[markerFlash.color] }} />
+          <span className="mf-text">MARK {markerFlash.tc}</span>
+          <span className="mf-count">#{markerFlash.count}</span>
+        </div>
+      )}
       <footer className="fixed-footer">
         <div className="footer-buttons">
           <div className="footer-left">
