@@ -97,6 +97,7 @@ function App() {
   // deliberate press-and-hold. stopHoldPct (0..100) drives the fill UI.
   const [stopHoldPct, setStopHoldPct] = useState(0);
   const [showGuide, setShowGuide] = useState(false);
+  const [isResyncing, setIsResyncing] = useState(false);
   const stopHoldRafRef = useRef<number | null>(null);
   const stopHoldStartRef = useRef(0);
   const [p2pSyncSource, setP2pSyncSource] = useState<'manual' | 'network'>('manual');
@@ -693,6 +694,30 @@ function App() {
     if (stopHoldRafRef.current !== null) cancelAnimationFrame(stopHoldRafRef.current);
   }, []);
 
+  // One-tap manual re-sync (re-jam) available from the MAIN screen.
+  const handleManualResync = async () => {
+    if (syncMode !== 'network') return;
+    setIsResyncing(true);
+    try {
+      const result = await TimeSync.sync();
+      setSyncStatus(result);
+      driftMonitorRef.current.addSync(result.offset);
+      const engine = engineRef.current;
+      if (engine && p2pRole !== 'master') {
+        engine.syncWithOffset(result.offset);
+        lastNetworkOffsetRef.current = result.offset;
+        if (isRunning) {
+          applySyncToWorklet(engine.getTimecodeForOffset(result.offset), 0, true);
+        }
+      }
+      addToast('RE-SYNCED', 'info');
+    } catch {
+      addToast('RE-SYNC FAILED — CHECK NETWORK', 'error');
+    } finally {
+      setIsResyncing(false);
+    }
+  };
+
   const handleStartStop = async () => {
     if (isRunning) {
       setIsPaused(false); // Stop means fully reset
@@ -1039,6 +1064,24 @@ function App() {
                 )}
               </div>
             </div>
+
+            {syncMode === 'network' && (
+              <div className="main-sync-bar">
+                <div className="msb-info">
+                  <span className="msb-label">SYNC</span>
+                  <span className="msb-mode">NETWORK</span>
+                  {isRunning && driftStatus && driftStatus.hasSync && (
+                    <>
+                      <span className={`msb-badge drift-${driftStatus.confidence}`}>{driftStatus.confidence.toUpperCase()}</span>
+                      <span className="msb-age">{formatSyncAge(driftStatus.msSinceSync)}</span>
+                    </>
+                  )}
+                </div>
+                <button type="button" className="msb-resync" onClick={handleManualResync} disabled={isResyncing}>
+                  {isResyncing ? 'SYNCING…' : 'RE-SYNC'}
+                </button>
+              </div>
+            )}
 
             {isMobile && (
               <>

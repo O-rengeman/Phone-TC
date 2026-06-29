@@ -30,5 +30,6 @@ docs/changelog/YYYY-MM-DD-NN-<slug>.md
 | 06 | ♻️ 変更 | [同期エンジン (TimeSync / PeerSync) 強化とテスト](./2026-06-29-06-sync-engine.md) | `src/utils/TimeSync.ts`, `src/utils/PeerSync.ts` |
 | 07 | 🧱 基盤 | [CI・テスト・依存・Lint 整備](./2026-06-29-07-tooling-ci.md) | `.github/workflows/ci.yml`, `vitest.config.ts` ほか |
 | 08 | ✨ 追加 | [UI改良（操作明確化 / TC視認性・録画中表示）](./2026-06-29-08-ui-usability.md) | `src/App.tsx`, `src/App.css` |
+| 09 | ✨ 追加 | [現場目線のUX改善（誤停止防止/接続ガイド/MAIN集約）](./2026-06-29-09-ux-onset.md) | `src/App.tsx`, `src/App.css` |
 
 > 種別凡例: ✨ 追加 / ♻️ 変更 / 🛠 修正 / 🧱 基盤
