@@ -1,0 +1,33 @@
+name: Local Config
+version: 1.0.0
+schema: v1
+# 1. モデルの定義
+models:
+  # メインチャット用：Qwen2.5-Coder-3b (バランス型)
+  - name: Qwen2.5-Coder-3b
+    title: Qwen2.5-Coder-3b (Standard)
+    provider: ollama
+    model: qwen2.5-coder:3b
+    contextLength: 32768
+    capabilities:
+      - edit
+      - tool_use
+
+  # 高度な推論用：Ornith:9b-q4_K_M (思考型)
+  - name: Ornith:9b-q4_K_M
+    title:  Ornith:9b-q4_K_M (Advanced)
+    provider: ollama
+    model: ornith:9b-q4_K_M
+    contextLength: 32768
+    capabilities:
+      - edit
+      - tool_use
+
+  # オートコンプリート専用：Qwen3.5:4b (爆速型)
+  - name: Qwen3.5:4b
+    title: Qwen3.5:4b (Autocomplete)
+    provider: ollama
+    model: qwen3.5:4b
+    contextLength: 32768
+    capabilities:
+      - autocomplete

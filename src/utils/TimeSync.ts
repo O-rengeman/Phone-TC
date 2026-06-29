@@ -11,6 +11,7 @@ const TIME_SERVERS = [
 
 const NTP_CACHE_KEY = 'ltc-ntp-cache';
 const NTP_CACHE_TTL_MS = 3600000; // 1 hour
+const FETCH_TIMEOUT_MS = 4000; // Abort a stuck time-server request after 4s
 
 export class TimeSync {
   public static async sync(samplesPerServer: number = 2): Promise<TimeSyncResult> {
@@ -19,11 +20,14 @@ export class TimeSync {
     for (const server of TIME_SERVERS) {
       console.log(`Attempting sync with ${server}...`);
       for (let i = 0; i < samplesPerServer; i++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
         try {
           const start = performance.now();
           const response = await fetch(`${server}${server.includes('?') ? '&' : '?'}nocache=${Date.now()}`, {
             cache: 'no-store',
-            mode: 'cors'
+            mode: 'cors',
+            signal: controller.signal
           });
           const end = performance.now();
 
@@ -52,6 +56,8 @@ export class TimeSync {
           if (latency < 50) break;
         } catch (err) {
           console.warn(`Sample from ${server} failed:`, err);
+        } finally {
+          clearTimeout(timeoutId);
         }
       }
 

@@ -542,6 +542,55 @@ input[type="range"] {
   margin-top: 4px;
 }
 
+/* Drift / accuracy readout — surfaces phone-clock drift honestly. */
+.drift-panel {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--panel-elevated);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text);
+}
+
+.drift-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1px 0;
+  color: var(--text-muted);
+}
+
+.drift-row span:last-child {
+  color: var(--text-bright);
+}
+
+.drift-label {
+  letter-spacing: 0.1em;
+}
+
+.drift-badge {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.drift-high .drift-badge { color: #36d399; }
+.drift-medium .drift-badge { color: #e2c044; }
+.drift-low .drift-badge,
+.drift-none .drift-badge { color: #f56565; }
+
+.drift-low { border-color: rgba(245, 101, 101, 0.5); }
+
+.drift-rejam {
+  margin-top: 6px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  color: #f56565;
+}
+
 .p2p-init-pro {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1193,46 +1242,3 @@ input[type="range"] {
   from { opacity: 0; transform: translateX(24px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-
-/* ── VU Meter ── */
-.vu-meter-container {
-  padding: 10px 12px;
-}
-
-.vu-label {
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: var(--text-muted);
-  display: block;
-  margin-bottom: 8px;
-  font-family: var(--font-mono);
-}
-
-.vu-bar-track {
-  height: 10px;
-  background: #0d0d0d;
-  border: 1px solid #1a1a1a;
-  border-radius: 5px;
-  overflow: hidden;
-}
-
-.vu-bar-fill {
-  height: 100%;
-  background: linear-gradient(to right, #555 0%, #999 60%, #fff 100%);
-  border-radius: 5px;
-  transition: width 0.05s linear;
-  min-width: 2px;
-}
-
-/* ── Dev Panel ── */
-.dev-panel {
-  border: 1px dashed #2a2a2a;
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-}
-
-.dev-label {
-  color: #444 !important;
-}
-

@@ -1,5 +1,5 @@
-// Peer is now provided by CDN in index.html
-declare const Peer: any;
+import { Peer } from 'peerjs';
+import type { DataConnection } from 'peerjs';
 
 export interface SyncMessage {
   type: 'sync-request' | 'sync-response' | 'heartbeat' | 'report';
@@ -14,19 +14,25 @@ export interface SyncMessage {
   drift?: number;    // Reported drift from client
 }
 
+/** Factory used to create the underlying Peer — overridable for tests. */
+export type PeerFactory = (id: string, options: object) => Peer;
+
 export class PeerSync {
-  private peer: any = null;
-  private connections: any[] = [];
+  private peer: Peer | null = null;
+  private connections: DataConnection[] = [];
   private onMessageCallback: (msg: SyncMessage) => void;
   private onStatusCallback: (status: string) => void;
   private lossRate: number = 0;
+  private peerFactory: PeerFactory;
 
   constructor(
     onMessage: (msg: SyncMessage) => void,
-    onStatus: (status: string) => void
+    onStatus: (status: string) => void,
+    peerFactory: PeerFactory = (id, options) => new Peer(id, options),
   ) {
     this.onMessageCallback = onMessage;
     this.onStatusCallback = onStatus;
+    this.peerFactory = peerFactory;
   }
 
   private generateShortId(): string {
@@ -42,8 +48,8 @@ export class PeerSync {
     return new Promise((resolve, reject) => {
       try {
         const shortId = this.generateShortId();
-        // Use global Peer object from CDN with ICE servers for NAT traversal
-        this.peer = new Peer(shortId, {
+        // Use injected factory (defaults to real Peer) with ICE servers for NAT traversal
+        this.peer = this.peerFactory(shortId, {
           debug: 2,
           config: {
             'iceServers': [
@@ -61,12 +67,12 @@ export class PeerSync {
           resolve(id);
         });
 
-        this.peer.on('connection', (conn: any) => {
+        this.peer.on('connection', (conn: DataConnection) => {
           this.onStatusCallback(`CONNECTED TO CLIENT: ${conn.peer}`);
           this.handleConnection(conn);
         });
 
-        this.peer.on('error', (err: any) => {
+        this.peer.on('error', (err) => {
           console.error('Peer error:', err);
           this.onStatusCallback(`ERROR: ${err.type}`);
           reject(err);
@@ -88,18 +94,18 @@ export class PeerSync {
     this.handleConnection(conn);
   }
 
-  private handleConnection(conn: any) {
+  private handleConnection(conn: DataConnection) {
     this.connections.push(conn);
-    
+
     conn.on('open', () => {
       this.onStatusCallback(`CONNECTED TO ${conn.peer}`);
       console.log('Connection opened with:', conn.peer);
     });
 
-    conn.on('data', (data: any) => {
+    conn.on('data', (data: unknown) => {
       const msg = data as SyncMessage;
       msg.clientId = conn.peer; // Identify the sender
-      
+
       // Master logic: Answer to sync-request automatically
       if (msg.type === 'sync-request' && this.onMessageCallback) {
         this.onMessageCallback({ ...msg, clientTimestamp: msg.clientTimestamp });
@@ -116,6 +122,11 @@ export class PeerSync {
 
   public setLossRate(rate: number): void {
     this.lossRate = Math.max(0, Math.min(1, rate));
+  }
+
+  /** Current simulated packet-loss rate in [0, 1]. */
+  public getLossRate(): number {
+    return this.lossRate;
   }
 
   public send(msg: SyncMessage) {

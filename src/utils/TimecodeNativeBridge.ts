@@ -67,5 +67,20 @@ export const TimecodeNativeBridge = {
     if (isRunning && Math.random() < 0.05) {
       console.log(`[NativeBridge] (Fallback) Playback status updated. active: ${isRunning}, timecode: ${timecode}`);
     }
+  },
+
+  /**
+   * iOS のオーディオセッション割り込み（着信など）を購読します。
+   * ネイティブ側は割り込み終了時に自動でセッションを再アクティブ化しますが、
+   * UI 警告のためにここで began/ended を通知します。ブラウザ環境では何もしません。
+   */
+  addInterruptionListener(callback: (state: 'began' | 'ended') => void): void {
+    const plugin = nativePlugin as unknown as
+      | { addListener?: (event: string, handler: () => void) => void }
+      | null;
+    if (plugin && typeof plugin.addListener === 'function') {
+      plugin.addListener('interruptionBegan', () => callback('began'));
+      plugin.addListener('interruptionEnded', () => callback('ended'));
+    }
   }
 };

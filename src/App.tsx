@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { LtcEngine } from './utils/LtcEngine';
@@ -8,6 +8,11 @@ import { PeerSync } from './utils/PeerSync';
 import type { SyncMessage } from './utils/PeerSync';
 import { QRCodeCanvas } from 'qrcode.react';
 import { TimecodeNativeBridge } from './utils/TimecodeNativeBridge';
+import { DriftMonitor, formatSyncAge } from './utils/DriftMonitor';
+import type { DriftStatus } from './utils/DriftMonitor';
+import { buildEdl, buildAle } from './utils/export';
+import type { Marker } from './utils/export';
+import { LTC_WORKLET_SOURCE } from './audio/ltcWorkletSource';
 import './App.css';
 
 
@@ -23,7 +28,6 @@ const FPS_OPTIONS = [
 type SyncMode = 'system' | 'network' | 'p2p';
 type ToastLevel = 'info' | 'warn' | 'error';
 type Toast = { id: number; msg: string; level: ToastLevel };
-type Marker = { id: number; tc: string; time: string; color: 'Red' | 'Blue' | 'Green' | 'Yellow'; reelName: string };
 
 function App() {
   const [isRunning, setIsRunning] = useState(false);
@@ -31,7 +35,6 @@ function App() {
   const [volume, setVolume] = useState(0.5);
   // Using Canvas for GPU-accelerated, ultra-smooth TC display
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const displayRef = useRef<HTMLDivElement>(null); // Keep for compatibility if needed, but primary is canvas
   const [syncStatus, setSyncStatus] = useState<{ offset: number, latency: number } | null>(null);
   const [syncMode, setSyncMode] = useState<SyncMode>('network');
   const [isPreparing, setIsPreparing] = useState(false);
@@ -56,10 +59,18 @@ function App() {
   const [userBits, setUserBits] = useState('00000000');
   const [isVisualSlate, setIsVisualSlate] = useState(false);
   const isVisualSlateRef = useRef(false);
-  
+  // Mirror slateTime into a ref so the canvas RAF loop can compare against the
+  // latest value without listing slateTime as an effect dependency (which would
+  // tear down and rebuild the animation loop on every frame update).
+  const slateTimeRef = useRef(slateTime);
+
   useEffect(() => {
     isVisualSlateRef.current = isVisualSlate;
   }, [isVisualSlate]);
+
+  useEffect(() => {
+    slateTimeRef.current = slateTime;
+  }, [slateTime]);
 
   const [markers, setMarkers] = useState<Marker[]>(() => {
     try {
@@ -77,19 +88,26 @@ function App() {
   const [targetId, setTargetId] = useState<string>('');
   const [p2pStatus, setP2pStatus] = useState<string>('P2P DISCONNECTED');
   const [isHost, setIsHost] = useState(false);
-  const [rttHistory, setRttHistory] = useState<number[]>([]);
+  const rttHistoryRef = useRef<number[]>([]);
+  const lastNetworkOffsetRef = useRef<number | null>(null);
+  const driftMonitorRef = useRef<DriftMonitor>(new DriftMonitor());
+  const [driftStatus, setDriftStatus] = useState<DriftStatus | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [p2pSyncSource, setP2pSyncSource] = useState<'manual' | 'network'>('manual');
   const [masterDrift, setMasterDrift] = useState<number | null>(null); // Drift in seconds from master
   const [clients, setClients] = useState<Record<string, { rtt: number, drift: number, lastSeen: number }>>({});
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [packetLossRate, setPacketLossRate] = useState(0);
+  // Wall-clock tick used to drive time-dependent render output (e.g. client
+  // offline detection) without reading Date.now() impurely during render.
+  const [nowTick, setNowTick] = useState(0);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const engineRef = useRef<LtcEngine | null>(null);
-  const scriptNodeRef = useRef<ScriptProcessorNode | null>(null);
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
+  const currentTcRef = useRef<string>('00:00:00:00'); // Latest TC emitted by the worklet (live source of truth)
   const peerSyncRef = useRef<PeerSync | null>(null);
-  const lastSyncTimeRef = useRef<number>(Date.now()); // Track last forced sync time
+  const lastSyncTimeRef = useRef<number>(0); // Track last forced sync time (initialised on mount)
   const analyserRef = useRef<AnalyserNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const [vuLevel, setVuLevel] = useState(0);
@@ -100,17 +118,50 @@ function App() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   };
 
+  // Initialise the last-sync timestamp once on mount. Done here (not in the
+  // ref initialiser) to keep render pure — Date.now() must not run during render.
+  useEffect(() => {
+    lastSyncTimeRef.current = Date.now();
+  }, []);
+
+  // Tick wall-clock every 5s while hosting so client offline status re-renders.
+  useEffect(() => {
+    if (!isHost) return;
+    const id = setInterval(() => setNowTick(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, [isHost]);
+
   // Mobile Initialization
   useEffect(() => {
     const initMobile = async () => {
       try {
         await StatusBar.setStyle({ style: Style.Dark });
         await ScreenOrientation.lock({ orientation: 'portrait' });
-      } catch (e) {
-        console.log('Not running on a mobile device');
+      } catch {
+        console.debug('StatusBar/Orientation unavailable (non-native environment)');
       }
     };
     initMobile();
+  }, []);
+
+  // Surface native audio-session interruptions (incoming calls, etc.).
+  // Native layer re-activates AVAudioSession; we must also resume the Web Audio context.
+  useEffect(() => {
+    TimecodeNativeBridge.addInterruptionListener(async (state) => {
+      if (state === 'began') {
+        addToast('オーディオ割り込み発生 — LTCを一時中断', 'error');
+      } else {
+        addToast('割り込み終了 — LTC出力を自動復帰', 'info');
+        const ctx = audioCtxRef.current;
+        if (ctx && ctx.state === 'suspended') {
+          try {
+            await ctx.resume();
+          } catch (e) {
+            console.warn('AudioContext resume after interruption failed', e);
+          }
+        }
+      }
+    });
   }, []);
 
   // Initialize engine
@@ -126,21 +177,64 @@ function App() {
       fpsDen: FPS_OPTIONS[fpsIndex].fpsDen
     };
     engineRef.current = new LtcEngine(settings);
-    // Initial update
-    if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
+    // Mount-only: builds the engine from the initial settings snapshot. Later
+    // changes to fps/volume/userBits/outputMode are pushed by dedicated effects.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update FPS/Volume
   useEffect(() => {
     if (engineRef.current) {
       engineRef.current.setFps(FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
-      if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
     }
   }, [fpsIndex]);
 
   useEffect(() => {
     if (engineRef.current) engineRef.current.setVolume(volume);
   }, [volume]);
+
+  // Push live config (volume / user bits / output mode) into the running worklet,
+  // which owns the emitted audio. Without this, changing them mid-run had no effect.
+  useEffect(() => {
+    const node = workletNodeRef.current;
+    if (isRunning && node) {
+      node.port.postMessage({
+        type: 'config',
+        volume: outputLevel === 'line' ? volume : volume * 0.1,
+        ubit: userBits,
+        mode: outputMode,
+      });
+    }
+  }, [volume, userBits, outputMode, outputLevel, isRunning]);
+
+  /**
+   * Push a latency-compensated correction into the AudioWorklet (the live audio
+   * source of truth). Large drift => hard jam; small drift => single-frame nudge.
+   * While idle the worklet doesn't exist, so we only update the engine used for
+   * the on-screen display.
+   */
+  const applySyncToWorklet = useCallback((masterTcStr: string, oneWayLatencyMs: number, isMasterRunning: boolean) => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const corrected = engine.getCorrectedTc(masterTcStr, oneWayLatencyMs, isMasterRunning);
+    const node = workletNodeRef.current;
+    if (isRunning && node) {
+      // The engine mirrors the worklet's emitted TC (see worklet onmessage),
+      // so diff/direction are measured against the actual output.
+      const diff = engine.getDiffSeconds(corrected);
+      if (diff > 0.5) {
+        const parts = corrected.split(':').map(Number);
+        node.port.postMessage({ type: 'jam', h: parts[0], m: parts[1], s: parts[2], f: parts[3] });
+      } else {
+        const frameDiff = engine.signedFrameDiffTo(corrected);
+        if (frameDiff !== 0) {
+          node.port.postMessage({ type: 'nudge', dir: frameDiff > 0 ? 1 : -1 });
+        }
+      }
+    } else {
+      engine.setManualTimecode(corrected);
+    }
+  }, [isRunning]);
 
   const messageHandlerRef = useRef<(msg: SyncMessage) => void>(null);
 
@@ -152,7 +246,7 @@ function App() {
           // Master: Reply with current time and raw timestamp
           const response: SyncMessage = {
             type: 'sync-response',
-            masterTimecode: engineRef.current.getTimecodeString(),
+            masterTimecode: isRunning ? currentTcRef.current : engineRef.current.getTimecodeString(),
             masterTimestamp: performance.now(), // Sub-ms precision
             fps: FPS_OPTIONS[fpsIndex].value,
             isDropFrame: FPS_OPTIONS[fpsIndex].drop,
@@ -198,17 +292,15 @@ function App() {
           
           const oneWayLatency = rtt / 2;
           
-          setRttHistory(prev => {
-            const next = [...prev, rtt].slice(-15);
-            return next;
-          });
+          const history = [...rttHistoryRef.current, rtt].slice(-15);
+          rttHistoryRef.current = history;
 
           // Calculate drift BEFORE deciding whether to sync
           const diff = engineRef.current.getDiffSeconds(msg.masterTimecode);
           setMasterDrift(diff);
 
-          // Latency protection: Only sync if RTT is stable
-          const avgRtt = rttHistory.length > 0 ? rttHistory.reduce((a, b) => a + b) / rttHistory.length : rtt;
+          // Latency protection: Only sync if RTT is stable (use ref, not stale state)
+          const avgRtt = history.length > 0 ? history.reduce((a, b) => a + b, 0) / history.length : rtt;
           const isRttStable = rtt <= avgRtt * 1.5 || rtt < 80;
 
           // Ultra-tight sync conditions: diff >= 0.03s (approx 1 frame) OR 15 seconds
@@ -216,7 +308,7 @@ function App() {
           const shouldSync = (Math.abs(diff) >= 0.03 && isRttStable) || timeSinceLastSync >= 15000;
 
           if (shouldSync) {
-            engineRef.current.softSync(
+            applySyncToWorklet(
               msg.masterTimecode,
               oneWayLatency,
               msg.isRunning
@@ -224,10 +316,7 @@ function App() {
             lastSyncTimeRef.current = Date.now();
           }
 
-          if (!isRunning) {
-            if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
-          }
-          const bestRtt = rttHistory.length > 0 ? Math.min(...rttHistory, rtt) : rtt;
+          const bestRtt = history.length > 0 ? Math.min(...history, rtt) : rtt;
           setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (RTT ${rtt.toFixed(0)}ms / MIN ${bestRtt.toFixed(0)}ms)`);
 
           // Report back to master
@@ -253,11 +342,8 @@ function App() {
           const shouldSync = Math.abs(diff) >= 0.05 || timeSinceLastSync >= 15000;
 
           if (shouldSync) {
-            engineRef.current.softSync(msg.masterTimecode, 0.03, msg.isRunning);
+            applySyncToWorklet(msg.masterTimecode, 0.03, msg.isRunning);
             lastSyncTimeRef.current = Date.now();
-          }
-          if (!isRunning) {
-            if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
           }
           setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (HB)`);
 
@@ -270,7 +356,7 @@ function App() {
                 fps: 0,
                 isDropFrame: false,
                 isRunning: false,
-                rtt: rttHistory.length > 0 ? Math.min(...rttHistory) : 0,
+                rtt: rttHistoryRef.current.length > 0 ? Math.min(...rttHistoryRef.current) : 0,
                 drift: diff
              });
           }
@@ -334,46 +420,27 @@ function App() {
     setMarkers(markers.filter(m => m.id !== id));
   };
 
-  const exportToEDL = () => {
-    if (markers.length === 0) return;
-
-    const sanitize = (s: string) => s.replace(/[\r\n\t]/g, '');
-    const fcm = FPS_OPTIONS[fpsIndex].drop ? 'DROP FRAME' : 'NON-DROP FRAME';
-    let edlContent = `TITLE: Logged Takes\nFCM: ${fcm}\n\n`;
-    const sortedMarkers = [...markers].reverse();
-    sortedMarkers.forEach((m, index) => {
-      const eventNum = String(index + 1).padStart(3, '0');
-      const reel = sanitize(m.reelName || 'AX').substring(0, 8).padEnd(8);
-      const tc = sanitize(m.tc);
-      const reelLabel = sanitize(m.reelName || 'AX');
-      const time = sanitize(m.time);
-      edlContent += `${eventNum}  ${reel} V     C        ${tc} ${tc} ${tc} ${tc}\n`;
-      edlContent += ` |C:ResolveColor${m.color} |M:${reelLabel} at ${time} |D:1\n\n`;
-    });
-
-    const blob = new Blob([edlContent], { type: 'text/plain' });
+  // Triggers a client-side download of the given text content.
+  const downloadText = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `PHONE_TC_${new Date().toISOString().slice(0, 10)}.edl`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   };
 
+  const exportToEDL = () => {
+    if (markers.length === 0) return;
+    const edl = buildEdl(markers, FPS_OPTIONS[fpsIndex].drop);
+    downloadText(edl, `PHONE_TC_${new Date().toISOString().slice(0, 10)}.edl`);
+  };
+
   const exportToALE = () => {
     if (markers.length === 0) return;
-    const dateStr = new Date().toISOString().slice(0,10);
-    let ale = `Heading\nFIELD_DELIM\tTABS\nVIDEO_FORMAT\t1080\nFPS\t${FPS_OPTIONS[fpsIndex].label}\n\nColumn\nName\tTracks\tStart\tEnd\tDescription\n\nData\n`;
-    markers.forEach((m, i) => {
-      ale += `MARKER_${markers.length - i}\tV\t${m.tc}\t${m.tc}\t${m.color} marker at ${m.time}\n`;
-    });
-
-    const blob = new Blob([ale], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `PHONE_TC_${dateStr}.ale`;
-    a.click();
+    const ale = buildAle(markers, FPS_OPTIONS[fpsIndex].label);
+    downloadText(ale, `PHONE_TC_${new Date().toISOString().slice(0, 10)}.ale`);
   };
 
   const handleSlateClick = () => {
@@ -410,6 +477,7 @@ function App() {
       setPeerId(id);
       peerSyncRef.current = ps;
     } catch (e) {
+      console.warn('P2P master init failed', e);
       setP2pStatus('PEER INIT FAILED');
       addToast('P2P INIT FAILED — CHECK NETWORK', 'error');
     }
@@ -429,6 +497,7 @@ function App() {
       setPeerId(id);
       peerSyncRef.current = ps;
     } catch (e) {
+      console.warn('P2P client init failed', e);
       setP2pStatus('PEER INIT FAILED');
       addToast('P2P CLIENT INIT FAILED — CHECK NETWORK', 'error');
     }
@@ -438,8 +507,7 @@ function App() {
     if (engineRef.current && p2pRole === 'master' && !isRunning && !isPaused) {
       try {
         engineRef.current.setManualTimecode(manualTimecode);
-        if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
-      } catch (e) {
+      } catch {
         // Ignore invalid formats while typing
       }
     }
@@ -486,12 +554,12 @@ function App() {
     }, 1000);
 
     // High-frequency Heartbeat for Master (10Hz for extreme reliability)
-    let hbInterval: any;
+    let hbInterval: ReturnType<typeof setInterval> | undefined;
     if (isHost) {
       hbInterval = setInterval(() => {
         peerSyncRef.current?.broadcast({
           type: 'heartbeat',
-          masterTimecode: engineRef.current!.getTimecodeString(),
+          masterTimecode: isRunning ? currentTcRef.current : engineRef.current!.getTimecodeString(),
           masterTimestamp: Date.now(),
           fps: FPS_OPTIONS[fpsIndex].value,
           isDropFrame: FPS_OPTIONS[fpsIndex].drop,
@@ -516,7 +584,6 @@ function App() {
   // VU meter RAF loop for mono-l mic input
   useEffect(() => {
     if (!isRunning || outputMode !== 'mono-l') {
-      setVuLevel(0);
       return;
     }
     let rafId: number;
@@ -534,29 +601,57 @@ function App() {
       rafId = requestAnimationFrame(update);
     };
     rafId = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(rafId);
+    // Reset the meter when leaving the running mono-l state (cleanup runs on
+    // the next deps change / unmount, not synchronously during this effect).
+    return () => {
+      cancelAnimationFrame(rafId);
+      setVuLevel(0);
+    };
   }, [isRunning, outputMode]);
 
-  // Periodic Network Sync
+  // Periodic Network Sync — apply offset drift to the live worklet while running
   useEffect(() => {
     if (syncMode !== 'network' || !isRunning) return;
 
     const interval = setInterval(async () => {
       try {
-        console.log('Background network time sync...');
         const result = await TimeSync.sync(1);
         setSyncStatus(result);
-        if (engineRef.current && p2pRole !== 'master') {
-           // Gently nudge the engine if offset changed significantly
-           // For now, we just update the status, engine uses it in next jamSync/start
+        driftMonitorRef.current.addSync(result.offset);
+        const engine = engineRef.current;
+        if (!engine || p2pRole === 'master') return;
+
+        const lastOffset = lastNetworkOffsetRef.current;
+        const offsetDelta = lastOffset !== null ? Math.abs(result.offset - lastOffset) : Infinity;
+        const targetTc = engine.getTimecodeForOffset(result.offset);
+        const driftSec = engine.getDiffSeconds(targetTc);
+        // ~1 frame at 30fps, or NTP offset moved by ≥33ms
+        const shouldCorrect = offsetDelta >= 33 || driftSec >= 0.033;
+
+        if (shouldCorrect) {
+          applySyncToWorklet(targetTc, 0, true);
+          engine.syncWithOffset(result.offset);
+          lastNetworkOffsetRef.current = result.offset;
         }
       } catch (e) {
-        console.warn('Background sync failed');
+        console.warn('Background sync failed', e);
       }
-    }, 30000); // Every 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
-  }, [syncMode, isRunning, p2pRole]);
+  }, [syncMode, isRunning, p2pRole, applySyncToWorklet]);
+
+  // Drift / accuracy readout — recompute the estimated accumulated drift once a
+  // second so the UI honestly reflects how stale the last sync is. Synchronising
+  // with an external system (wall clock) is exactly what useEffect is for.
+  useEffect(() => {
+    if (syncMode !== 'network' || !isRunning) return;
+    const fps = FPS_OPTIONS[fpsIndex].value;
+    const tick = () => setDriftStatus(driftMonitorRef.current.getStatus(fps));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [syncMode, isRunning, fpsIndex]);
 
   const handleStartStop = async () => {
     if (isRunning) {
@@ -565,7 +660,9 @@ function App() {
     } else {
       // Create/Resume AudioContext IMMEDIATELY on user gesture
       if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioCtx = window.AudioContext
+          || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        audioCtxRef.current = new AudioCtx();
       }
       
       const ctx = audioCtxRef.current;
@@ -605,7 +702,9 @@ function App() {
           try {
             const result = await TimeSync.sync();
             setSyncStatus(result);
+            driftMonitorRef.current.addSync(result.offset);
             offset = result.offset;
+            lastNetworkOffsetRef.current = result.offset;
             if (result.fromCache) {
               addToast('NTP SERVERS UNREACHABLE — USING CACHED OFFSET', 'warn');
             }
@@ -625,10 +724,13 @@ function App() {
               fps: 0,
               isDropFrame: false,
               isRunning: false,
+              // Runs from the START button handler (not render); clock read is intentional.
+              // eslint-disable-next-line react-hooks/purity
               clientTimestamp: performance.now()
             };
             peerSyncRef.current.broadcast(msg);
           }
+          // eslint-disable-next-line react-hooks/purity
           lastSyncTimeRef.current = Date.now();
         } else if (engineRef.current) {
           if (syncMode === 'p2p' && p2pRole === 'master' && p2pSyncSource === 'manual') {
@@ -636,7 +738,6 @@ function App() {
           } else {
             engineRef.current.syncWithOffset(offset);
           }
-          if (displayRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
         }
       }
 
@@ -671,107 +772,7 @@ function App() {
     if (ctx.state === 'suspended') await ctx.resume();
 
     // Define Worklet Script inline for compatibility and speed
-    const workletCode = `
-      class LtcProcessor extends AudioWorkletProcessor {
-        constructor(options) {
-          super();
-          this.settings = options.processorOptions;
-          this.phase = 1;
-          this.frameCount = 0;
-          this.sampleOffset = 0;
-          this.currentFrameSamples = null;
-          
-          // Initial TC setup
-          this.hours = this.settings.h;
-          this.minutes = this.settings.m;
-          this.seconds = this.settings.s;
-          this.frames = this.settings.f;
-        }
-
-        addFrame() {
-          this.frames++;
-          if (this.frames >= this.settings.fps) {
-            this.frames = 0;
-            this.seconds++;
-            if (this.seconds >= 60) {
-              this.seconds = 0;
-              this.minutes++;
-              if (this.minutes >= 60) {
-                this.minutes = 0;
-                this.hours++;
-                if (this.hours >= 24) this.hours = 0;
-              }
-            }
-          }
-          // Basic Drop Frame support (simplified for worklet)
-          if (this.settings.isDrop && this.frames < 2 && this.seconds === 0 && this.minutes % 10 !== 0) {
-             this.frames = 2;
-          }
-          
-          this.port.postMessage({ 
-            tc: \`\${String(this.hours).padStart(2, '0')}:\${String(this.minutes).padStart(2, '0')}:\${String(this.seconds).padStart(2, '0')}:\${String(this.frames).padStart(2, '0')}\`
-          });
-        }
-
-        generateBits() {
-          const bits = new Array(80).fill(0);
-          const f = this.frames, s = this.seconds, m = this.minutes, h = this.hours;
-          const setBits = (arr, start, count, val) => {
-            for (let i = 0; i < count; i++) arr[start + i] = (val >> i) & 1;
-          };
-          setBits(bits, 0, 4, f % 10); setBits(bits, 8, 2, Math.floor(f / 10));
-          bits[10] = this.settings.isDrop ? 1 : 0;
-          setBits(bits, 16, 4, s % 10); setBits(bits, 24, 3, Math.floor(s / 10));
-          setBits(bits, 32, 4, m % 10); setBits(bits, 40, 3, Math.floor(m / 10));
-          setBits(bits, 48, 4, h % 10); setBits(bits, 56, 2, Math.floor(h / 10));
-          // User bits
-          for (let i = 0; i < 8; i++) setBits(bits, 4 + (i * 8), 4, parseInt(this.settings.ubit[i], 16) || 0);
-          const sync = [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1];
-          for (let i = 0; i < 16; i++) bits[64 + i] = sync[i];
-          return bits;
-        }
-
-        process(inputs, outputs) {
-          const outputL = outputs[0][0];
-          const outputR = outputs[0][1];
-          const input = inputs[0] ? inputs[0][0] : null;
-          if (!outputL) return true;
-
-          for (let i = 0; i < outputL.length; i++) {
-            if (!this.currentFrameSamples || this.sampleOffset >= this.currentFrameSamples.length) {
-              const bits = this.generateBits();
-              const sr = sampleRate;
-              const nextEnd = Math.floor((this.frameCount + 1) * sr * this.settings.fpsDen / this.settings.fpsNum);
-              const curStart = Math.floor(this.frameCount * sr * this.settings.fpsDen / this.settings.fpsNum);
-              const count = nextEnd - curStart;
-              this.currentFrameSamples = new Float32Array(count);
-              const spb = count / 80;
-              let sIdx = 0;
-              for (let b = 0; b < 80; b++) {
-                const bit = bits[b];
-                const bEnd = Math.round((b + 1) * spb);
-                const bMid = Math.round((b + 0.5) * spb);
-                this.phase *= -1;
-                while (sIdx < bEnd && sIdx < count) {
-                  if (bit === 1 && sIdx === bMid) this.phase *= -1;
-                  this.currentFrameSamples[sIdx] = this.phase * this.settings.volume;
-                  sIdx++;
-                }
-              }
-              this.sampleOffset = 0;
-              this.frameCount++;
-              this.addFrame();
-            }
-            const s = this.currentFrameSamples[this.sampleOffset];
-            outputL[i] = s;
-            if (outputR) outputR[i] = this.settings.mode === 'stereo' ? s : (input ? input[i] : 0);
-            this.sampleOffset++;
-          }
-          return true;
-        }
-      }
-      registerProcessor('ltc-processor', LtcProcessor);
-    `;
+    const workletCode = LTC_WORKLET_SOURCE;
 
     const blob = new Blob([workletCode], { type: 'application/javascript' });
     const url = URL.createObjectURL(blob);
@@ -793,6 +794,7 @@ function App() {
         isDrop: FPS_OPTIONS[fpsIndex].drop,
         fpsNum: FPS_OPTIONS[fpsIndex].fpsNum,
         fpsDen: FPS_OPTIONS[fpsIndex].fpsDen,
+        framesPerSec: Math.round(FPS_OPTIONS[fpsIndex].fpsNum / FPS_OPTIONS[fpsIndex].fpsDen),
         volume: outputLevel === 'line' ? volume : volume * 0.1,
         ubit: userBits,
         mode: outputMode,
@@ -800,8 +802,11 @@ function App() {
       }
     });
     workletNode.port.onmessage = (e) => {
-       const tc = e.data.tc;
-       // Sync back to local engine state for markers etc
+       const tc = e.data?.tc;
+       if (!tc) return;
+       // Worklet is the live source of truth; cache its latest emitted TC.
+       currentTcRef.current = tc;
+       // Mirror into the engine so drift / markers reflect the ACTUAL output.
        if (engineRef.current) engineRef.current.setManualTimecode(tc);
        if (isVisualSlateRef.current) setSlateTime(tc);
     };
@@ -817,12 +822,13 @@ function App() {
         analyser.connect(workletNode);
         analyserRef.current = analyser;
       } catch (err) {
+        console.warn('Mic access denied', err);
         addToast('MIC ACCESS DENIED — CHECK BROWSER PERMISSIONS', 'error');
       }
     }
 
     workletNode.connect(ctx.destination);
-    (scriptNodeRef as any).current = workletNode; // Reuse ref for simplicity
+    workletNodeRef.current = workletNode;
     setIsRunning(true);
     TimecodeNativeBridge.startBackgroundMode();
   };
@@ -838,12 +844,13 @@ function App() {
         return;
       }
 
-      const tc = engine.getTimecodeString();
+      // While running the worklet drives the TC; when idle use the engine.
+      const tc = isRunning ? currentTcRef.current : engine.getTimecodeString();
       TimecodeNativeBridge.updatePlaybackStatus(isRunning, tc);
       
       // Update Slate Time (state) for overlay components (QR, etc)
       // Only update when needed to avoid React re-renders unless necessary
-      if (isVisualSlateRef.current && slateTime !== tc) {
+      if (isVisualSlateRef.current && slateTimeRef.current !== tc) {
         setSlateTime(tc);
       }
 
@@ -893,10 +900,10 @@ function App() {
   }, [isRunning, isMobile]);
 
   const stopEngine = () => {
-    if (scriptNodeRef.current) {
-      (scriptNodeRef.current as any).port.onmessage = null;
-      scriptNodeRef.current.disconnect();
-      scriptNodeRef.current = null;
+    if (workletNodeRef.current) {
+      workletNodeRef.current.port.onmessage = null;
+      workletNodeRef.current.disconnect();
+      workletNodeRef.current = null;
     }
     analyserRef.current = null;
     if (micStreamRef.current) {
@@ -904,8 +911,9 @@ function App() {
       micStreamRef.current = null;
     }
     setVuLevel(0);
-    if (displayRef.current && engineRef.current) displayRef.current.innerText = engineRef.current.getTimecodeString();
     setIsRunning(false);
+    driftMonitorRef.current.reset();
+    setDriftStatus(null);
     TimecodeNativeBridge.stopBackgroundMode();
   };
 
@@ -1022,6 +1030,36 @@ function App() {
               {syncStatus && syncMode === 'network' && (
                 <div className="sync-detail">Latency: {syncStatus.latency.toFixed(1)}ms | Offset: {syncStatus.offset.toFixed(1)}ms</div>
               )}
+              {syncMode === 'network' && isRunning && driftStatus && driftStatus.hasSync && (
+                <div className={`drift-panel drift-${driftStatus.confidence}`}>
+                  <div className="drift-row">
+                    <span className="drift-label">ACCURACY</span>
+                    <span className="drift-badge">{driftStatus.confidence.toUpperCase()}</span>
+                  </div>
+                  <div className="drift-row">
+                    <span>Last sync</span>
+                    <span>{formatSyncAge(driftStatus.msSinceSync)} ago</span>
+                  </div>
+                  <div className="drift-row">
+                    <span>Est. drift</span>
+                    <span>
+                      ±{driftStatus.estimatedDriftMs.toFixed(1)}ms
+                      {' '}({driftStatus.estimatedDriftFrames.toFixed(2)}f)
+                    </span>
+                  </div>
+                  <div className="drift-row">
+                    <span>Clock error</span>
+                    <span>
+                      {driftStatus.measured
+                        ? `${driftStatus.driftRatePpm >= 0 ? '+' : ''}${driftStatus.driftRatePpm.toFixed(1)} ppm`
+                        : `~${driftStatus.driftRatePpm} ppm (est.)`}
+                    </span>
+                  </div>
+                  {driftStatus.rejamRecommended && (
+                    <div className="drift-rejam">⚠ RE-SYNC RECOMMENDED</div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="control-section">
@@ -1124,7 +1162,7 @@ function App() {
                 <label className="section-label">CONNECTED CLIENTS ({Object.keys(clients).length})</label>
                 <div className="clients-grid">
                   {Object.entries(clients).map(([id, stats]: [string, { rtt: number, drift: number, lastSeen: number }]) => {
-                    const isOffline = Date.now() - stats.lastSeen > 30000;
+                    const isOffline = nowTick - stats.lastSeen > 30000;
                     return (
                       <div key={id} className={`client-card ${isOffline ? 'offline' : ''}`}>
                         <div className="client-id">{id}</div>
@@ -1236,8 +1274,8 @@ function App() {
       <footer className="fixed-footer">
         <div className="footer-buttons">
           <div className="footer-left">
-            <button 
-              className={`btn-main-action ${isRunning ? 'running danger' : ''}`} 
+            <button
+              className={`btn-main-action ${isRunning ? 'running danger' : ''}`}
               onClick={handleStartStop}
               disabled={isPreparing}
             >
@@ -1285,6 +1323,6 @@ function App() {
       )}
     </div>
   );
-};
+}
 
 export default App;

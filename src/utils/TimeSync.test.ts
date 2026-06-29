@@ -77,4 +77,47 @@ describe('TimeSync', () => {
 
     await expect(TimeSync.sync(1)).rejects.toThrow('All time servers failed');
   });
+
+  it('parses the lowercase `datetime` field format', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ datetime: new Date().toISOString() }),
+    }));
+
+    const result = await TimeSync.sync(1);
+    expect(typeof result.offset).toBe('number');
+  });
+
+  it('skips responses that contain no recognised time field', async () => {
+    // No dateTime/datetime -> the sample is skipped; with no cache it throws.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ unexpected: 'shape' }),
+    }));
+
+    await expect(TimeSync.sync(1)).rejects.toThrow('All time servers failed');
+  });
+
+  it('skips non-ok responses', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      json: () => Promise.resolve({}),
+    }));
+
+    await expect(TimeSync.sync(1)).rejects.toThrow('All time servers failed');
+  });
+
+  it('aborts and recovers when a request exceeds the timeout', async () => {
+    // fetch rejects as if aborted; with a fresh cache we fall back to it.
+    localStorage.setItem(NTP_CACHE_KEY, JSON.stringify({
+      offset: 42, latency: 10, savedAt: Date.now(),
+    }));
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(
+      Object.assign(new Error('aborted'), { name: 'AbortError' }),
+    ));
+
+    const result = await TimeSync.sync(1);
+    expect(result.fromCache).toBe(true);
+    expect(result.offset).toBe(42);
+  });
 });
