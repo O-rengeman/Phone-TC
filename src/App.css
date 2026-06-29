@@ -992,6 +992,8 @@ input[type="range"] {
 
 .btn-main-action {
   flex: 1;
+  position: relative;
+  overflow: hidden;
   background: var(--panel);
   border: 2px solid var(--border-subtle);
   color: var(--text);
@@ -1004,6 +1006,25 @@ input[type="range"] {
   gap: 10px;
   cursor: pointer;
   transition: all 0.2s;
+  touch-action: none;
+  user-select: none;
+}
+
+/* Hold-to-stop progress fill (sits behind the label). */
+.stop-hold-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 0;
+  background: rgba(255, 59, 113, 0.4);
+  pointer-events: none;
+}
+
+.btn-main-action .btn-icon,
+.btn-main-action .btn-text {
+  position: relative;
+  z-index: 1;
 }
 
 .btn-main-action:active {

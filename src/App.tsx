@@ -93,6 +93,11 @@ function App() {
   const driftMonitorRef = useRef<DriftMonitor>(new DriftMonitor());
   const [driftStatus, setDriftStatus] = useState<DriftStatus | null>(null);
   const [isPaused, setIsPaused] = useState(false);
+  // Hold-to-stop guard: stopping LTC mid-take ruins sync, so STOP requires a
+  // deliberate press-and-hold. stopHoldPct (0..100) drives the fill UI.
+  const [stopHoldPct, setStopHoldPct] = useState(0);
+  const stopHoldRafRef = useRef<number | null>(null);
+  const stopHoldStartRef = useRef(0);
   const [p2pSyncSource, setP2pSyncSource] = useState<'manual' | 'network'>('manual');
   const [masterDrift, setMasterDrift] = useState<number | null>(null); // Drift in seconds from master
   const [clients, setClients] = useState<Record<string, { rtt: number, drift: number, lastSeen: number }>>({});
@@ -652,6 +657,40 @@ function App() {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [syncMode, isRunning, fpsIndex]);
+
+  const STOP_HOLD_MS = 700;
+
+  const cancelStopHold = () => {
+    if (stopHoldRafRef.current !== null) {
+      cancelAnimationFrame(stopHoldRafRef.current);
+      stopHoldRafRef.current = null;
+    }
+    setStopHoldPct(0);
+  };
+
+  // Press-and-hold to confirm STOP while LTC is being emitted.
+  const beginStopHold = () => {
+    if (stopHoldRafRef.current !== null) return;
+    // eslint-disable-next-line react-hooks/purity -- runs from a pointer event, not render
+    stopHoldStartRef.current = performance.now();
+    const tick = () => {
+      const pct = Math.min(100, ((performance.now() - stopHoldStartRef.current) / STOP_HOLD_MS) * 100);
+      setStopHoldPct(pct);
+      if (pct >= 100) {
+        stopHoldRafRef.current = null;
+        setStopHoldPct(0);
+        setIsPaused(false);
+        stopEngine();
+      } else {
+        stopHoldRafRef.current = requestAnimationFrame(tick);
+      }
+    };
+    stopHoldRafRef.current = requestAnimationFrame(tick);
+  };
+
+  useEffect(() => () => {
+    if (stopHoldRafRef.current !== null) cancelAnimationFrame(stopHoldRafRef.current);
+  }, []);
 
   const handleStartStop = async () => {
     if (isRunning) {
@@ -1307,12 +1346,17 @@ function App() {
           <div className="footer-left">
             <button
               className={`btn-main-action ${isRunning ? 'running danger' : isPreparing ? 'preparing' : 'start'}`}
-              onClick={handleStartStop}
+              onClick={() => { if (!isRunning) void handleStartStop(); }}
+              onPointerDown={isRunning ? beginStopHold : undefined}
+              onPointerUp={isRunning ? cancelStopHold : undefined}
+              onPointerLeave={isRunning ? cancelStopHold : undefined}
+              onContextMenu={(e) => { if (isRunning) e.preventDefault(); }}
               disabled={isPreparing}
             >
+              {isRunning && <div className="stop-hold-fill" style={{ width: `${stopHoldPct}%` }} />}
               <div className="btn-icon"></div>
               <div className="btn-text">
-                {isRunning ? 'STOP' : isPreparing ? 'PREP...' : isPaused ? 'RESUME' : 'START'}
+                {isRunning ? (stopHoldPct > 0 ? 'HOLD…' : 'HOLD TO STOP') : isPreparing ? 'PREP...' : isPaused ? 'RESUME' : 'START'}
               </div>
             </button>
             {isRunning && (
