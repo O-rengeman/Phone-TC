@@ -874,23 +874,46 @@ function App() {
       // Clear
       ctx.clearRect(0, 0, w, h);
 
-      // Draw Timecode
-      const vw = window.innerWidth;
-      const baseSize = isMobile ? Math.min(vw * 0.12, 100) : vw * 0.065;
-      ctx.font = `900 ${baseSize}px 'JetBrains Mono', monospace`;
+      // Draw Timecode — auto-size to fill ~90% of the card width so the TC is
+      // as large and legible as possible on any screen / orientation.
+      const targetWidth = w * 0.9;
+      const maxSize = isMobile ? 140 : 220;
+      let fontSize = maxSize;
+      ctx.font = `900 ${fontSize}px 'JetBrains Mono', monospace`;
+      const measured = ctx.measureText(tc).width;
+      if (measured > targetWidth && measured > 0) {
+        fontSize = Math.floor(fontSize * (targetWidth / measured));
+        ctx.font = `900 ${fontSize}px 'JetBrains Mono', monospace`;
+      }
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      // Neon Glow (GPU accelerated shadow)
-      ctx.shadowColor = 'rgba(255, 255, 255, 0.3)';
-      ctx.shadowBlur = isMobile ? 20 : 60;
-      ctx.fillStyle = '#fafafa';
-      
+      // High-contrast white; warmer/stronger glow while emitting LTC.
+      ctx.shadowColor = isRunning ? 'rgba(255, 90, 120, 0.45)' : 'rgba(255, 255, 255, 0.3)';
+      ctx.shadowBlur = isMobile ? 18 : 50;
+      ctx.fillStyle = '#ffffff';
       ctx.fillText(tc, w / 2, h / 2);
-      
-      // Secondary sharper glow
-      ctx.shadowBlur = 5;
+
+      // Secondary sharper pass for crisp edges.
+      ctx.shadowBlur = 4;
       ctx.fillText(tc, w / 2, h / 2);
+
+      // REC indicator while LTC is being emitted.
+      if (isRunning) {
+        ctx.shadowBlur = 0;
+        const r = Math.max(5, w * 0.013);
+        const pad = Math.max(12, w * 0.045);
+        const pulse = 0.5 + 0.5 * Math.abs(Math.sin(Date.now() / 450));
+        ctx.beginPath();
+        ctx.arc(pad, pad, r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 59, 113, ${pulse})`;
+        ctx.fill();
+        ctx.font = `800 ${Math.round(r * 2.1)}px 'JetBrains Mono', monospace`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ff3b71';
+        ctx.fillText('REC', pad + r * 1.9, pad + 1);
+      }
 
       rafId = requestAnimationFrame(render);
     };
@@ -932,8 +955,16 @@ function App() {
           <div className="logo">LTC SYNC PRO</div>
           <div className="version">v1.3</div>
         </div>
-        <div className={`status-badge-compact ${isRunning ? 'active' : ''}`}>
-          {isRunning ? 'LTC OUT' : isPreparing ? 'SYNCING' : 'READY'}
+        <div className="status-cluster">
+          <div className={`status-pill ${isRunning ? 'live' : isPreparing ? 'prep' : 'idle'}`}>
+            <span className="status-dot" />
+            {isRunning ? 'LTC OUT' : isPreparing ? 'SYNCING' : 'READY'}
+          </div>
+          <div className="status-meta">
+            <span>{FPS_OPTIONS[fpsIndex].label}</span>
+            <span className="status-meta-sep">·</span>
+            <span>{syncMode.toUpperCase()}</span>
+          </div>
         </div>
       </header>
 
@@ -1275,7 +1306,7 @@ function App() {
         <div className="footer-buttons">
           <div className="footer-left">
             <button
-              className={`btn-main-action ${isRunning ? 'running danger' : ''}`}
+              className={`btn-main-action ${isRunning ? 'running danger' : isPreparing ? 'preparing' : 'start'}`}
               onClick={handleStartStop}
               disabled={isPreparing}
             >

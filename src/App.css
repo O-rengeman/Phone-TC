@@ -93,6 +93,69 @@ header {
   box-shadow: 0 0 12px var(--primary-glow);
 }
 
+/* ── Always-visible status rail (state + FPS + sync mode) ── */
+.status-cluster {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--panel-elevated);
+  color: var(--text-muted);
+  transition: all 0.3s ease;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.status-pill.idle .status-dot { background: #666; }
+.status-pill.prep {
+  color: #e2c044;
+  border-color: rgba(226, 192, 68, 0.4);
+}
+.status-pill.prep .status-dot {
+  background: #e2c044;
+  animation: pulse-warn 1s infinite;
+}
+.status-pill.live {
+  color: #ff3b71;
+  border-color: rgba(255, 59, 113, 0.5);
+  background: rgba(255, 59, 113, 0.1);
+}
+.status-pill.live .status-dot {
+  background: #ff3b71;
+  box-shadow: 0 0 8px #ff3b71;
+  animation: pulse-recording 1.2s infinite ease-in-out;
+}
+
+.status-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text);
+}
+
+.status-meta-sep { color: var(--text-muted); }
+
 /* ── Tab Bar ── */
 .tab-bar {
   display: flex;
@@ -932,7 +995,8 @@ input[type="range"] {
   background: var(--panel);
   border: 2px solid var(--border-subtle);
   color: var(--text);
-  padding: 16px;
+  padding: 20px 16px;
+  min-height: 60px;
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
@@ -946,16 +1010,40 @@ input[type="range"] {
   transform: scale(0.97);
 }
 
-.btn-main-action.running {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: #000;
+.btn-main-action:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
+/* Idle / resume = clear GO (green). */
+.btn-main-action.start {
+  border-color: #00c853;
+  color: #00e676;
+  background: rgba(0, 200, 83, 0.12);
+}
+
+.btn-main-action.start .btn-icon {
+  background: #00e676;
+  box-shadow: 0 0 10px rgba(0, 230, 118, 0.6);
+}
+
+.btn-main-action.preparing {
+  border-color: #e2c044;
+  color: #e2c044;
+  background: rgba(226, 192, 68, 0.1);
+}
+
+/* Running = STOP, unambiguous red. */
+.btn-main-action.running,
 .btn-main-action.danger {
-  border-color: var(--danger);
-  color: var(--danger);
-  background: rgba(255, 61, 113, 0.08);
+  border-color: #ff3b71;
+  color: #ff6b8e;
+  background: rgba(255, 59, 113, 0.14);
+}
+
+.running .btn-icon {
+  background: #ff3b71;
+  animation: blink 1s steps(2, start) infinite;
 }
 
 .btn-main-action.pause {
@@ -969,11 +1057,6 @@ input[type="range"] {
   height: 12px;
   border-radius: 50%;
   background: var(--text-muted);
-}
-
-.running .btn-icon {
-  background: #000;
-  animation: blink 1s steps(2, start) infinite;
 }
 
 @keyframes blink {
