@@ -1346,3 +1346,108 @@ input[type="range"] {
   from { opacity: 0; transform: translateX(24px); }
   to   { opacity: 1; transform: translateX(0); }
 }
+
+/* ── Help button + Camera sync guide modal ── */
+.help-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+  background: var(--panel-elevated);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.help-btn:active { transform: scale(0.92); }
+
+.guide-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: toast-in 0.18s ease;
+}
+
+.guide-card {
+  width: 100%;
+  max-width: 460px;
+  max-height: 86dvh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 18px 18px 20px;
+}
+
+.guide-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.guide-title {
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  color: var(--text-bright);
+}
+
+.guide-x {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.guide-steps {
+  margin: 0 0 14px;
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.guide-steps li {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.guide-steps b { color: var(--text-bright); font-weight: 800; }
+
+.guide-tip {
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  background: var(--panel-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  margin-bottom: 16px;
+}
+
+.guide-done {
+  width: 100%;
+  padding: 13px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: #000;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}

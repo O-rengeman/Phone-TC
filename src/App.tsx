@@ -96,6 +96,7 @@ function App() {
   // Hold-to-stop guard: stopping LTC mid-take ruins sync, so STOP requires a
   // deliberate press-and-hold. stopHoldPct (0..100) drives the fill UI.
   const [stopHoldPct, setStopHoldPct] = useState(0);
+  const [showGuide, setShowGuide] = useState(false);
   const stopHoldRafRef = useRef<number | null>(null);
   const stopHoldStartRef = useRef(0);
   const [p2pSyncSource, setP2pSyncSource] = useState<'manual' | 'network'>('manual');
@@ -995,6 +996,13 @@ function App() {
           <div className="version">v1.3</div>
         </div>
         <div className="status-cluster">
+          <button
+            type="button"
+            className="help-btn"
+            onClick={() => setShowGuide(true)}
+            aria-label="Camera sync setup guide"
+            title="Camera sync setup guide"
+          >?</button>
           <div className={`status-pill ${isRunning ? 'live' : isPreparing ? 'prep' : 'idle'}`}>
             <span className="status-dot" />
             {isRunning ? 'LTC OUT' : isPreparing ? 'SYNCING' : 'READY'}
@@ -1394,6 +1402,26 @@ function App() {
           </div>
           <div className="slate-close">TAP FOR CLAPPER / LONG PRESS TO CLOSE</div>
           <button style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', color: '#666', fontSize: '2rem' }} onClick={(e) => { e.stopPropagation(); setIsVisualSlate(false); }}>×</button>
+        </div>
+      )}
+
+      {showGuide && (
+        <div className="guide-overlay" onClick={() => setShowGuide(false)}>
+          <div className="guide-card" onClick={(e) => e.stopPropagation()}>
+            <div className="guide-head">
+              <span className="guide-title">CAMERA SYNC — QUICK SETUP</span>
+              <button type="button" className="guide-x" onClick={() => setShowGuide(false)} aria-label="Close">×</button>
+            </div>
+            <ol className="guide-steps">
+              <li>Connect this phone's audio output to the camera's MIC / LINE input with a 3.5mm TRS cable.</li>
+              <li><b>OUTPUT MODE</b>: pick <b>L-TC / R-AUDIO</b> to also record reference audio, or <b>STEREO TC</b> for timecode only.</li>
+              <li><b>OUTPUT LEVEL</b>: start at <b>LINE</b>. If the camera can't read TC, switch to <b>MIC</b> (lower level).</li>
+              <li>Match <b>FRAME RATE</b> (and drop-frame) to your camera exactly — an FPS mismatch is the #1 sync error.</li>
+              <li>Press <b>START</b>, then confirm the camera's timecode matches the value on screen.</li>
+            </ol>
+            <div className="guide-tip">Keep the app running in the foreground or via background mode. Re-jam whenever you see <b>RE-SYNC RECOMMENDED</b>.</div>
+            <button type="button" className="guide-done" onClick={() => setShowGuide(false)}>GOT IT</button>
+          </div>
         </div>
       )}
     </div>
