@@ -131,6 +131,12 @@ function App() {
   const [tallyControlsOpen, setTallyControlsOpen] = useState(false);
   const [tallyDimmerOpacity, setTallyDimmerOpacity] = useState(0); // 0 = transparent (bright), 0.5 = dim, 0.9 = very dark
   const tallyControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  const [directorPanelOpen, setDirectorPanelOpen] = useState(false);
+  const [directorTime, setDirectorTime] = useState<string>('00:00:00:00');
+  const directorTimeRef = useRef<string>(directorTime);
+  const directorPanelOpenRef = useRef<boolean>(directorPanelOpen);
+
   const [isResyncing, setIsResyncing] = useState(false);
   const [lang, setLang] = useState<Lang>(() => getInitialLang());
   const langRef = useRef<Lang>(lang);
@@ -145,6 +151,10 @@ function App() {
       }
     }
   }, [tallyOpen]);
+
+  useEffect(() => {
+    directorPanelOpenRef.current = directorPanelOpen;
+  }, [directorPanelOpen]);
   const tr = (key: string, vars?: Record<string, string | number>) => translate(key, lang, vars);
   useEffect(() => { langRef.current = lang; persistLang(lang); }, [lang]);
   // Battery readout: level, charging state and an estimated time-to-empty so
@@ -1057,6 +1067,11 @@ function App() {
         setTallyTime(tc);
       }
 
+      if (directorPanelOpenRef.current && directorTimeRef.current !== tc) {
+        directorTimeRef.current = tc;
+        setDirectorTime(tc);
+      }
+
       // Draw Logic
       const ctx = canvas.getContext('2d', { alpha: true });
       if (!ctx) return;
@@ -1328,6 +1343,27 @@ function App() {
   const handleTallyExit = (e: React.MouseEvent) => {
     e.stopPropagation();
     setTallyOpen(false);
+  };
+
+  const handleAllTallyChange = (s: TallyState) => {
+    if (!isHost) return;
+    tallyRevRef.current += 1;
+    const newPayload: TallyPayload = {
+      rev: tallyRevRef.current,
+      all: s,
+      assignments: {}
+    };
+    setTallyPayload(newPayload);
+    setManualTally(s);
+    peerSyncRef.current?.broadcast({
+      type: 'tally',
+      masterTimecode: '',
+      masterTimestamp: 0,
+      fps: 0,
+      isDropFrame: false,
+      isRunning: false,
+      tally: newPayload
+    });
   };
 
   return (
@@ -1631,6 +1667,20 @@ function App() {
                   <span>Torch LED</span>
                 </label>
               </div>
+              {isHost && (
+                <button
+                  className="tally-open-btn"
+                  style={{
+                    marginTop: '10px',
+                    background: 'linear-gradient(90deg, #ff3b30, #ff9500)',
+                    borderColor: '#ff9500',
+                    color: '#fff'
+                  }}
+                  onClick={() => setDirectorPanelOpen(true)}
+                >
+                  DIRECTOR SWITCHER PANEL
+                </button>
+              )}
               {tallyMode === 'manual' && (
                 <div className="tally-state-row">
                   {(['live', 'standby', 'off'] as TallyState[]).map(s => (
@@ -1877,6 +1927,100 @@ function App() {
 
           <div className="tally-footer">
             {tallyControlsOpen ? 'TAP SCREEN TO HIDE CONTROLS' : 'TAP SCREEN FOR CONTROLS'}
+          </div>
+        </div>
+      )}
+
+      {directorPanelOpen && (
+        <div className="director-tally-overlay">
+          <div className="director-tally-header">
+            <div className="director-title">
+              <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', background: '#ff3b30', animation: 'blink 1.5s infinite' }} />
+              DIRECTOR TALLY SWITCHER
+            </div>
+            <div className="director-header-right">
+              <div className="director-tc-large">{directorTime}</div>
+              <button className="director-close-btn" onClick={() => setDirectorPanelOpen(false)}>EXIT PANEL</button>
+            </div>
+          </div>
+
+          <div className="director-all-control">
+            <div className="director-all-left">
+              <span style={{ fontWeight: '800', color: '#ff9500' }}>ALL CAMERAS</span>
+              <span style={{ fontSize: '0.8rem', color: '#666' }}>Batch control for all non-assigned states</span>
+            </div>
+            <div className="director-all-right">
+              {(['live', 'preview', 'standby', 'off'] as TallyState[]).map(s => {
+                const isActive = tallyPayload?.all === s;
+                return (
+                  <button
+                    key={s}
+                    className={`director-action-btn director-btn-${s === 'live' ? 'pgm' : s === 'preview' ? 'pvw' : s} ${isActive ? 'active' : ''}`}
+                    style={{ padding: '8px 16px' }}
+                    onClick={() => handleAllTallyChange(s)}
+                  >
+                    ALL {tr(tallyLabelKey(s))}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="director-grid">
+            {Object.keys(clients).length === 0 ? (
+              <div className="director-no-clients">
+                NO ACTIVE CAMERAS CONNECTED
+                <div style={{ fontSize: '0.85rem', color: '#555', marginTop: '8px', fontWeight: '400' }}>
+                  Connect client phones via P2P to control them from this switcher panel.
+                </div>
+              </div>
+            ) : (
+              Object.entries(clients).map(([id, stats]: [string, any]) => {
+                const isOffline = Date.now() - stats.lastSeen > 30000;
+                const currentAssignedState = tallyPayload?.assignments?.[id] ?? tallyPayload?.all ?? 'off';
+                return (
+                  <div
+                    key={id}
+                    className={`director-cam-card status-${currentAssignedState} ${isOffline ? 'offline' : ''}`}
+                  >
+                    <div className="director-cam-info">
+                      <div className="director-cam-name">{id}</div>
+                      <div className="director-cam-stats">
+                        <span>RTT: {stats.rtt.toFixed(0)}ms</span>
+                        <span>Δ: {stats.drift.toFixed(2)}s</span>
+                      </div>
+                    </div>
+
+                    <div className="director-cam-actions">
+                      <button
+                        className={`director-action-btn director-btn-pgm ${currentAssignedState === 'live' ? 'active' : ''}`}
+                        onClick={() => handleClientTallyChange(id, 'live')}
+                      >
+                        PGM (LIVE)
+                      </button>
+                      <button
+                        className={`director-action-btn director-btn-pvw ${currentAssignedState === 'preview' ? 'active' : ''}`}
+                        onClick={() => handleClientTallyChange(id, 'preview')}
+                      >
+                        PVW (PREV)
+                      </button>
+                      <button
+                        className={`director-action-btn director-btn-stby ${currentAssignedState === 'standby' ? 'active' : ''}`}
+                        onClick={() => handleClientTallyChange(id, 'standby')}
+                      >
+                        STANDBY
+                      </button>
+                      <button
+                        className={`director-action-btn director-btn-off ${currentAssignedState === 'off' ? 'active' : ''}`}
+                        onClick={() => handleClientTallyChange(id, 'off')}
+                      >
+                        OFF
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}
