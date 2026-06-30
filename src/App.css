@@ -1829,3 +1829,20 @@ input[type="range"] {
 .mobile-view .status-meta { display: none; }
 .mobile-view .hdr-divider { height: 14px; }
 .mobile-view .header-right { gap: 8px; }
+
+/* ── Free-run start timecode input ── */
+.tc-input {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-align: center;
+  color: var(--text-bright);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+.tc-input:focus { outline: none; border-color: var(--primary); }
+.tc-input:disabled { opacity: 0.6; }

@@ -29,7 +29,7 @@ const FPS_OPTIONS = [
   { label: '30', value: 30, drop: false, fpsNum: 30000, fpsDen: 1000 },
 ];
 
-type SyncMode = 'system' | 'network' | 'p2p';
+type SyncMode = 'system' | 'network' | 'p2p' | 'freerun';
 type ToastLevel = 'info' | 'warn' | 'error';
 type Toast = { id: number; msg: string; level: ToastLevel };
 
@@ -885,7 +885,7 @@ function App() {
           // eslint-disable-next-line react-hooks/purity
           lastSyncTimeRef.current = Date.now();
         } else if (engineRef.current) {
-          if (syncMode === 'p2p' && p2pRole === 'master' && p2pSyncSource === 'manual') {
+          if (syncMode === 'freerun' || (syncMode === 'p2p' && p2pRole === 'master' && p2pSyncSource === 'manual')) {
             engineRef.current.setManualTimecode(manualTimecode);
           } else {
             engineRef.current.syncWithOffset(offset);
@@ -1180,10 +1180,7 @@ function App() {
                   <span className="msb-label">{tr('sync.label')}</span>
                   <span className="msb-mode">{tr('sync.network')}</span>
                   {isRunning && driftStatus && driftStatus.hasSync && (
-                    <>
-                      <span className={`msb-badge drift-${driftStatus.confidence}`}>{driftStatus.confidence.toUpperCase()}</span>
-                      <span className="msb-age">{formatSyncAge(driftStatus.msSinceSync)}</span>
-                    </>
+                    <span className="msb-age">{formatSyncAge(driftStatus.msSinceSync)}</span>
                   )}
                 </div>
                 <button type="button" className="msb-resync" onClick={handleManualResync} disabled={isResyncing}>
@@ -1246,14 +1243,14 @@ function App() {
             <div className="control-section">
               <label className="section-label">{tr('label.syncMethod')}</label>
               <div className="sync-toggle-pro">
-                {['system', 'network', 'p2p'].map((m) => (
+                {(['system', 'network', 'p2p', 'freerun'] as SyncMode[]).map((m) => (
                   <button 
                     key={m}
                     className={syncMode === m ? 'active' : ''}
-                    onClick={() => setSyncMode(m as SyncMode)}
+                    onClick={() => setSyncMode(m)}
                     disabled={isRunning || (m === 'p2p' && !p2pRole)}
                   >
-                    {m.toUpperCase()}
+                    {m === 'freerun' ? tr('mode.freerun') : m.toUpperCase()}
                   </button>
                 ))}
               </div>
@@ -1261,36 +1258,31 @@ function App() {
                 <div className="sync-detail">Latency: {syncStatus.latency.toFixed(1)}ms | Offset: {syncStatus.offset.toFixed(1)}ms</div>
               )}
               {syncMode === 'network' && isRunning && driftStatus && driftStatus.hasSync && (
-                <div className={`drift-panel drift-${driftStatus.confidence}`}>
-                  <div className="drift-row">
-                    <span className="drift-label">{tr('drift.accuracy')}</span>
-                    <span className="drift-badge">{driftStatus.confidence.toUpperCase()}</span>
-                  </div>
+                <div className="drift-panel">
                   <div className="drift-row">
                     <span>{tr('drift.lastSync')}</span>
-                    <span>{formatSyncAge(driftStatus.msSinceSync)} ago</span>
+                    <span>{formatSyncAge(driftStatus.msSinceSync)} {tr('drift.ago')}</span>
                   </div>
-                  <div className="drift-row">
-                    <span>{tr('drift.estDrift')}</span>
-                    <span>
-                      ±{driftStatus.estimatedDriftMs.toFixed(1)}ms
-                      {' '}({driftStatus.estimatedDriftFrames.toFixed(2)}f)
-                    </span>
-                  </div>
-                  <div className="drift-row">
-                    <span>{tr('drift.clockError')}</span>
-                    <span>
-                      {driftStatus.measured
-                        ? `${driftStatus.driftRatePpm >= 0 ? '+' : ''}${driftStatus.driftRatePpm.toFixed(1)} ppm`
-                        : `~${driftStatus.driftRatePpm} ppm (est.)`}
-                    </span>
-                  </div>
-                  {driftStatus.rejamRecommended && (
+                  {driftStatus.msSinceSync >= 3600000 && (
                     <div className="drift-rejam">⚠ {tr('drift.rejam')}</div>
                   )}
                 </div>
               )}
             </div>
+
+            {syncMode === 'freerun' && (
+              <div className="control-section">
+                <label className="section-label">{tr('label.startTc')}</label>
+                <input
+                  className="tc-input"
+                  value={manualTimecode}
+                  onChange={(e) => setManualTimecode(e.target.value)}
+                  disabled={isRunning}
+                  placeholder="HH:MM:SS:FF"
+                  inputMode="numeric"
+                />
+              </div>
+            )}
 
             <div className="control-section">
               <label className="section-label">{tr('label.p2p')}</label>

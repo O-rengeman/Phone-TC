@@ -24,6 +24,9 @@ const en: Dict = {
   'status.live': 'LTC OUT',
 
   'guide.aria': 'Camera sync setup guide',
+  'mode.freerun': 'FREE',
+  'label.startTc': 'START TIMECODE',
+  'drift.ago': 'ago',
 
   'label.frameRate': 'FRAME RATE',
   'label.outputVolume': 'OUTPUT VOLUME & LEVEL',
@@ -102,6 +105,9 @@ const ja: Dict = {
   'status.live': 'LTC出力中',
 
   'guide.aria': 'カメラ同期セットアップガイド',
+  'mode.freerun': 'フリー',
+  'label.startTc': '開始タイムコード',
+  'drift.ago': '前',
 
   'label.frameRate': 'フレームレート',
   'label.outputVolume': '出力音量・レベル',
