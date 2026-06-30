@@ -56,6 +56,22 @@ public class TimecodeNativeBridge: CAPPlugin {
         call.resolve()
     }
 
+    @objc func setTorch(_ call: CAPPluginCall) {
+        let on = call.getBool("on") ?? false
+        guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else {
+            call.reject("Torch not available on this device")
+            return
+        }
+        do {
+            try device.lockForConfiguration()
+            device.torchMode = on ? .on : .off
+            device.unlockForConfiguration()
+            call.resolve()
+        } catch {
+            call.reject("Could not lock device for torch configuration")
+        }
+    }
+
     private func registerInterruptionHandler() {
         removeInterruptionHandler()
         interruptionObserver = NotificationCenter.default.addObserver(

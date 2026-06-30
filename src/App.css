@@ -1846,3 +1846,61 @@ input[type="range"] {
 }
 .tc-input:focus { outline: none; border-color: var(--primary); }
 .tc-input:disabled { opacity: 0.6; }
+
+/* ---------- Tally lamp ---------- */
+.tally-section .tally-controls { display: flex; gap: 8px; }
+.tally-section .tally-state-row { display: flex; gap: 8px; margin-top: 8px; }
+.tally-state-btn {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 8px;
+  border: 2px solid #333;
+  background: #1a1a1a;
+  color: #eee;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+.tally-state-btn.active { color: #fff; }
+.tally-open-btn {
+  margin-top: 10px;
+  width: 100%;
+  padding: 12px 0;
+  border-radius: 8px;
+  border: 2px solid #444;
+  background: #161616;
+  color: #ddd;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.tally-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4vh;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tally-overlay-label {
+  font-size: 22vw;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 0 18px rgba(0, 0, 0, 0.55);
+}
+.tally-overlay.tally-off .tally-overlay-label { color: #555; text-shadow: none; }
+.tally-overlay-hint {
+  font-size: 3.5vw;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.8);
+}
+.tally-overlay.tally-off .tally-overlay-hint { color: #444; }

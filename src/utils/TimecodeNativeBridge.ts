@@ -12,6 +12,9 @@ export interface TimecodeNativeBridgePlugin {
    * iOSのロック画面表示やAndroidの通知表示更新などに利用
    */
   updatePlaybackStatus(options: { isRunning: boolean; timecode: string }): Promise<void>;
+
+  /** デバイスのトーチ（フラッシュライト）のON/OFFを切り替えます */
+  setTorch(options: { on: boolean }): Promise<void>;
 }
 
 // Capacitor プラグインとしての登録を試みます
@@ -67,6 +70,23 @@ export const TimecodeNativeBridge = {
     if (isRunning && Math.random() < 0.05) {
       console.log(`[NativeBridge] (Fallback) Playback status updated. active: ${isRunning}, timecode: ${timecode}`);
     }
+  },
+
+  async setTorch(on: boolean): Promise<void> {
+    if (nativePlugin) {
+      // Capacitor v3/v4+ conventions
+      const plugin = nativePlugin as any;
+      if (typeof plugin.setTorch === 'function') {
+        try {
+          await plugin.setTorch({ on });
+          return;
+        } catch (err) {
+          console.error('[NativeBridge] Failed to invoke native setTorch', err);
+        }
+      }
+    }
+    // Web environment: App.tsx will handle the browser torch API if Capacitor fails
+    console.log(`[NativeBridge] (Fallback) Torch set to ${on}`);
   },
 
   /**

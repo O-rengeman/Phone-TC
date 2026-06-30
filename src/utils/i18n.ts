@@ -83,6 +83,16 @@ const en: Dict = {
 
   'slate.close': 'TAP FOR CLAPPER / LONG PRESS TO CLOSE',
 
+  'label.tally': 'TALLY',
+  'tally.live': 'LIVE',
+  'tally.preview': 'PVW',
+  'tally.standby': 'STBY',
+  'tally.off': 'OFF',
+  'tally.auto': 'AUTO',
+  'tally.manual': 'MANUAL',
+  'tally.fullscreen': 'FULL SCREEN',
+  'tally.closeHint': 'TAP TO CLOSE',
+
   'toast.interruptBegan': 'AUDIO INTERRUPTION — LTC PAUSED',
   'toast.interruptEnded': 'INTERRUPTION ENDED — LTC RESUMED',
   'toast.p2pInitFailed': 'P2P INIT FAILED — CHECK NETWORK',
@@ -163,6 +173,16 @@ const ja: Dict = {
   'guide.tip': 'アプリは前面、またはバックグラウンドモードで動かし続けてください。「要再同期」が出たら再同期してください。',
 
   'slate.close': 'タップでカチンコ / 長押しで閉じる',
+
+  'label.tally': 'タリー',
+  'tally.live': 'LIVE',
+  'tally.preview': 'PVW',
+  'tally.standby': 'STBY',
+  'tally.off': 'OFF',
+  'tally.auto': '自動',
+  'tally.manual': '手動',
+  'tally.fullscreen': '全画面',
+  'tally.closeHint': 'タップで閉じる',
 
   'toast.interruptBegan': 'オーディオ割り込み発生 — LTCを一時中断',
   'toast.interruptEnded': '割り込み終了 — LTC出力を自動復帰',

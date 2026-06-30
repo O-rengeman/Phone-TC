@@ -1,8 +1,10 @@
 import { Peer } from 'peerjs';
 import type { DataConnection } from 'peerjs';
 
+import type { TallyPayload } from './tally';
+
 export interface SyncMessage {
-  type: 'sync-request' | 'sync-response' | 'heartbeat' | 'report';
+  type: 'sync-request' | 'sync-response' | 'heartbeat' | 'report' | 'tally';
   masterTimecode: string;
   masterTimestamp: number;
   fps: number;
@@ -12,6 +14,7 @@ export interface SyncMessage {
   clientId?: string; // Identifier for the sender
   rtt?: number;      // Reported RTT from client
   drift?: number;    // Reported drift from client
+  tally?: TallyPayload;
 }
 
 /** Factory used to create the underlying Peer — overridable for tests. */

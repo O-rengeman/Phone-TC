@@ -16,6 +16,8 @@ import type { BatterySample } from './utils/battery';
 import type { DriftStatus } from './utils/DriftMonitor';
 import { buildEdl, buildAle } from './utils/export';
 import type { Marker } from './utils/export';
+import { resolveTally, adoptTally, TALLY_COLORS, tallyLabelKey } from './utils/tally';
+import type { TallyState, TallyPayload } from './utils/tally';
 import { LTC_WORKLET_SOURCE } from './audio/ltcWorkletSource';
 import './App.css';
 
@@ -112,6 +114,16 @@ function App() {
   // deliberate press-and-hold. stopHoldPct (0..100) drives the fill UI.
   const [stopHoldPct, setStopHoldPct] = useState(0);
   const [showGuide, setShowGuide] = useState(false);
+  // Tally lamp: full-screen on-camera indicator. Phase 1 is standalone (no
+  // network payload yet): AUTO derives live/standby from LTC output, MANUAL is
+  // set by the operator. tallyOpen toggles the full-screen overlay.
+  const [tallyOpen, setTallyOpen] = useState(false);
+  const [tallyMode, setTallyMode] = useState<'auto' | 'manual'>('auto');
+  const [tallyTorchEnabled, setTallyTorchEnabled] = useState(false);
+  const videoTrackRef = useRef<MediaStreamTrack | null>(null);
+  const [manualTally, setManualTally] = useState<TallyState>('off');
+  const [tallyPayload, setTallyPayload] = useState<TallyPayload | null>(null);
+  const tallyRevRef = useRef<number>(0);
   const [isResyncing, setIsResyncing] = useState(false);
   const [lang, setLang] = useState<Lang>(() => getInitialLang());
   const langRef = useRef<Lang>(lang);
@@ -435,6 +447,10 @@ function App() {
           }
           setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (HB)`);
 
+          if (msg.tally) {
+            setTallyPayload(prev => adoptTally(prev, msg.tally!));
+          }
+
           // Periodically report during heartbeat too
           if (Date.now() % 5000 < 500) {
              peerSyncRef.current?.send({
@@ -447,6 +463,10 @@ function App() {
                 rtt: rttHistoryRef.current.length > 0 ? Math.min(...rttHistoryRef.current) : 0,
                 drift: diff
              });
+          }
+        } else if (msg.type === 'tally' && !isHost) {
+          if (msg.tally) {
+            setTallyPayload(prev => adoptTally(prev, msg.tally!));
           }
         }
       }
@@ -660,7 +680,8 @@ function App() {
           masterTimestamp: Date.now(),
           fps: FPS_OPTIONS[fpsIndex].value,
           isDropFrame: FPS_OPTIONS[fpsIndex].drop,
-          isRunning: isRunning
+          isRunning: isRunning,
+          tally: tallyPayload ?? undefined
         });
       }, 100); // 10Hz Heartbeat
     }
@@ -1118,6 +1139,122 @@ function App() {
     }
   };
 
+  const handleManualTallyChange = (s: TallyState) => {
+    setManualTally(s);
+    if (isHost) {
+      tallyRevRef.current += 1;
+      const newPayload: TallyPayload = {
+        rev: tallyRevRef.current,
+        all: s,
+        assignments: {}
+      };
+      setTallyPayload(newPayload);
+      peerSyncRef.current?.broadcast({
+        type: 'tally',
+        masterTimecode: '',
+        masterTimestamp: 0,
+        fps: 0,
+        isDropFrame: false,
+        isRunning: false,
+        tally: newPayload
+      });
+    }
+  };
+
+  const handleClientTallyChange = (clientId: string, s: TallyState) => {
+    if (isHost) {
+      tallyRevRef.current += 1;
+      const newPayload: TallyPayload = {
+        rev: tallyRevRef.current,
+        all: tallyPayload?.all ?? manualTally,
+        assignments: {
+          ...tallyPayload?.assignments,
+          [clientId]: s
+        }
+      };
+      setTallyPayload(newPayload);
+      peerSyncRef.current?.broadcast({
+        type: 'tally',
+        masterTimecode: '',
+        masterTimestamp: 0,
+        fps: 0,
+        isDropFrame: false,
+        isRunning: false,
+        tally: newPayload
+      });
+    }
+  };
+
+  // Phase 1/2: tally state resolution
+  const tallyState = resolveTally(tallyPayload, peerId, {
+    connected: p2pRole === 'client',
+    autoMode: tallyMode === 'auto',
+    selfIsRunning: isRunning,
+    manualState: manualTally,
+  });
+
+  // Master: Tally Auto Mode Broadcast
+  useEffect(() => {
+    if (isHost && tallyMode === 'auto') {
+      const stateToBroadcast = isRunning ? 'live' : 'standby';
+      if (tallyPayload?.all !== stateToBroadcast) {
+        tallyRevRef.current += 1;
+        const newPayload: TallyPayload = {
+          rev: tallyRevRef.current,
+          all: stateToBroadcast,
+          assignments: {}
+        };
+        setTallyPayload(newPayload);
+        peerSyncRef.current?.broadcast({
+          type: 'tally',
+          masterTimecode: '',
+          masterTimestamp: 0,
+          fps: 0,
+          isDropFrame: false,
+          isRunning: isRunning,
+          tally: newPayload
+        });
+      }
+    }
+  }, [isHost, tallyMode, isRunning, tallyPayload?.all]);
+
+  // Tally Torch Effect
+  useEffect(() => {
+    const turnOn = tallyTorchEnabled && tallyState === 'live';
+    const applyTorch = async (on: boolean) => {
+      await TimecodeNativeBridge.setTorch(on);
+      // Web Fallback (when not on native capacitor)
+      const isNative = (window as any).Capacitor?.isNative;
+      if (!isNative) {
+        try {
+          if (on) {
+            if (!videoTrackRef.current) {
+              const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+              });
+              videoTrackRef.current = stream.getVideoTracks()[0];
+            }
+            if (videoTrackRef.current) {
+              await videoTrackRef.current.applyConstraints({ advanced: [{ torch: true }] } as any);
+            }
+          } else {
+            if (videoTrackRef.current) {
+              await videoTrackRef.current.applyConstraints({ advanced: [{ torch: false }] } as any);
+              videoTrackRef.current.stop();
+              videoTrackRef.current = null;
+            }
+          }
+        } catch (e) {
+          console.warn('Web fallback torch failed:', e);
+        }
+      }
+    };
+    applyTorch(turnOn);
+    return () => {
+      if (turnOn) applyTorch(false);
+    };
+  }, [tallyState, tallyTorchEnabled]);
+
   return (
     <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
       <header>
@@ -1289,14 +1426,16 @@ function App() {
             {syncMode === 'freerun' && (
               <div className="control-section">
                 <label className="section-label">{tr('label.startTc')}</label>
-                <input
-                  className="tc-input"
-                  value={manualTimecode}
-                  onChange={(e) => setManualTimecode(e.target.value)}
-                  disabled={isRunning}
-                  placeholder="HH:MM:SS:FF"
-                  inputMode="numeric"
-                />
+                <div className="section-content">
+                  <input
+                    className="tc-input"
+                    value={manualTimecode}
+                    onChange={(e) => setManualTimecode(e.target.value)}
+                    disabled={isRunning}
+                    placeholder="HH:MM:SS:FF"
+                    inputMode="numeric"
+                  />
+                </div>
               </div>
             )}
 
@@ -1395,6 +1534,43 @@ function App() {
 
         {(isMobile ? activeTab === 'tools' : true) && (
           <div className="tab-pane tools-pane">
+            <div className="control-section tally-section">
+              <label className="section-label">{tr('label.tally')}</label>
+              <div className="tally-controls">
+                <button
+                  className={`btn-pill ${tallyMode === 'manual' ? 'active' : ''}`}
+                  onClick={() => setTallyMode('manual')}
+                >{tr('tally.manual')}</button>
+                <button
+                  className={`btn-pill ${tallyMode === 'auto' ? 'active' : ''}`}
+                  onClick={() => setTallyMode('auto')}
+                >{tr('tally.auto')}</button>
+              </div>
+              <div className="tally-options" style={{ marginTop: '8px' }}>
+                <label className="toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={tallyTorchEnabled}
+                    onChange={(e) => setTallyTorchEnabled(e.target.checked)}
+                  />
+                  <span>Torch LED</span>
+                </label>
+              </div>
+              {tallyMode === 'manual' && (
+                <div className="tally-state-row">
+                  {(['live', 'standby', 'off'] as TallyState[]).map(s => (
+                    <button
+                      key={s}
+                      className={`tally-state-btn ${manualTally === s ? 'active' : ''}`}
+                      style={manualTally === s ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
+                      onClick={() => handleManualTallyChange(s)}
+                    >{tr(tallyLabelKey(s))}</button>
+                  ))}
+                </div>
+              )}
+              <button className="tally-open-btn" onClick={() => setTallyOpen(true)}>{tr('tally.fullscreen')}</button>
+            </div>
+
             {isHost && Object.keys(clients).length > 0 && (
               <div className="control-section clients-list-section">
                 <label className="section-label">CONNECTED CLIENTS ({Object.keys(clients).length})</label>
@@ -1410,6 +1586,26 @@ function App() {
                             Δ: {stats.drift.toFixed(2)}s
                           </span>
                         </div>
+                        {tallyMode === 'manual' && (
+                          <div className="client-tally-controls" style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
+                            {(['live', 'preview', 'standby', 'off'] as TallyState[]).map(s => {
+                               const isActive = tallyPayload?.assignments?.[id] === s;
+                               return (
+                                 <button
+                                   key={s}
+                                   className={`tally-state-btn mini ${isActive ? 'active' : ''}`}
+                                   style={{
+                                     flex: 1, padding: '4px', fontSize: '0.7rem',
+                                     ...(isActive ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s], color: '#fff' } : {})
+                                   }}
+                                   onClick={() => handleClientTallyChange(id, s)}
+                                 >
+                                   {tr(tallyLabelKey(s))}
+                                 </button>
+                               );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1562,6 +1758,17 @@ function App() {
           <div key={t.id} className={`toast toast-${t.level}`}>{t.msg}</div>
         ))}
       </div>
+
+      {tallyOpen && (
+        <div
+          className={`tally-overlay tally-${tallyState}`}
+          style={{ background: TALLY_COLORS[tallyState] }}
+          onClick={() => setTallyOpen(false)}
+        >
+          <div className="tally-overlay-label">{tr(tallyLabelKey(tallyState))}</div>
+          <div className="tally-overlay-hint">{tr('tally.closeHint')}</div>
+        </div>
+      )}
 
       {isVisualSlate && (
         <div className={`visual-slate-overlay ${isSlateFlashing ? 'flashing' : ''}`} onClick={handleSlateClick}>
