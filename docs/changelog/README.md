@@ -32,5 +32,6 @@ docs/changelog/YYYY-MM-DD-NN-<slug>.md
 | 08 | ✨ 追加 | [UI改良（操作明確化 / TC視認性・録画中表示）](./2026-06-29-08-ui-usability.md) | `src/App.tsx`, `src/App.css` |
 | 09 | ✨ 追加 | [現場目線のUX改善（誤停止防止/接続ガイド/MAIN集約）](./2026-06-29-09-ux-onset.md) | `src/App.tsx`, `src/App.css` |
 | 10 | ✨ 追加 | [バッテリー残量/可動時間・マーカー打点フィードバック](./2026-06-29-10-battery-marker-feedback.md) | `src/utils/battery.ts` ほか |
+| 11 | ✨ 追加 | [日本語化(i18n) と 色覚配慮(色＋文字/形)](./2026-06-29-11-i18n-colorblind.md) | `src/utils/i18n.ts` ほか |
 
 > 種別凡例: ✨ 追加 / ♻️ 変更 / 🛠 修正 / 🧱 基盤

@@ -10,6 +10,8 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { TimecodeNativeBridge } from './utils/TimecodeNativeBridge';
 import { DriftMonitor, formatSyncAge } from './utils/DriftMonitor';
 import { estimateMinutesRemaining, trimSamples, formatDuration } from './utils/battery';
+import { t as translate, getInitialLang, persistLang } from './utils/i18n';
+import type { Lang } from './utils/i18n';
 import type { BatterySample } from './utils/battery';
 import type { DriftStatus } from './utils/DriftMonitor';
 import { buildEdl, buildAle } from './utils/export';
@@ -111,6 +113,10 @@ function App() {
   const [stopHoldPct, setStopHoldPct] = useState(0);
   const [showGuide, setShowGuide] = useState(false);
   const [isResyncing, setIsResyncing] = useState(false);
+  const [lang, setLang] = useState<Lang>(() => getInitialLang());
+  const langRef = useRef<Lang>(lang);
+  const tr = (key: string, vars?: Record<string, string | number>) => translate(key, lang, vars);
+  useEffect(() => { langRef.current = lang; persistLang(lang); }, [lang]);
   // Battery readout: level, charging state and an estimated time-to-empty so
   // operators know whether the phone will last the shoot.
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
@@ -228,9 +234,9 @@ function App() {
   useEffect(() => {
     TimecodeNativeBridge.addInterruptionListener(async (state) => {
       if (state === 'began') {
-        addToast('オーディオ割り込み発生 — LTCを一時中断', 'error');
+        addToast(translate('toast.interruptBegan', langRef.current), 'error');
       } else {
-        addToast('割り込み終了 — LTC出力を自動復帰', 'info');
+        addToast(translate('toast.interruptEnded', langRef.current), 'info');
         const ctx = audioCtxRef.current;
         if (ctx && ctx.state === 'suspended') {
           try {
@@ -567,7 +573,7 @@ function App() {
     } catch (e) {
       console.warn('P2P master init failed', e);
       setP2pStatus('PEER INIT FAILED');
-      addToast('P2P INIT FAILED — CHECK NETWORK', 'error');
+      addToast(translate('toast.p2pInitFailed', langRef.current), 'error');
     }
   };
 
@@ -587,7 +593,7 @@ function App() {
     } catch (e) {
       console.warn('P2P client init failed', e);
       setP2pStatus('PEER INIT FAILED');
-      addToast('P2P CLIENT INIT FAILED — CHECK NETWORK', 'error');
+      addToast(translate('toast.p2pClientFailed', langRef.current), 'error');
     }
   };
 
@@ -791,9 +797,9 @@ function App() {
           applySyncToWorklet(engine.getTimecodeForOffset(result.offset), 0, true);
         }
       }
-      addToast('RE-SYNCED', 'info');
+      addToast(translate('toast.resynced', langRef.current), 'info');
     } catch {
-      addToast('RE-SYNC FAILED — CHECK NETWORK', 'error');
+      addToast(translate('toast.resyncFailed', langRef.current), 'error');
     } finally {
       setIsResyncing(false);
     }
@@ -852,10 +858,10 @@ function App() {
             offset = result.offset;
             lastNetworkOffsetRef.current = result.offset;
             if (result.fromCache) {
-              addToast('NTP SERVERS UNREACHABLE — USING CACHED OFFSET', 'warn');
+              addToast(translate('toast.ntpCached', langRef.current), 'warn');
             }
           } catch {
-            addToast('NTP SYNC FAILED — USING SYSTEM CLOCK', 'error');
+            addToast(translate('toast.ntpFailed', langRef.current), 'error');
           }
         }
 
@@ -891,7 +897,7 @@ function App() {
       await startEngine();
     } catch (err) {
       console.error('Start sequence failed:', err);
-      addToast('START FAILED — CHECK CONNECTION', 'error');
+      addToast(translate('toast.startFailed', langRef.current), 'error');
     } finally {
       setIsPreparing(false);
     }
@@ -969,7 +975,7 @@ function App() {
         analyserRef.current = analyser;
       } catch (err) {
         console.warn('Mic access denied', err);
-        addToast('MIC ACCESS DENIED — CHECK BROWSER PERMISSIONS', 'error');
+        addToast(translate('toast.micDenied', langRef.current), 'error');
       }
     }
 
@@ -1104,14 +1110,21 @@ function App() {
         <div className="status-cluster">
           <button
             type="button"
+            className="lang-btn"
+            onClick={() => setLang((l) => (l === 'en' ? 'ja' : 'en'))}
+            aria-label="Toggle language"
+            title="Language"
+          >{lang === 'en' ? '日本語' : 'EN'}</button>
+          <button
+            type="button"
             className="help-btn"
             onClick={() => setShowGuide(true)}
-            aria-label="Camera sync setup guide"
-            title="Camera sync setup guide"
+            aria-label={tr('guide.aria')}
+            title={tr('guide.aria')}
           >?</button>
           <div className={`status-pill ${isRunning ? 'live' : isPreparing ? 'prep' : 'idle'}`}>
             <span className="status-dot" />
-            {isRunning ? 'LTC OUT' : isPreparing ? 'SYNCING' : 'READY'}
+            {isRunning ? tr('status.live') : isPreparing ? tr('status.syncing') : tr('status.ready')}
           </div>
           <div className="status-meta">
             <span>{FPS_OPTIONS[fpsIndex].label}</span>
@@ -1131,9 +1144,9 @@ function App() {
 
       {isMobile && (
         <nav className="tab-bar">
-          <button className={activeTab === 'main' ? 'active' : ''} onClick={() => setActiveTab('main')}>MAIN</button>
-          <button className={activeTab === 'sync' ? 'active' : ''} onClick={() => setActiveTab('sync')}>SYNC</button>
-          <button className={activeTab === 'tools' ? 'active' : ''} onClick={() => setActiveTab('tools')}>TOOLS</button>
+          <button className={activeTab === 'main' ? 'active' : ''} onClick={() => setActiveTab('main')}>{tr('tab.main')}</button>
+          <button className={activeTab === 'sync' ? 'active' : ''} onClick={() => setActiveTab('sync')}>{tr('tab.sync')}</button>
+          <button className={activeTab === 'tools' ? 'active' : ''} onClick={() => setActiveTab('tools')}>{tr('tab.tools')}</button>
         </nav>
       )}
 
@@ -1148,7 +1161,7 @@ function App() {
                 <span className="info-label">UBIT: {userBits}</span>
                 {p2pRole === 'client' && masterDrift !== null && (
                   <span className={`info-label ${masterDrift >= 0.5 ? 'warn' : 'ok'}`}>
-                    Δ {masterDrift < 0.01 ? '<0.01' : masterDrift.toFixed(2)}s
+                    {masterDrift >= 0.5 ? '⚠ ' : '✓ '}Δ {masterDrift < 0.01 ? '<0.01' : masterDrift.toFixed(2)}s
                   </span>
                 )}
               </div>
@@ -1157,8 +1170,8 @@ function App() {
             {syncMode === 'network' && (
               <div className="main-sync-bar">
                 <div className="msb-info">
-                  <span className="msb-label">SYNC</span>
-                  <span className="msb-mode">NETWORK</span>
+                  <span className="msb-label">{tr('sync.label')}</span>
+                  <span className="msb-mode">{tr('sync.network')}</span>
                   {isRunning && driftStatus && driftStatus.hasSync && (
                     <>
                       <span className={`msb-badge drift-${driftStatus.confidence}`}>{driftStatus.confidence.toUpperCase()}</span>
@@ -1167,7 +1180,7 @@ function App() {
                   )}
                 </div>
                 <button type="button" className="msb-resync" onClick={handleManualResync} disabled={isResyncing}>
-                  {isResyncing ? 'SYNCING…' : 'RE-SYNC'}
+                  {isResyncing ? tr('sync.resyncing') : tr('sync.resync')}
                 </button>
               </div>
             )}
@@ -1175,7 +1188,7 @@ function App() {
             {isMobile && (
               <>
                 <div className="control-section">
-                  <label className="section-label">FRAME RATE</label>
+                  <label className="section-label">{tr('label.frameRate')}</label>
                   <div className="fps-grid-compact">
                     {FPS_OPTIONS.map((opt, i) => (
                       <button 
@@ -1191,7 +1204,7 @@ function App() {
                 </div>
 
                 <div className="control-section">
-                  <label className="section-label">OUTPUT VOLUME & LEVEL</label>
+                  <label className="section-label">{tr('label.outputVolume')}</label>
                   <div className="volume-row">
                     <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} />
                     <div className="level-toggle">
@@ -1202,7 +1215,7 @@ function App() {
                 </div>
 
                 <div className="control-section">
-                  <label className="section-label">OUTPUT MODE (FOR DSLR SYNC)</label>
+                  <label className="section-label">{tr('label.outputMode')}</label>
                   <div className="sync-toggle-pro">
                     <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => setOutputMode('stereo')}>STEREO TC</button>
                     <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => setOutputMode('mono-l')}>L-TC / R-AUDIO</button>
@@ -1224,7 +1237,7 @@ function App() {
         {(isMobile ? activeTab === 'sync' : true) && (
           <div className="tab-pane sync-pane">
             <div className="control-section">
-              <label className="section-label">SYNC METHOD</label>
+              <label className="section-label">{tr('label.syncMethod')}</label>
               <div className="sync-toggle-pro">
                 {['system', 'network', 'p2p'].map((m) => (
                   <button 
@@ -1243,22 +1256,22 @@ function App() {
               {syncMode === 'network' && isRunning && driftStatus && driftStatus.hasSync && (
                 <div className={`drift-panel drift-${driftStatus.confidence}`}>
                   <div className="drift-row">
-                    <span className="drift-label">ACCURACY</span>
+                    <span className="drift-label">{tr('drift.accuracy')}</span>
                     <span className="drift-badge">{driftStatus.confidence.toUpperCase()}</span>
                   </div>
                   <div className="drift-row">
-                    <span>Last sync</span>
+                    <span>{tr('drift.lastSync')}</span>
                     <span>{formatSyncAge(driftStatus.msSinceSync)} ago</span>
                   </div>
                   <div className="drift-row">
-                    <span>Est. drift</span>
+                    <span>{tr('drift.estDrift')}</span>
                     <span>
                       ±{driftStatus.estimatedDriftMs.toFixed(1)}ms
                       {' '}({driftStatus.estimatedDriftFrames.toFixed(2)}f)
                     </span>
                   </div>
                   <div className="drift-row">
-                    <span>Clock error</span>
+                    <span>{tr('drift.clockError')}</span>
                     <span>
                       {driftStatus.measured
                         ? `${driftStatus.driftRatePpm >= 0 ? '+' : ''}${driftStatus.driftRatePpm.toFixed(1)} ppm`
@@ -1266,24 +1279,24 @@ function App() {
                     </span>
                   </div>
                   {driftStatus.rejamRecommended && (
-                    <div className="drift-rejam">⚠ RE-SYNC RECOMMENDED</div>
+                    <div className="drift-rejam">⚠ {tr('drift.rejam')}</div>
                   )}
                 </div>
               )}
             </div>
 
             <div className="control-section">
-              <label className="section-label">P2P NETWORK</label>
+              <label className="section-label">{tr('label.p2p')}</label>
               {!p2pRole ? (
                 <div className="p2p-init-pro">
-                  <button onClick={setupP2PMaster}>CREATE MASTER</button>
-                  <button onClick={setupP2PClient}>JOIN AS CLIENT</button>
+                  <button onClick={setupP2PMaster}>{tr('btn.createMaster')}</button>
+                  <button onClick={setupP2PClient}>{tr('btn.joinClient')}</button>
                 </div>
               ) : (
                 <div className="p2p-panel-pro">
                   <div className="p2p-header">
                     <span className="role-tag">{p2pRole.toUpperCase()}</span>
-                    <button className="btn-small" onClick={resetP2P}>RESET</button>
+                    <button className="btn-small" onClick={resetP2P}>{tr('btn.reset')}</button>
                   </div>
                   {p2pRole === 'master' && (
                     <div className="p2p-master-box">
@@ -1347,7 +1360,7 @@ function App() {
 
             {!isMobile && (
               <div className="control-section">
-                <label className="section-label">FRAME RATE</label>
+                <label className="section-label">{tr('label.frameRate')}</label>
                 <div className="fps-grid-compact">
                   {FPS_OPTIONS.map((opt, i) => (
                     <button 
@@ -1391,14 +1404,14 @@ function App() {
 
             <div className="tools-grid-pro">
               <div className="tool-card span-2">
-                <label>USER BITS (HEX)</label>
+                <label>{tr('label.userBits')}</label>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <input value={userBits} onChange={e => setUserBits(e.target.value.toUpperCase())} maxLength={8} disabled={autoUserBits} />
-                  <button className={`btn-pill ${autoUserBits ? 'active' : ''}`} onClick={() => setAutoUserBits(!autoUserBits)}>AUTO (DATE)</button>
+                  <button className={`btn-pill ${autoUserBits ? 'active' : ''}`} onClick={() => setAutoUserBits(!autoUserBits)}>{tr('btn.auto')}</button>
                 </div>
               </div>
               <div className="tool-card span-2">
-                <label>DEFAULT REEL NAME</label>
+                <label>{tr('label.defaultReel')}</label>
                 <input
                   value={defaultReelName}
                   onChange={e => setDefaultReelName(e.target.value.toUpperCase())}
@@ -1409,7 +1422,7 @@ function App() {
               {!isMobile && (
                 <>
                   <div className="tool-card span-2">
-                    <label className="section-label">OUTPUT VOLUME & LEVEL</label>
+                    <label className="section-label">{tr('label.outputVolume')}</label>
                     <div className="volume-row">
                       <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} />
                       <div className="level-toggle">
@@ -1420,7 +1433,7 @@ function App() {
                   </div>
 
                   <div className="tool-card span-2">
-                    <label className="section-label">OUTPUT MODE (FOR DSLR SYNC)</label>
+                    <label className="section-label">{tr('label.outputMode')}</label>
                     <div className="sync-toggle-pro">
                       <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => setOutputMode('stereo')}>STEREO TC</button>
                       <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => setOutputMode('mono-l')}>L-TC / R-AUDIO</button>
@@ -1440,19 +1453,19 @@ function App() {
             
             {isMobile && (
               <div className="control-section mobile-marker-section">
-                <label className="section-label">QUICK MARK</label>
+                <label className="section-label">{tr('label.quickMark')}</label>
                 <div className="marker-buttons-grid">
-                  <button className="btn-mark-large red" onClick={() => addMarker('Red')}>RED</button>
-                  <button className="btn-mark-large blue" onClick={() => addMarker('Blue')}>BLUE</button>
-                  <button className="btn-mark-large green" onClick={() => addMarker('Green')}>GREEN</button>
-                  <button className="btn-mark-large yellow" onClick={() => addMarker('Yellow')}>YELLOW</button>
+                  <button className="btn-mark-large red" onClick={() => addMarker('Red')}>{tr('color.red')}</button>
+                  <button className="btn-mark-large blue" onClick={() => addMarker('Blue')}>{tr('color.blue')}</button>
+                  <button className="btn-mark-large green" onClick={() => addMarker('Green')}>{tr('color.green')}</button>
+                  <button className="btn-mark-large yellow" onClick={() => addMarker('Yellow')}>{tr('color.yellow')}</button>
                 </div>
               </div>
             )}
 
             <div className="marker-section-pro">
               <div className="marker-header">
-                <label>LOGGED TAKES</label>
+                <label>{tr('label.loggedTakes')}</label>
                 <div className="export-group">
                   <button className="btn-export-pro" onClick={exportToEDL} disabled={markers.length === 0}>EDL</button>
                   <button className="btn-export-pro" onClick={exportToALE} disabled={markers.length === 0}>ALE</button>
@@ -1460,12 +1473,12 @@ function App() {
               </div>
               <div className="marker-scroll">
                 {markers.length === 0 ? (
-                  <div className="empty-msg">NO MARKERS RECORDED</div>
+                  <div className="empty-msg">{tr('markers.none')}</div>
                 ) : (
                   markers.map(m => (
                     <div key={m.id} className="marker-row-pro">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div className={`color-dot ${m.color.toLowerCase()}`}></div>
+                        <div className={`color-dot ${m.color.toLowerCase()}`}>{m.color.charAt(0)}</div>
                         <span className="m-tc">{m.tc}</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1483,7 +1496,7 @@ function App() {
 
       {markerFlash && (
         <div className="marker-flash" style={{ borderColor: MARKER_HEX[markerFlash.color] }}>
-          <span className="mf-dot" style={{ background: MARKER_HEX[markerFlash.color] }} />
+          <span className="mf-dot" style={{ background: MARKER_HEX[markerFlash.color] }}>{markerFlash.color.charAt(0)}</span>
           <span className="mf-text">MARK {markerFlash.tc}</span>
           <span className="mf-count">#{markerFlash.count}</span>
         </div>
@@ -1503,22 +1516,22 @@ function App() {
               {isRunning && <div className="stop-hold-fill" style={{ width: `${stopHoldPct}%` }} />}
               <div className="btn-icon"></div>
               <div className="btn-text">
-                {isRunning ? (stopHoldPct > 0 ? 'HOLD…' : 'HOLD TO STOP') : isPreparing ? 'PREP...' : isPaused ? 'RESUME' : 'START'}
+                {isRunning ? (stopHoldPct > 0 ? tr('btn.holding') : tr('btn.holdToStop')) : isPreparing ? tr('btn.prep') : isPaused ? tr('btn.resume') : tr('btn.start')}
               </div>
             </button>
             {isRunning && (
               <button className="btn-main-action pause" onClick={handlePause}>
-                <div className="btn-text">PAUSE</div>
+                <div className="btn-text">{tr('btn.pause')}</div>
               </button>
             )}
           </div>
           <div className="footer-right">
-            <div className="mark-label">MARK</div>
+            <div className="mark-label">{tr('btn.mark')}</div>
             <div className="mark-colors-container">
-              <button className="btn-mark-color red" onClick={() => addMarker('Red')} title="Red Marker"></button>
-              <button className="btn-mark-color blue" onClick={() => addMarker('Blue')} title="Blue Marker"></button>
-              <button className="btn-mark-color green" onClick={() => addMarker('Green')} title="Green Marker"></button>
-              <button className="btn-mark-color yellow" onClick={() => addMarker('Yellow')} title="Yellow Marker"></button>
+              <button className="btn-mark-color red" onClick={() => addMarker('Red')} title={tr('marker.redTitle')}>R</button>
+              <button className="btn-mark-color blue" onClick={() => addMarker('Blue')} title={tr('marker.blueTitle')}>B</button>
+              <button className="btn-mark-color green" onClick={() => addMarker('Green')} title={tr('marker.greenTitle')}>G</button>
+              <button className="btn-mark-color yellow" onClick={() => addMarker('Yellow')} title={tr('marker.yellowTitle')}>Y</button>
             </div>
           </div>
         </div>
@@ -1539,7 +1552,7 @@ function App() {
           <div className="slate-qr">
             <QRCodeCanvas value={slateTime} size={256} level="L" includeMargin={true} />
           </div>
-          <div className="slate-close">TAP FOR CLAPPER / LONG PRESS TO CLOSE</div>
+          <div className="slate-close">{tr('slate.close')}</div>
           <button style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', color: '#666', fontSize: '2rem' }} onClick={(e) => { e.stopPropagation(); setIsVisualSlate(false); }}>×</button>
         </div>
       )}
@@ -1548,18 +1561,18 @@ function App() {
         <div className="guide-overlay" onClick={() => setShowGuide(false)}>
           <div className="guide-card" onClick={(e) => e.stopPropagation()}>
             <div className="guide-head">
-              <span className="guide-title">CAMERA SYNC — QUICK SETUP</span>
+              <span className="guide-title">{tr('guide.title')}</span>
               <button type="button" className="guide-x" onClick={() => setShowGuide(false)} aria-label="Close">×</button>
             </div>
             <ol className="guide-steps">
-              <li>Connect this phone's audio output to the camera's MIC / LINE input with a 3.5mm TRS cable.</li>
-              <li><b>OUTPUT MODE</b>: pick <b>L-TC / R-AUDIO</b> to also record reference audio, or <b>STEREO TC</b> for timecode only.</li>
-              <li><b>OUTPUT LEVEL</b>: start at <b>LINE</b>. If the camera can't read TC, switch to <b>MIC</b> (lower level).</li>
-              <li>Match <b>FRAME RATE</b> (and drop-frame) to your camera exactly — an FPS mismatch is the #1 sync error.</li>
-              <li>Press <b>START</b>, then confirm the camera's timecode matches the value on screen.</li>
+              <li>{tr('guide.step1')}</li>
+              <li>{tr('guide.step2')}</li>
+              <li>{tr('guide.step3')}</li>
+              <li>{tr('guide.step4')}</li>
+              <li>{tr('guide.step5')}</li>
             </ol>
-            <div className="guide-tip">Keep the app running in the foreground or via background mode. Re-jam whenever you see <b>RE-SYNC RECOMMENDED</b>.</div>
-            <button type="button" className="guide-done" onClick={() => setShowGuide(false)}>GOT IT</button>
+            <div className="guide-tip">{tr('guide.tip')}</div>
+            <button type="button" className="guide-done" onClick={() => setShowGuide(false)}>{tr('btn.gotIt')}</button>
           </div>
         </div>
       )}
