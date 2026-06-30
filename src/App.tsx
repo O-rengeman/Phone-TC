@@ -124,6 +124,7 @@ function App() {
   const [manualTally, setManualTally] = useState<TallyState>('off');
   const [tallyPayload, setTallyPayload] = useState<TallyPayload | null>(null);
   const tallyRevRef = useRef<number>(0);
+  const lastHeartbeatTimeRef = useRef<number>(0);
   const [isResyncing, setIsResyncing] = useState(false);
   const [lang, setLang] = useState<Lang>(() => getInitialLang());
   const langRef = useRef<Lang>(lang);
@@ -451,6 +452,8 @@ function App() {
             setTallyPayload(prev => adoptTally(prev, msg.tally!));
           }
 
+          lastHeartbeatTimeRef.current = Date.now();
+
           // Periodically report during heartbeat too
           if (Date.now() % 5000 < 500) {
              peerSyncRef.current?.send({
@@ -634,6 +637,7 @@ function App() {
     if (!peerSyncRef.current || !targetId) return;
     peerSyncRef.current.connect(targetId);
     setSyncMode('p2p');
+    lastHeartbeatTimeRef.current = Date.now();
   };
 
   // Periodic Heartbeat & Sync Requests (Optimized for low latency & packet loss)
@@ -1187,7 +1191,7 @@ function App() {
 
   // Phase 1/2: tally state resolution
   const tallyState = resolveTally(tallyPayload, peerId, {
-    connected: p2pRole === 'client',
+    connected: p2pRole === 'client' && (Date.now() - lastHeartbeatTimeRef.current < 3000),
     autoMode: tallyMode === 'auto',
     selfIsRunning: isRunning,
     manualState: manualTally,
