@@ -2027,12 +2027,21 @@ input[type="range"] {
   gap: 0.5vh;
 }
 .tally-timecode {
-  font-size: min(10vw, 7vh);
   font-weight: 900;
   color: rgba(255, 255, 255, 0.85);
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
   letter-spacing: -0.01em;
   margin-bottom: 2vh;
+  transition: font-size 0.15s ease-out;
+}
+.tally-timecode.size-sm {
+  font-size: min(6vw, 4.5vh);
+}
+.tally-timecode.size-md {
+  font-size: min(12vw, 8vh);
+}
+.tally-timecode.size-lg {
+  font-size: min(18vw, 13vh);
 }
 /* P2-1: 超大型ラベル（3m離れても見える） */
 .tally-state-label {

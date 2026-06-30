@@ -130,6 +130,42 @@ function App() {
   const tallyOpenRef = useRef<boolean>(tallyOpen);
   const tallyControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [tallyDimmerOpacity, setTallyDimmerOpacity] = useState(0);
+  // P2-5: タイムコードサイズ state
+  const [tallyTcSize, setTallyTcSize] = useState<'sm' | 'md' | 'lg'>(() => {
+    try {
+      const saved = localStorage.getItem('ltc-tally-tc-size');
+      return (saved === 'sm' || saved === 'md' || saved === 'lg') ? saved : 'md';
+    } catch { return 'md'; }
+  });
+
+  // P6-1: ハプティクス/ビープ音再生
+  const playHapticFeedback = () => {
+    try {
+      // バイブレーション (Haptic)
+      if (navigator.vibrate) {
+        navigator.vibrate(30);
+      }
+      // ビープ音 (Beep)
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.frequency.value = 850; // 周波数 (Hz)
+      gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.05); // 50msでフェードアウト
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.05);
+    } catch (e) {
+      // 自動再生ポリシーなどのエラーは無視
+    }
+  };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ltc-tally-tc-size', tallyTcSize);
+    } catch { /* ignore */ }
+  }, [tallyTcSize]);
   
   const [directorPanelOpen, setDirectorPanelOpen] = useState(false);
   const [directorTime, setDirectorTime] = useState<string>('00:00:00:00');
@@ -1899,12 +1935,14 @@ function App() {
 
       {tallyOpen && (() => {
         const isConnected = p2pRole === 'client' && (Date.now() - lastHeartbeatTimeRef.current < 3000);
-        const stateLabel = tallyState === 'live' ? 'ON AIR' : tallyState === 'preview' ? 'PREVIEW' : tallyState === 'standby' ? 'READY' : 'OFF';
-        const stateSubLabel = tallyState === 'live' ? '本番中' : tallyState === 'preview' ? '次点・確認中' : tallyState === 'standby' ? '待機中' : 'オフ';
+        // P5-1: 状態UIを3択（ON AIR / PREVIEW / OFF）に制限
+        const uiState = tallyState === 'standby' ? 'preview' : tallyState;
+        const stateLabel = uiState === 'live' ? 'ON AIR' : uiState === 'preview' ? 'PREVIEW' : 'OFF';
+        const stateSubLabel = uiState === 'live' ? '本番中' : uiState === 'preview' ? '次点・確認中' : 'オフ';
         return (
           <div
-            className={`tally-overlay tally-${tallyState}`}
-            style={{ background: TALLY_COLORS[tallyState] }}
+            className={`tally-overlay tally-${uiState}`}
+            style={{ background: TALLY_COLORS[uiState] }}
           >
             <div className="tally-dimmer" style={{ opacity: tallyDimmerOpacity }} />
             {p2pRole === 'client' && (
@@ -1921,20 +1959,30 @@ function App() {
               </span>
             </div>
             <div className="tally-body">
-              <div className="tally-timecode">{tallyTime}</div>
+              {/* P2-5: S/M/Lクラスを適用 */}
+              <div className={`tally-timecode size-${tallyTcSize}`}>{tallyTime}</div>
               <div className="tally-state-label">{stateLabel}</div>
               <div className="tally-state-sublabel">{stateSubLabel}</div>
             </div>
             <div className="tally-control-bar">
-              <button className="tally-ctrl-bar-btn" onClick={handleDimmerCycle}>
+              <button className="tally-ctrl-bar-btn" onClick={(e) => { playHapticFeedback(); handleDimmerCycle(e); }}>
                 <span className="tally-ctrl-icon">☀</span>
                 <span>{tallyDimmerOpacity === 0 ? '明' : tallyDimmerOpacity === 0.5 ? '中' : '暗'}</span>
               </button>
-              <button className={`tally-ctrl-bar-btn ${tallyTorchEnabled ? 'active' : ''}`} onClick={handleTorchToggle}>
+              <button className={`tally-ctrl-bar-btn ${tallyTorchEnabled ? 'active' : ''}`} onClick={(e) => { playHapticFeedback(); handleTorchToggle(e); }}>
                 <span className="tally-ctrl-icon">🔦</span>
                 <span>TORCH {tallyTorchEnabled ? 'ON' : 'OFF'}</span>
               </button>
-              <button className="tally-ctrl-bar-btn exit" onClick={handleTallyExit}>
+              {/* P2-5: TCサイズトグルボタンを追加 */}
+              <button className="tally-ctrl-bar-btn" onClick={(e) => {
+                e.stopPropagation();
+                playHapticFeedback();
+                setTallyTcSize(prev => prev === 'sm' ? 'md' : prev === 'md' ? 'lg' : 'sm');
+              }}>
+                <span className="tally-ctrl-icon">⏱</span>
+                <span>TC: {tallyTcSize.toUpperCase()}</span>
+              </button>
+              <button className="tally-ctrl-bar-btn exit" onClick={(e) => { playHapticFeedback(); handleTallyExit(e); }}>
                 <span className="tally-ctrl-icon">✕</span>
                 <span>CLOSE</span>
               </button>
@@ -1955,7 +2003,7 @@ function App() {
               </div>
               <div className="director-header-right">
                 <div className="director-tc-large">{directorTime}</div>
-                <button className="director-close-btn" onClick={() => setDirectorPanelOpen(false)}>✕ EXIT</button>
+                <button className="director-close-btn" onClick={() => { playHapticFeedback(); setDirectorPanelOpen(false); }}>✕ EXIT</button>
               </div>
             </div>
             <div className="director-all-control">
@@ -1966,15 +2014,15 @@ function App() {
               <div className="director-all-btns">
                 <button
                   className={`dir-all-btn on-air ${tallyPayload?.all === 'live' ? 'active' : ''}`}
-                  onClick={() => handleAllTallyChange('live')}
+                  onClick={() => { playHapticFeedback(); handleAllTallyChange('live'); }}
                 >ON AIR</button>
                 <button
                   className={`dir-all-btn preview ${tallyPayload?.all === 'preview' ? 'active' : ''}`}
-                  onClick={() => handleAllTallyChange('preview')}
+                  onClick={() => { playHapticFeedback(); handleAllTallyChange('preview'); }}
                 >PREVIEW</button>
                 <button
                   className={`dir-all-btn off ${tallyPayload?.all === 'off' ? 'active' : ''}`}
-                  onClick={() => handleAllTallyChange('off')}
+                  onClick={() => { playHapticFeedback(); handleAllTallyChange('off'); }}
                 >OFF</button>
               </div>
             </div>
@@ -1990,10 +2038,12 @@ function App() {
                   Object.entries(clients).map(([id, stats]: [string, any], idx) => {
                     const isOffline = Date.now() - stats.lastSeen > 30000;
                     const assignedState = tallyPayload?.assignments?.[id] ?? tallyPayload?.all ?? 'off';
+                    // P5-1: 個別表示でもstandbyをpreviewにマッピングして3択に
+                    const uiAssignedState = assignedState === 'standby' ? 'preview' : assignedState;
                     const defaultLabel = `CAM${idx + 1}`;
                     const label = cameraLabels[id] || defaultLabel;
                     return (
-                      <div key={id} className={`director-cam-card status-${assignedState} ${isOffline ? 'offline' : ''}`}>
+                      <div key={id} className={`director-cam-card status-${uiAssignedState} ${isOffline ? 'offline' : ''}`}>
                         {isOffline && <div className="director-offline-overlay">OFFLINE</div>}
                         <div className="director-cam-header">
                           <input
@@ -2004,24 +2054,24 @@ function App() {
                             maxLength={8}
                           />
                           <div className="director-cam-meta">
-                            <span className={`director-state-chip state-${assignedState}`}>
-                              {assignedState === 'live' ? '● ON AIR' : assignedState === 'preview' ? '◐ PREVIEW' : assignedState === 'standby' ? '○ READY' : '— OFF'}
+                            <span className={`director-state-chip state-${uiAssignedState}`}>
+                              {uiAssignedState === 'live' ? '● ON AIR' : uiAssignedState === 'preview' ? '◐ PREVIEW' : '— OFF'}
                             </span>
                             <span className="director-cam-rtt">{stats.rtt.toFixed(0)}ms</span>
                           </div>
                         </div>
                         <div className="director-cam-actions-v">
                           <button
-                            className={`dir-cam-btn on-air ${assignedState === 'live' ? 'active' : ''}`}
-                            onClick={() => handleClientTallyChange(id, 'live')}
+                            className={`dir-cam-btn on-air ${uiAssignedState === 'live' ? 'active' : ''}`}
+                            onClick={() => { playHapticFeedback(); handleClientTallyChange(id, 'live'); }}
                           >ON AIR</button>
                           <button
-                            className={`dir-cam-btn preview ${assignedState === 'preview' ? 'active' : ''}`}
-                            onClick={() => handleClientTallyChange(id, 'preview')}
+                            className={`dir-cam-btn preview ${uiAssignedState === 'preview' ? 'active' : ''}`}
+                            onClick={() => { playHapticFeedback(); handleClientTallyChange(id, 'preview'); }}
                           >PREVIEW</button>
                           <button
-                            className={`dir-cam-btn off ${assignedState === 'off' ? 'active' : ''}`}
-                            onClick={() => handleClientTallyChange(id, 'off')}
+                            className={`dir-cam-btn off ${uiAssignedState === 'off' ? 'active' : ''}`}
+                            onClick={() => { playHapticFeedback(); handleClientTallyChange(id, 'off'); }}
                           >OFF</button>
                         </div>
                       </div>
