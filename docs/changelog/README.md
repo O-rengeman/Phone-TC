@@ -35,5 +35,6 @@ docs/changelog/YYYY-MM-DD-NN-<slug>.md
 | 11 | ✨ 追加 | [日本語化(i18n) と 色覚配慮(色＋文字/形)](./2026-06-29-11-i18n-colorblind.md) | `src/utils/i18n.ts` ほか |
 | 12 | ♻️ 変更 | [PC(デスクトップ)UIのスペース効率改善](./2026-06-29-12-desktop-density.md) | `src/App.css`, `src/App.tsx` |
 | 13 | ♻️ 変更 | [モバイルUIのスペース効率改善](./2026-06-29-13-mobile-density.md) | `src/App.css` |
+| 14 | 🛠 修正 | [言語切替でレイアウトが変わらないように固定](./2026-06-29-14-lang-stable-layout.md) | `src/App.css` |
 
 > 種別凡例: ✨ 追加 / ♻️ 変更 / 🛠 修正 / 🧱 基盤

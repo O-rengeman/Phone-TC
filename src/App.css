@@ -1703,3 +1703,52 @@ input[type="range"] {
   padding-bottom: calc(8px + env(safe-area-inset-bottom));
 }
 .mobile-view .btn-main-action { padding: 14px; min-height: 54px; }
+
+/* ============================================================
+   Language-invariant layout: toggling JA/EN must not reflow.
+   Text length differs between languages, so every element whose
+   footprint is content-driven is given a stable size, and
+   translated labels are kept single-line (clip, never wrap) so
+   vertical layout is identical in both languages.
+   ============================================================ */
+
+/* Fixed-footprint header controls. */
+.lang-btn {
+  width: 50px;
+  padding: 0;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.status-pill {
+  min-width: 108px;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+/* Labels stay on one line -> constant section height across languages. */
+.tab-bar button,
+.section-label,
+.marker-header label,
+.tool-card label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Translated buttons/badges stay single-line (their box is sized by the
+   layout container, so 1-line text keeps height constant regardless of
+   language). */
+.btn-main-action .btn-text,
+.btn-pill,
+.btn-mark-large,
+.p2p-init-pro button,
+.p2p-panel-pro button,
+.msb-label,
+.msb-mode,
+.msb-resync,
+.drift-rejam,
+.guide-title,
+.guide-done {
+  white-space: nowrap;
+}
