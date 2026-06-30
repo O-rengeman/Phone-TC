@@ -201,11 +201,13 @@ header {
 .desktop-dashboard {
   flex: 1;
   display: grid;
-  grid-template-columns: 280px 1fr 300px;
-  grid-template-areas: "side-l center side-r";
-  gap: 0;
-  padding: 0;
-  overflow: hidden;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-auto-rows: max-content;
+  gap: 16px;
+  padding: 24px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  align-content: start;
   background: #000;
   background-image: 
     radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 80%),
@@ -214,34 +216,58 @@ header {
   background-size: 100% 100%, 40px 40px, 40px 40px;
 }
 
-.desktop-dashboard .main-pane { 
-  grid-area: center; 
-  padding: 0;
+.desktop-dashboard .dashboard-hero {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.dashboard-hero-left {
+  flex: 2 1 500px;
+}
+
+.dashboard-hero-right {
+  flex: 1 1 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.desktop-dashboard .dashboard-transport {
+  background: rgba(10, 10, 10, 0.7);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: center;
-  border-left: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-  position: relative;
-  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 70%);
+  gap: 20px;
+  height: 100%;
 }
 
-.desktop-dashboard .sync-pane { 
-  grid-area: side-l; 
-  padding: 32px 24px;
-  border-right: 1px solid var(--border);
+.desktop-dashboard .bento-card {
   background: rgba(10, 10, 10, 0.7);
   backdrop-filter: blur(20px);
-  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.desktop-dashboard .tools-pane { 
-  grid-area: side-r; 
-  padding: 32px 24px;
-  background: rgba(10, 10, 10, 0.7);
-  backdrop-filter: blur(20px);
-  overflow-y: auto;
+.bento-card-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 8px;
 }
 
 /* Desktop Specific Adjustments */
