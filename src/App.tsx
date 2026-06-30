@@ -128,14 +128,21 @@ function App() {
   const [tallyTime, setTallyTime] = useState<string>('00:00:00:00');
   const tallyTimeRef = useRef<string>(tallyTime);
   const tallyOpenRef = useRef<boolean>(tallyOpen);
-  const [tallyControlsOpen, setTallyControlsOpen] = useState(false);
-  const [tallyDimmerOpacity, setTallyDimmerOpacity] = useState(0); // 0 = transparent (bright), 0.5 = dim, 0.9 = very dark
   const tallyControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [tallyDimmerOpacity, setTallyDimmerOpacity] = useState(0);
   
   const [directorPanelOpen, setDirectorPanelOpen] = useState(false);
   const [directorTime, setDirectorTime] = useState<string>('00:00:00:00');
   const directorTimeRef = useRef<string>(directorTime);
   const directorPanelOpenRef = useRef<boolean>(directorPanelOpen);
+  // カメララベル: peerIdをキーにした表示名（例: CAM1）
+  const [cameraLabels, setCameraLabels] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem('ltc-camera-labels');
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
+  const [tallyActionLog, setTallyActionLog] = useState<{time: string; cam: string; state: string}[]>([]);
 
   const [isResyncing, setIsResyncing] = useState(false);
   const [lang, setLang] = useState<Lang>(() => getInitialLang());
@@ -144,7 +151,6 @@ function App() {
   useEffect(() => {
     tallyOpenRef.current = tallyOpen;
     if (!tallyOpen) {
-      setTallyControlsOpen(false);
       if (tallyControlsTimerRef.current) {
         clearTimeout(tallyControlsTimerRef.current);
         tallyControlsTimerRef.current = null;
@@ -1223,8 +1229,19 @@ function App() {
         isRunning: false,
         tally: newPayload
       });
+      // 操作ログ履歴を記録（最新10件）
+      const camLabel = cameraLabels[clientId] || clientId.slice(0, 6);
+      const stateLabel = s === 'live' ? 'ON AIR' : s === 'preview' ? 'PREVIEW' : s === 'standby' ? 'READY' : 'OFF';
+      const tc = currentTcRef.current;
+      setTallyActionLog(prev => [{ time: tc, cam: camLabel, state: stateLabel }, ...prev].slice(0, 10));
     }
   };
+
+  // カメララベルをlocalStorageに保存
+  useEffect(() => {
+    try { localStorage.setItem('ltc-camera-labels', JSON.stringify(cameraLabels)); } catch { /* ignore */ }
+  }, [cameraLabels]);
+
 
   // Phase 1/2: tally state resolution
   const tallyState = resolveTally(tallyPayload, peerId, {
@@ -1296,23 +1313,7 @@ function App() {
     };
   }, [tallyState, tallyTorchEnabled]);
 
-  const handleTallyScreenClick = () => {
-    setTallyControlsOpen(prev => {
-      const next = !prev;
-      if (next) {
-        if (tallyControlsTimerRef.current) clearTimeout(tallyControlsTimerRef.current);
-        tallyControlsTimerRef.current = setTimeout(() => {
-          setTallyControlsOpen(false);
-        }, 3000);
-      } else {
-        if (tallyControlsTimerRef.current) {
-          clearTimeout(tallyControlsTimerRef.current);
-          tallyControlsTimerRef.current = null;
-        }
-      }
-      return next;
-    });
-  };
+
 
   const handleDimmerCycle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1321,23 +1322,12 @@ function App() {
       if (prev === 0.5) return 0.85;
       return 0;
     });
-    if (tallyControlsTimerRef.current) {
-      clearTimeout(tallyControlsTimerRef.current);
-      tallyControlsTimerRef.current = setTimeout(() => {
-        setTallyControlsOpen(false);
-      }, 3000);
-    }
   };
+
 
   const handleTorchToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
     setTallyTorchEnabled(prev => !prev);
-    if (tallyControlsTimerRef.current) {
-      clearTimeout(tallyControlsTimerRef.current);
-      tallyControlsTimerRef.current = setTimeout(() => {
-        setTallyControlsOpen(false);
-      }, 3000);
-    }
   };
 
   const handleTallyExit = (e: React.MouseEvent) => {
@@ -1395,6 +1385,29 @@ function App() {
           </div>
           <div className="hdr-divider" />
           <div className="hdr-actions">
+            {/* タリークイックアクセス（常時表示） */}
+            <button
+              type="button"
+              className={`hdr-tally-btn ${tallyOpen ? 'active' : ''}`}
+              onClick={() => setTallyOpen(v => !v)}
+              aria-label="タリーランプを開く"
+              title="TALLY"
+            >
+              <span className="hdr-tally-dot" style={{ background: tallyState === 'live' ? '#ff2222' : tallyState === 'preview' ? '#22cc55' : tallyState === 'standby' ? '#ff9900' : '#333' }} />
+              TALLY
+            </button>
+            {/* ディレクタークイックアクセス（マスターのみ） */}
+            {isHost && (
+              <button
+                type="button"
+                className="hdr-director-btn"
+                onClick={() => setDirectorPanelOpen(true)}
+                aria-label="ディレクターパネルを開く"
+                title="DIRECTOR"
+              >
+                DIR
+              </button>
+            )}
             <button
               type="button"
               className="lang-btn"
@@ -1884,146 +1897,157 @@ function App() {
         ))}
       </div>
 
-      {tallyOpen && (
-        <div
-          className={`tally-overlay tally-${tallyState}`}
-          style={{ background: TALLY_COLORS[tallyState] }}
-          onClick={handleTallyScreenClick}
-        >
-          <div className="tally-dimmer" style={{ opacity: tallyDimmerOpacity }} />
-
-          <div className="tally-header">
-            <div className="tally-header-left">
-              <div>ID: {peerId || 'LOCAL'}</div>
-              <div>ROLE: {p2pRole ? p2pRole.toUpperCase() : 'STANDALONE'}</div>
-            </div>
-            <div className="tally-header-right">
-              <div className="tally-status-indicator">
-                <span className={`tally-conn-dot ${p2pRole === 'client' && (Date.now() - lastHeartbeatTimeRef.current < 3000) ? '' : 'disconnected'}`} />
-                <span>{p2pRole === 'client' && (Date.now() - lastHeartbeatTimeRef.current < 3000) ? 'SYNCED' : 'STANDALONE'}</span>
+      {tallyOpen && (() => {
+        const isConnected = p2pRole === 'client' && (Date.now() - lastHeartbeatTimeRef.current < 3000);
+        const stateLabel = tallyState === 'live' ? 'ON AIR' : tallyState === 'preview' ? 'PREVIEW' : tallyState === 'standby' ? 'READY' : 'OFF';
+        const stateSubLabel = tallyState === 'live' ? '本番中' : tallyState === 'preview' ? '次点・確認中' : tallyState === 'standby' ? '待機中' : 'オフ';
+        return (
+          <div
+            className={`tally-overlay tally-${tallyState}`}
+            style={{ background: TALLY_COLORS[tallyState] }}
+          >
+            <div className="tally-dimmer" style={{ opacity: tallyDimmerOpacity }} />
+            {p2pRole === 'client' && (
+              <div className={`tally-conn-banner ${isConnected ? 'connected' : 'disconnected'}`}>
+                {isConnected ? '● CONNECTED TO DIRECTOR' : '⚠ DISCONNECTED — STANDALONE MODE'}
               </div>
-              <div>BATTERY: {batteryLevel !== null ? `${batteryLevel}%` : 'N/A'}</div>
-            </div>
-          </div>
-
-          {tallyControlsOpen && (
-            <div className="tally-controls-popup">
-              <button className="tally-ctrl-btn" onClick={handleDimmerCycle}>
-                DIM: {tallyDimmerOpacity === 0 ? '0%' : tallyDimmerOpacity === 0.5 ? '50%' : '85%'}
-              </button>
-              <button className="tally-ctrl-btn" onClick={handleTorchToggle}>
-                TORCH: {tallyTorchEnabled ? 'ON' : 'OFF'}
-              </button>
-              <button className="tally-ctrl-btn exit-btn" onClick={handleTallyExit}>
-                CLOSE
-              </button>
-            </div>
-          )}
-
-          <div className="tally-body">
-            <div className="tally-timecode">{tallyTime}</div>
-            <div className="tally-overlay-label">{tr(tallyLabelKey(tallyState))}</div>
-          </div>
-
-          <div className="tally-footer">
-            {tallyControlsOpen ? 'TAP SCREEN TO HIDE CONTROLS' : 'TAP SCREEN FOR CONTROLS'}
-          </div>
-        </div>
-      )}
-
-      {directorPanelOpen && (
-        <div className="director-tally-overlay">
-          <div className="director-tally-header">
-            <div className="director-title">
-              <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', background: '#ff3b30', animation: 'blink 1.5s infinite' }} />
-              DIRECTOR TALLY SWITCHER
-            </div>
-            <div className="director-header-right">
-              <div className="director-tc-large">{directorTime}</div>
-              <button className="director-close-btn" onClick={() => setDirectorPanelOpen(false)}>EXIT PANEL</button>
-            </div>
-          </div>
-
-          <div className="director-all-control">
-            <div className="director-all-left">
-              <span style={{ fontWeight: '800', color: '#ff9500' }}>ALL CAMERAS</span>
-              <span style={{ fontSize: '0.8rem', color: '#666' }}>Batch control for all non-assigned states</span>
-            </div>
-            <div className="director-all-right">
-              {(['live', 'preview', 'standby', 'off'] as TallyState[]).map(s => {
-                const isActive = tallyPayload?.all === s;
-                return (
-                  <button
-                    key={s}
-                    className={`director-action-btn director-btn-${s === 'live' ? 'pgm' : s === 'preview' ? 'pvw' : s} ${isActive ? 'active' : ''}`}
-                    style={{ padding: '8px 16px' }}
-                    onClick={() => handleAllTallyChange(s)}
-                  >
-                    ALL {tr(tallyLabelKey(s))}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="director-grid">
-            {Object.keys(clients).length === 0 ? (
-              <div className="director-no-clients">
-                NO ACTIVE CAMERAS CONNECTED
-                <div style={{ fontSize: '0.85rem', color: '#555', marginTop: '8px', fontWeight: '400' }}>
-                  Connect client phones via P2P to control them from this switcher panel.
-                </div>
-              </div>
-            ) : (
-              Object.entries(clients).map(([id, stats]: [string, any]) => {
-                const isOffline = Date.now() - stats.lastSeen > 30000;
-                const currentAssignedState = tallyPayload?.assignments?.[id] ?? tallyPayload?.all ?? 'off';
-                return (
-                  <div
-                    key={id}
-                    className={`director-cam-card status-${currentAssignedState} ${isOffline ? 'offline' : ''}`}
-                  >
-                    <div className="director-cam-info">
-                      <div className="director-cam-name">{id}</div>
-                      <div className="director-cam-stats">
-                        <span>RTT: {stats.rtt.toFixed(0)}ms</span>
-                        <span>Δ: {stats.drift.toFixed(2)}s</span>
-                      </div>
-                    </div>
-
-                    <div className="director-cam-actions">
-                      <button
-                        className={`director-action-btn director-btn-pgm ${currentAssignedState === 'live' ? 'active' : ''}`}
-                        onClick={() => handleClientTallyChange(id, 'live')}
-                      >
-                        PGM (LIVE)
-                      </button>
-                      <button
-                        className={`director-action-btn director-btn-pvw ${currentAssignedState === 'preview' ? 'active' : ''}`}
-                        onClick={() => handleClientTallyChange(id, 'preview')}
-                      >
-                        PVW (PREV)
-                      </button>
-                      <button
-                        className={`director-action-btn director-btn-stby ${currentAssignedState === 'standby' ? 'active' : ''}`}
-                        onClick={() => handleClientTallyChange(id, 'standby')}
-                      >
-                        STANDBY
-                      </button>
-                      <button
-                        className={`director-action-btn director-btn-off ${currentAssignedState === 'off' ? 'active' : ''}`}
-                        onClick={() => handleClientTallyChange(id, 'off')}
-                      >
-                        OFF
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
             )}
+            <div className="tally-header-slim">
+              <span className="tally-header-id">
+                {cameraLabels[peerId] || (peerId ? peerId.slice(0, 8) : 'LOCAL')}
+              </span>
+              <span className="tally-header-battery">
+                {batteryLevel !== null ? `${isCharging ? '⚡' : '🔋'} ${Math.round(batteryLevel * 100)}%` : ''}
+              </span>
+            </div>
+            <div className="tally-body">
+              <div className="tally-timecode">{tallyTime}</div>
+              <div className="tally-state-label">{stateLabel}</div>
+              <div className="tally-state-sublabel">{stateSubLabel}</div>
+            </div>
+            <div className="tally-control-bar">
+              <button className="tally-ctrl-bar-btn" onClick={handleDimmerCycle}>
+                <span className="tally-ctrl-icon">☀</span>
+                <span>{tallyDimmerOpacity === 0 ? '明' : tallyDimmerOpacity === 0.5 ? '中' : '暗'}</span>
+              </button>
+              <button className={`tally-ctrl-bar-btn ${tallyTorchEnabled ? 'active' : ''}`} onClick={handleTorchToggle}>
+                <span className="tally-ctrl-icon">🔦</span>
+                <span>TORCH {tallyTorchEnabled ? 'ON' : 'OFF'}</span>
+              </button>
+              <button className="tally-ctrl-bar-btn exit" onClick={handleTallyExit}>
+                <span className="tally-ctrl-icon">✕</span>
+                <span>CLOSE</span>
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
+      {directorPanelOpen && (() => {
+        const camCount = Object.keys(clients).length;
+        return (
+          <div className="director-tally-overlay">
+            <div className="director-tally-header">
+              <div className="director-title">
+                <span className="director-rec-dot" />
+                DIRECTOR PANEL
+                <span className="director-cam-count">{camCount} CAM{camCount !== 1 ? 'S' : ''}</span>
+              </div>
+              <div className="director-header-right">
+                <div className="director-tc-large">{directorTime}</div>
+                <button className="director-close-btn" onClick={() => setDirectorPanelOpen(false)}>✕ EXIT</button>
+              </div>
+            </div>
+            <div className="director-all-control">
+              <div className="director-all-label">
+                <span>ALL CAMERAS</span>
+                <span className="director-all-sub">一括操作</span>
+              </div>
+              <div className="director-all-btns">
+                <button
+                  className={`dir-all-btn on-air ${tallyPayload?.all === 'live' ? 'active' : ''}`}
+                  onClick={() => handleAllTallyChange('live')}
+                >ON AIR</button>
+                <button
+                  className={`dir-all-btn preview ${tallyPayload?.all === 'preview' ? 'active' : ''}`}
+                  onClick={() => handleAllTallyChange('preview')}
+                >PREVIEW</button>
+                <button
+                  className={`dir-all-btn off ${tallyPayload?.all === 'off' ? 'active' : ''}`}
+                  onClick={() => handleAllTallyChange('off')}
+                >OFF</button>
+              </div>
+            </div>
+            <div className="director-main-area">
+              <div className="director-grid">
+                {camCount === 0 ? (
+                  <div className="director-no-clients">
+                    <div className="director-no-clients-icon">📷</div>
+                    <div>NO CAMERAS CONNECTED</div>
+                    <div className="director-no-clients-sub">P2P でクライアント端末を接続してください</div>
+                  </div>
+                ) : (
+                  Object.entries(clients).map(([id, stats]: [string, any], idx) => {
+                    const isOffline = Date.now() - stats.lastSeen > 30000;
+                    const assignedState = tallyPayload?.assignments?.[id] ?? tallyPayload?.all ?? 'off';
+                    const defaultLabel = `CAM${idx + 1}`;
+                    const label = cameraLabels[id] || defaultLabel;
+                    return (
+                      <div key={id} className={`director-cam-card status-${assignedState} ${isOffline ? 'offline' : ''}`}>
+                        {isOffline && <div className="director-offline-overlay">OFFLINE</div>}
+                        <div className="director-cam-header">
+                          <input
+                            className="director-cam-label-input"
+                            value={label}
+                            onChange={e => setCameraLabels(prev => ({ ...prev, [id]: e.target.value }))}
+                            placeholder={defaultLabel}
+                            maxLength={8}
+                          />
+                          <div className="director-cam-meta">
+                            <span className={`director-state-chip state-${assignedState}`}>
+                              {assignedState === 'live' ? '● ON AIR' : assignedState === 'preview' ? '◐ PREVIEW' : assignedState === 'standby' ? '○ READY' : '— OFF'}
+                            </span>
+                            <span className="director-cam-rtt">{stats.rtt.toFixed(0)}ms</span>
+                          </div>
+                        </div>
+                        <div className="director-cam-actions-v">
+                          <button
+                            className={`dir-cam-btn on-air ${assignedState === 'live' ? 'active' : ''}`}
+                            onClick={() => handleClientTallyChange(id, 'live')}
+                          >ON AIR</button>
+                          <button
+                            className={`dir-cam-btn preview ${assignedState === 'preview' ? 'active' : ''}`}
+                            onClick={() => handleClientTallyChange(id, 'preview')}
+                          >PREVIEW</button>
+                          <button
+                            className={`dir-cam-btn off ${assignedState === 'off' ? 'active' : ''}`}
+                            onClick={() => handleClientTallyChange(id, 'off')}
+                          >OFF</button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              {tallyActionLog.length > 0 && (
+                <div className="director-log">
+                  <div className="director-log-title">操作ログ</div>
+                  {tallyActionLog.map((entry, i) => (
+                    <div key={i} className="director-log-row">
+                      <span className={`director-log-state state-text-${entry.state === 'ON AIR' ? 'live' : entry.state === 'PREVIEW' ? 'preview' : 'off'}`}>
+                        {entry.state}
+                      </span>
+                      <span className="director-log-cam">{entry.cam}</span>
+                      <span className="director-log-tc">{entry.time}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
 
       {isVisualSlate && (
         <div className={`visual-slate-overlay ${isSlateFlashing ? 'flashing' : ''}`} onClick={handleSlateClick}>

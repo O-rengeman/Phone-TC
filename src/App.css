@@ -1854,9 +1854,9 @@ input[type="range"] {
   flex: 1;
   padding: 10px 0;
   border-radius: 8px;
-  border: 2px solid #333;
-  background: #1a1a1a;
-  color: #eee;
+  border: 2px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
   font-weight: 700;
   font-size: 0.85rem;
   letter-spacing: 0.05em;
@@ -1868,15 +1868,61 @@ input[type="range"] {
   width: 100%;
   padding: 12px 0;
   border-radius: 8px;
-  border: 2px solid #444;
-  background: #161616;
-  color: #ddd;
+  border: 2px solid var(--border-subtle);
+  background: var(--panel);
+  color: var(--text);
   font-weight: 700;
   letter-spacing: 0.08em;
   cursor: pointer;
+  transition: all 0.15s;
+}
+.tally-open-btn:active { border-color: var(--primary); }
+
+/* ── P1-1: ヘッダー タリー/DIR ボタン ── */
+.hdr-tally-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.hdr-tally-btn.active {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.hdr-tally-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.hdr-director-btn {
+  background: rgba(255, 59, 48, 0.12);
+  border: 1px solid rgba(255, 59, 48, 0.4);
+  color: #ff5c52;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.hdr-director-btn:active {
+  background: rgba(255, 59, 48, 0.3);
 }
 
-/* Tally Premium Fullscreen View */
+/* ── P2: タリー全画面オーバーレイ（リデザイン） ── */
 .tally-overlay {
   position: fixed;
   inset: 0;
@@ -1885,33 +1931,38 @@ input[type="range"] {
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 6vh 6vw;
   box-sizing: border-box;
   font-family: var(--font-mono), monospace;
   transition: background 0.25s ease-out;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  padding: 0;
 }
 
-/* Pulsing Tally Border Glow (LIVE) */
+/* アニメーション強化 (P2-2) */
 .tally-overlay.tally-live {
-  animation: tally-pulse-live 1.5s infinite alternate;
+  animation: tally-pulse-live 1.2s infinite alternate;
 }
 @keyframes tally-pulse-live {
-  0% { box-shadow: inset 0 0 30px rgba(255, 0, 0, 0.5); }
-  100% { box-shadow: inset 0 0 80px rgba(255, 0, 0, 0.9); }
+  0% { box-shadow: inset 0 0 40px rgba(255, 0, 0, 0.6); }
+  100% { box-shadow: inset 0 0 100px rgba(255, 0, 0, 1); }
 }
-
-/* Pulsing Opacity (STANDBY) */
+.tally-overlay.tally-preview {
+  animation: tally-pulse-preview 2s infinite alternate;
+}
+@keyframes tally-pulse-preview {
+  0% { box-shadow: inset 0 0 20px rgba(22, 163, 74, 0.4); }
+  100% { box-shadow: inset 0 0 60px rgba(22, 163, 74, 0.8); }
+}
 .tally-overlay.tally-standby {
-  animation: tally-pulse-standby 2.5s infinite alternate;
+  animation: tally-pulse-standby 3s infinite alternate;
 }
 @keyframes tally-pulse-standby {
-  0% { box-shadow: inset 0 0 20px rgba(255, 140, 0, 0.3); }
-  100% { box-shadow: inset 0 0 60px rgba(255, 140, 0, 0.75); }
+  0% { box-shadow: inset 0 0 20px rgba(180, 83, 9, 0.3); }
+  100% { box-shadow: inset 0 0 60px rgba(180, 83, 9, 0.7); }
 }
 
-/* Brightness Simulated Dimmer Overlay */
+/* Dimmerオーバーレイ */
 .tally-dimmer {
   position: absolute;
   inset: 0;
@@ -1921,43 +1972,51 @@ input[type="range"] {
   transition: opacity 0.2s ease;
 }
 
-.tally-header {
+/* P2-4: 接続状態バナー（上部常時表示） */
+.tally-conn-banner {
+  position: relative;
+  z-index: 30;
+  width: 100%;
+  padding: 10px 20px;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  box-sizing: border-box;
+}
+.tally-conn-banner.connected {
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.7);
+}
+.tally-conn-banner.disconnected {
+  background: rgba(255, 200, 0, 0.9);
+  color: #000;
+  animation: pulse-warn 1s infinite;
+}
+
+/* スリムヘッダー */
+.tally-header-slim {
+  position: relative;
+  z-index: 20;
   width: 100%;
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.85);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
-  z-index: 20;
-}
-.tally-header-left, .tally-header-right {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.tally-header-right {
-  text-align: right;
-  align-items: flex-end;
-}
-.tally-status-indicator {
-  display: flex;
   align-items: center;
+  padding: 8px 20px;
+  box-sizing: border-box;
 }
-.tally-conn-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #4cd964;
-  margin-right: 6px;
+.tally-header-id {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 1px;
 }
-.tally-conn-dot.disconnected {
-  background: #ff3b30;
-  animation: blink 1s infinite;
+.tally-header-battery {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
 }
 
+/* P2-1: タリー本体 — 大型ラベル */
 .tally-body {
   display: flex;
   flex-direction: column;
@@ -1965,94 +2024,92 @@ input[type="range"] {
   justify-content: center;
   flex: 1;
   z-index: 20;
+  gap: 0.5vh;
 }
 .tally-timecode {
-  font-size: 13vw;
+  font-size: min(10vw, 7vh);
   font-weight: 900;
-  color: #fff;
-  text-shadow: 0 4px 15px rgba(0, 0, 0, 0.85);
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
   letter-spacing: -0.01em;
-  margin-bottom: 1vh;
+  margin-bottom: 2vh;
 }
-.tally-overlay-label {
-  font-size: 7.5vw;
+/* P2-1: 超大型ラベル（3m離れても見える） */
+.tally-state-label {
+  font-size: min(22vw, 20vh);
   font-weight: 900;
-  letter-spacing: 0.1em;
   color: #fff;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 4px 30px rgba(0, 0, 0, 0.8);
+  letter-spacing: 0.05em;
+  line-height: 1;
 }
-.tally-overlay.tally-off .tally-overlay-label {
-  color: #444;
-  text-shadow: none;
+.tally-overlay.tally-off .tally-state-label {
+  color: rgba(255, 255, 255, 0.2);
 }
-
-.tally-footer {
-  width: 100%;
-  text-align: center;
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.5);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-  z-index: 20;
-}
-
-/* Quick Control Panel */
-.tally-controls-popup {
-  position: absolute;
-  top: 18vh;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(18, 18, 18, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(12px);
-  padding: 12px 20px;
-  border-radius: 12px;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.7);
-  z-index: 30;
-  animation: tallyFadeIn 0.2s ease-out;
-}
-@keyframes tallyFadeIn {
-  from { opacity: 0; transform: translate(-50%, -10px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
-}
-
-.tally-ctrl-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #fff;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 0.8rem;
+.tally-state-sublabel {
+  font-size: min(5vw, 4.5vh);
   font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s ease;
-}
-.tally-ctrl-btn:active {
-  background: rgba(255, 255, 255, 0.25);
-}
-.tally-ctrl-btn.exit-btn {
-  background: rgba(255, 59, 48, 0.2);
-  border-color: rgba(255, 59, 48, 0.4);
-}
-.tally-ctrl-btn.exit-btn:active {
-  background: rgba(255, 59, 48, 0.4);
+  color: rgba(255, 255, 255, 0.65);
+  letter-spacing: 0.12em;
+  margin-top: 1.5vh;
+  font-family: var(--font-main);
 }
 
-/* Director Tally Panel (Switcher Interface) */
+/* P2-3: 常時表示コントロールバー（下部固定） */
+.tally-control-bar {
+  position: relative;
+  z-index: 30;
+  width: 100%;
+  display: flex;
+  gap: 1px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+.tally-ctrl-bar-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 14px 8px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+.tally-ctrl-bar-btn:last-child { border-right: none; }
+.tally-ctrl-bar-btn:active { background: rgba(255, 255, 255, 0.15); }
+.tally-ctrl-bar-btn.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+.tally-ctrl-bar-btn.exit { color: rgba(255, 120, 120, 0.9); }
+.tally-ctrl-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+/* ── P3/P4: ディレクターパネル（全面リデザイン） ── */
 .director-tally-overlay {
   position: fixed;
   inset: 0;
   z-index: 9998;
-  background: #0b0b0f;
-  color: #f1f1f7;
+  background: var(--bg);
+  color: var(--text-bright);
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  padding: 24px;
-  font-family: var(--font-mono), monospace;
+  padding: 20px 20px 0;
+  font-family: var(--font-main);
   overflow: hidden;
 }
 
@@ -2060,211 +2117,409 @@ input[type="range"] {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #222230;
-  padding-bottom: 16px;
-  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 14px;
+  margin-bottom: 16px;
   flex-shrink: 0;
 }
 
 .director-title {
-  font-size: 1.4rem;
+  font-size: 1.1rem;
   font-weight: 900;
-  letter-spacing: 0.05em;
-  background: linear-gradient(90deg, #ff3b30, #ff9500);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  letter-spacing: 0.08em;
+  color: var(--text-bright);
   display: flex;
   align-items: center;
   gap: 10px;
+  font-family: var(--font-mono);
+}
+
+/* REC dot */
+.director-rec-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff3b30;
+  animation: blink 1.5s infinite;
+  flex-shrink: 0;
+}
+.director-cam-count {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
 }
 
 .director-header-right {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
 }
 
 .director-tc-large {
-  font-size: 2rem;
+  font-size: 1.6rem;
   font-weight: 900;
-  color: #fff;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+  color: var(--text-bright);
+  font-family: var(--font-mono);
+  letter-spacing: 0.03em;
 }
 
+/* P3-4: ALL操作エリア */
 .director-all-control {
-  background: #13131c;
-  border: 1px solid #222235;
-  border-radius: 8px;
-  padding: 12px 20px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   flex-shrink: 0;
 }
-.director-all-left {
+.director-all-label {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 1px;
 }
-.director-all-right {
+.director-all-sub {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.director-all-btns {
   display: flex;
   gap: 8px;
 }
 
+/* ALL CAM ボタン */
+.dir-all-btn {
+  padding: 8px 20px;
+  border-radius: var(--radius-sm);
+  font-weight: 900;
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.12s ease;
+  font-family: var(--font-mono);
+}
+.dir-all-btn.on-air {
+  background: rgba(255, 34, 34, 0.1);
+  border-color: rgba(255, 34, 34, 0.4);
+  color: #ff5555;
+}
+.dir-all-btn.on-air.active, .dir-all-btn.on-air:active {
+  background: #ff2222;
+  border-color: #ff2222;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(255, 34, 34, 0.5);
+}
+.dir-all-btn.preview {
+  background: rgba(34, 200, 80, 0.08);
+  border-color: rgba(34, 200, 80, 0.35);
+  color: #22cc55;
+}
+.dir-all-btn.preview.active, .dir-all-btn.preview:active {
+  background: #22aa44;
+  border-color: #22aa44;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(34, 170, 68, 0.4);
+}
+.dir-all-btn.off {
+  background: transparent;
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+}
+.dir-all-btn.off.active, .dir-all-btn.off:active {
+  background: var(--panel-elevated);
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+
+/* メインエリア（グリッド + ログ） */
+.director-main-area {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+  overflow: hidden;
+}
+
 .director-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
   flex: 1;
   overflow-y: auto;
   padding-bottom: 20px;
+  align-content: start;
 }
 
-/* Camera Card */
+/* P3-1/P3-2/P3-3/P3-5: カメラカード */
 .director-cam-card {
-  background: #111118;
-  border: 2px solid #222230;
-  border-radius: 12px;
-  padding: 16px;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  transition: all 0.2s ease;
+  gap: 10px;
+  transition: all 0.15s ease;
   position: relative;
-  height: 200px;
+  overflow: hidden;
   box-sizing: border-box;
+  /* P3-3: 左端カラーバー */
 }
-
+.director-cam-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--border);
+  transition: background 0.15s;
+}
 .director-cam-card.status-live {
-  border-color: #ff3b30;
-  box-shadow: 0 0 12px rgba(255, 59, 48, 0.15);
-  background: #1d0a0a;
+  border-color: rgba(255, 34, 34, 0.5);
+  background: rgba(255, 34, 34, 0.05);
 }
-
+.director-cam-card.status-live::before { background: #ff2222; }
 .director-cam-card.status-preview {
-  border-color: #4cd964;
-  box-shadow: 0 0 12px rgba(76, 217, 100, 0.15);
-  background: #0a1c0f;
+  border-color: rgba(34, 200, 80, 0.4);
+  background: rgba(34, 200, 80, 0.04);
+}
+.director-cam-card.status-preview::before { background: #22cc55; }
+.director-cam-card.status-standby::before { background: #ff9900; }
+
+/* P3-5: オフライン表示 */
+.director-cam-card.offline {
+  opacity: 0.5;
+}
+.director-offline-overlay {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 8px,
+    rgba(255, 255, 255, 0.02) 8px,
+    rgba(255, 255, 255, 0.02) 16px
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: var(--text-muted);
+  z-index: 5;
+  border-radius: var(--radius-md);
 }
 
-.director-cam-card.status-standby {
-  border-color: #ff9500;
-  background: #1a1205;
-}
-
-.director-cam-info {
+/* カードヘッダー（ラベル入力 + 状態チップ） */
+.director-cam-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 8px;
+  align-items: center;
+  gap: 8px;
 }
+/* P3-1: カメラ名ラベル入力 */
+.director-cam-label-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-bright);
+  font-size: 1rem;
+  font-weight: 900;
+  font-family: var(--font-mono);
+  letter-spacing: 1px;
+  width: 80px;
+  padding: 2px 0;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.director-cam-label-input:focus { border-bottom-color: var(--primary); }
 
-.director-cam-name {
-  font-size: 1.05rem;
+.director-cam-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+.director-state-chip {
+  font-size: 0.6rem;
   font-weight: 800;
-  color: #fff;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--panel-elevated);
   white-space: nowrap;
-  max-width: 140px;
+}
+.director-state-chip.state-live { color: #ff4444; background: rgba(255, 34, 34, 0.15); }
+.director-state-chip.state-preview { color: #22cc55; background: rgba(34, 200, 80, 0.12); }
+.director-state-chip.state-standby { color: #ff9900; background: rgba(255, 153, 0, 0.12); }
+.director-state-chip.state-off { color: var(--text-muted); }
+.director-cam-rtt {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
 }
 
-.director-cam-stats {
+/* P3-2: 縦1列大型ボタン */
+.director-cam-actions-v {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.dir-cam-btn {
+  width: 100%;
+  padding: 9px 0;
+  border-radius: var(--radius-sm);
+  font-weight: 900;
   font-size: 0.7rem;
-  color: #8e8e93;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: all 0.1s ease;
+  text-align: center;
+  background: var(--bg);
+  color: var(--text-muted);
+  border-color: var(--border);
+  font-family: var(--font-mono);
+}
+.dir-cam-btn:active { transform: scale(0.97); }
+.dir-cam-btn.on-air {
+  border-color: rgba(255, 34, 34, 0.35);
+  color: #ff5555;
+}
+.dir-cam-btn.on-air.active {
+  background: #ff2222;
+  border-color: #ff2222;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(255, 34, 34, 0.4);
+}
+.dir-cam-btn.preview {
+  border-color: rgba(34, 200, 80, 0.3);
+  color: #22cc55;
+}
+.dir-cam-btn.preview.active {
+  background: #22aa44;
+  border-color: #22aa44;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(34, 170, 68, 0.35);
+}
+.dir-cam-btn.off {
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+.dir-cam-btn.off.active {
+  background: var(--panel-elevated);
+  color: var(--text);
+  border-color: var(--border-subtle);
+}
+
+/* P6-2: 操作ログ */
+.director-log {
+  width: 200px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.director-log-title {
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+.director-log-row {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  align-items: flex-end;
+  padding: 6px 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  border-left: 3px solid var(--border);
+  flex-shrink: 0;
 }
-
-.director-cam-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
+.director-log-state {
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  font-family: var(--font-mono);
 }
-
-.director-action-btn {
-  padding: 8px 0;
-  border-radius: 6px;
-  font-weight: 800;
-  font-size: 0.75rem;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 0.1s ease;
-  text-align: center;
-  background: #1e1e2d;
-  color: #ccc;
-  border-color: #333;
+.state-text-live { color: #ff4444; border-color: #ff2222; }
+.director-log-row:has(.state-text-live) { border-left-color: #ff2222; }
+.state-text-preview { color: #22cc55; }
+.director-log-row:has(.state-text-preview) { border-left-color: #22cc55; }
+.state-text-off { color: var(--text-muted); }
+.director-log-cam {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  font-family: var(--font-mono);
 }
-
-/* Switcher Button States */
-.director-btn-pgm {
-  border-color: rgba(255, 59, 48, 0.4);
-  color: #ff3b30;
-}
-.director-btn-pgm.active {
-  background: #ff3b30;
-  color: #fff;
-  border-color: #ff3b30;
-  box-shadow: 0 0 8px rgba(255, 59, 48, 0.4);
-}
-
-.director-btn-pvw {
-  border-color: rgba(76, 217, 100, 0.4);
-  color: #4cd964;
-}
-.director-btn-pvw.active {
-  background: #4cd964;
-  color: #000;
-  border-color: #4cd964;
-  box-shadow: 0 0 8px rgba(76, 217, 100, 0.4);
-}
-
-.director-btn-stby {
-  border-color: rgba(255, 149, 0, 0.4);
-  color: #ff9500;
-}
-.director-btn-stby.active {
-  background: #ff9500;
-  color: #000;
-  border-color: #ff9500;
-}
-
-.director-btn-off {
-  border-color: #444;
-  color: #888;
-}
-.director-btn-off.active {
-  background: #444;
-  color: #fff;
-  border-color: #444;
+.director-log-tc {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
 }
 
 .director-close-btn {
-  background: #1c1c28;
-  border: 1px solid #444;
-  color: #fff;
-  padding: 8px 16px;
-  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text-bright);
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
   font-weight: 800;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s;
+  font-family: var(--font-mono);
 }
 .director-close-btn:active {
-  background: #2d2d3f;
+  background: var(--panel-elevated);
+  border-color: var(--text-muted);
 }
 
 .director-no-clients {
   grid-column: 1 / -1;
   text-align: center;
-  padding: 40px;
-  color: #555;
+  padding: 60px 40px;
+  color: var(--text-muted);
   font-weight: 700;
-  font-size: 1.1rem;
-  border: 2px dashed #222;
-  border-radius: 12px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
 }
+.director-no-clients-icon { font-size: 2.5rem; opacity: 0.4; }
+.director-no-clients-sub {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+/* ログで使うstate-textクラスがdirector-log外でも使えるよう重複定義 */
+.director-log-row { border-left: 3px solid var(--border); }
+
