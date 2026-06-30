@@ -1609,3 +1609,57 @@ input[type="range"] {
   font-size: 0.85rem;
   color: rgba(0, 0, 0, 0.65);
 }
+
+/* ============================================================
+   Desktop space-efficiency pass (overrides earlier desktop rules
+   via equal specificity + later source order). Goal: fill the
+   wasted center space with a much larger timecode and tighten
+   the generous paddings/gaps across the dashboard.
+   ============================================================ */
+
+/* Give the center more room; trim the side rails. */
+.desktop-dashboard {
+  grid-template-columns: 252px 1fr 284px;
+}
+.desktop-dashboard .sync-pane { padding: 16px 16px; }
+.desktop-dashboard .tools-pane { padding: 16px 16px; }
+
+/* Center column: top-aligned and dense, TC fills the height. */
+.desktop-dashboard .main-pane {
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 16px 20px;
+}
+.desktop-view .timecode-card-pro {
+  height: auto;
+  flex: 1 1 auto;
+  min-height: 200px;
+  width: 100%;
+}
+.desktop-view .info-strip-pro { margin: 0; }
+.desktop-view .main-sync-bar { width: 100%; max-width: 520px; }
+
+/* Tighter panes / sections. */
+.desktop-view .tab-pane { gap: 10px; }
+.desktop-view .control-section { gap: 8px; }
+.desktop-view .section-label,
+.desktop-view .tool-card label {
+  font-size: 0.72rem;
+  margin-bottom: 6px;
+}
+.desktop-view .tool-card { padding: 12px 14px; }
+.desktop-view .tool-card input {
+  font-size: 1.25rem;
+  padding: 7px 10px;
+}
+.desktop-view .btn-pill { font-size: 0.8rem; padding: 9px 8px; }
+.desktop-view .btn-mark-color { width: 42px; height: 42px; }
+
+/* Compact footer reclaims vertical space. */
+.desktop-view .fixed-footer { padding: 14px 24px; }
+.desktop-view .footer-buttons { max-width: 720px; gap: 14px; }
+.desktop-view .btn-main-action { padding: 14px 32px; font-size: 1rem; min-height: 52px; }
+.desktop-view .btn-export-pro { font-size: 0.72rem; padding: 8px 14px; }
+
+/* With the denser footer/header there is more list height available. */
+.desktop-view .marker-scroll { height: calc(100vh - 300px); }

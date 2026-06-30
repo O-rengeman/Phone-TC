@@ -1029,8 +1029,10 @@ function App() {
       // Draw Timecode — auto-size to fill ~90% of the card width so the TC is
       // as large and legible as possible on any screen / orientation.
       const targetWidth = w * 0.9;
-      const maxSize = isMobile ? 140 : 220;
-      let fontSize = maxSize;
+      // Cap by height first so a tall desktop card grows the TC to fill the
+      // column; the width check below then shrinks it to fit if needed.
+      const maxSize = isMobile ? 140 : 360;
+      let fontSize = Math.min(maxSize, h * 0.72);
       ctx.font = `900 ${fontSize}px 'JetBrains Mono', monospace`;
       const measured = ctx.measureText(tc).width;
       if (measured > targetWidth && measured > 0) {
