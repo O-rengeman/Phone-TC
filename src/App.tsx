@@ -1109,38 +1109,43 @@ function App() {
           <div className="logo">LTC SYNC PRO</div>
           <div className="version">v1.3</div>
         </div>
-        <div className="status-cluster">
-          <button
-            type="button"
-            className="lang-btn"
-            onClick={() => setLang((l) => (l === 'en' ? 'ja' : 'en'))}
-            aria-label="Toggle language"
-            title="Language"
-          >{lang === 'en' ? '日本語' : 'EN'}</button>
-          <button
-            type="button"
-            className="help-btn"
-            onClick={() => setShowGuide(true)}
-            aria-label={tr('guide.aria')}
-            title={tr('guide.aria')}
-          >?</button>
-          <div className={`status-pill ${isRunning ? 'live' : isPreparing ? 'prep' : 'idle'}`}>
-            <span className="status-dot" />
-            {isRunning ? tr('status.live') : isPreparing ? tr('status.syncing') : tr('status.ready')}
-          </div>
-          <div className="status-meta">
-            <span>{FPS_OPTIONS[fpsIndex].label}</span>
-            <span className="status-meta-sep">·</span>
-            <span>{syncMode.toUpperCase()}</span>
-          </div>
-          {batteryLevel !== null && (
-            <div className={`batt-chip ${batteryLevel <= 0.15 && !isCharging ? 'low' : ''}`}>
-              <span className="batt-pct">{isCharging ? '⚡' : ''}{Math.round(batteryLevel * 100)}%</span>
-              {!isCharging && isRunning && batteryEta !== null && (
-                <span className="batt-eta">{formatDuration(batteryEta)}</span>
-              )}
+        <div className="header-right">
+          <div className="hdr-status">
+            <div className={`status-pill ${isRunning ? 'live' : isPreparing ? 'prep' : 'idle'}`}>
+              <span className="status-dot" />
+              {isRunning ? tr('status.live') : isPreparing ? tr('status.syncing') : tr('status.ready')}
             </div>
-          )}
+            <div className="status-meta">
+              <span>{FPS_OPTIONS[fpsIndex].label}</span>
+              <span className="status-meta-sep">·</span>
+              <span>{syncMode.toUpperCase()}</span>
+            </div>
+            {batteryLevel !== null && (
+              <div className={`batt-chip ${batteryLevel <= 0.15 && !isCharging ? 'low' : ''}`}>
+                <span className="batt-pct">{isCharging ? '⚡' : ''}{Math.round(batteryLevel * 100)}%</span>
+                {!isCharging && isRunning && batteryEta !== null && (
+                  <span className="batt-eta">{formatDuration(batteryEta)}</span>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="hdr-divider" />
+          <div className="hdr-actions">
+            <button
+              type="button"
+              className="lang-btn"
+              onClick={() => setLang((l) => (l === 'en' ? 'ja' : 'en'))}
+              aria-label="Toggle language"
+              title="Language"
+            >{lang === 'en' ? '日本語' : 'EN'}</button>
+            <button
+              type="button"
+              className="help-btn"
+              onClick={() => setShowGuide(true)}
+              aria-label={tr('guide.aria')}
+              title={tr('guide.aria')}
+            >?</button>
+          </div>
         </div>
       </header>
 

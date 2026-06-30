@@ -1783,3 +1783,49 @@ input[type="range"] {
    whose label is translated (RE-SYNC / 再同期, RESET / リセット). */
 .msb-resync { min-width: 88px; text-align: center; }
 .btn-small { min-width: 64px; text-align: center; }
+
+/* ============================================================
+   Header tidy-up: split the right side into a STATUS group and a
+   compact ACTIONS group (language / help) separated by a hairline
+   divider, with consistent alignment. On mobile the redundant
+   FPS·MODE meta is hidden (it already shows on the timecode card),
+   keeping the bar uncluttered and overflow-free.
+   ============================================================ */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.hdr-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.hdr-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
+}
+.hdr-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Uniform, aligned action buttons. */
+.hdr-actions .lang-btn,
+.hdr-actions .help-btn {
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Mobile: drop the redundant FPS·MODE meta to keep the bar smart & fitting. */
+.mobile-view .status-meta { display: none; }
+.mobile-view .hdr-divider { height: 14px; }
+.mobile-view .header-right { gap: 8px; }

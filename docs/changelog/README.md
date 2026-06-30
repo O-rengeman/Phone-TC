@@ -37,5 +37,6 @@ docs/changelog/YYYY-MM-DD-NN-<slug>.md
 | 13 | ♻️ 変更 | [モバイルUIのスペース効率改善](./2026-06-29-13-mobile-density.md) | `src/App.css` |
 | 14 | 🛠 修正 | [言語切替でレイアウトが変わらないように固定](./2026-06-29-14-lang-stable-layout.md) | `src/App.css` |
 | 15 | ♻️ 変更 | [モバイル密度のさらなる改善＋言語不変の総仕上げ](./2026-06-29-15-mobile-density2-lang.md) | `src/App.css` |
+| 16 | ♻️ 変更 | [上部バー(ヘッダー)の整理・スマート化](./2026-06-29-16-header-tidy.md) | `src/App.tsx`, `src/App.css` |
 
 > 種別凡例: ✨ 追加 / ♻️ 変更 / 🛠 修正 / 🧱 基盤
