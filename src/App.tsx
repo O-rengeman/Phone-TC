@@ -177,6 +177,9 @@ function App() {
     if (markerFlashTimerRef.current !== null) clearTimeout(markerFlashTimerRef.current);
   }, []);
   const stopHoldRafRef = useRef<number | null>(null);
+  // Set when a hold-to-stop completes; consumed to swallow the trailing click
+  // (finger-lift) so STOP doesn't immediately re-trigger START.
+  const holdStoppedRef = useRef(false);
   const stopHoldStartRef = useRef(0);
   const [p2pSyncSource, setP2pSyncSource] = useState<'manual' | 'network'>('manual');
   const [masterDrift, setMasterDrift] = useState<number | null>(null); // Drift in seconds from master
@@ -770,6 +773,7 @@ function App() {
         setStopHoldPct(0);
         setIsPaused(false);
         stopEngine(true);
+        holdStoppedRef.current = true;
       } else {
         stopHoldRafRef.current = requestAnimationFrame(tick);
       }
@@ -1517,11 +1521,16 @@ function App() {
           <div className="footer-left">
             <button
               className={`btn-main-action ${isRunning ? 'running danger' : isPreparing ? 'preparing' : 'start'}`}
-              onClick={() => { if (!isRunning) void handleStartStop(); }}
-              onPointerDown={isRunning ? beginStopHold : undefined}
-              onPointerUp={isRunning ? cancelStopHold : undefined}
-              onPointerLeave={isRunning ? cancelStopHold : undefined}
-              onContextMenu={(e) => { if (isRunning) e.preventDefault(); }}
+              onClick={() => {
+                // Swallow the trailing click that fires when the finger lifts
+                // after a completed hold-to-stop (it would otherwise restart).
+                if (holdStoppedRef.current) { holdStoppedRef.current = false; return; }
+                if (!isRunning) void handleStartStop();
+              }}
+              onPointerDown={() => { if (isRunning) beginStopHold(); }}
+              onPointerUp={cancelStopHold}
+              onPointerLeave={cancelStopHold}
+              onContextMenu={(e) => e.preventDefault()}
               disabled={isPreparing}
             >
               {isRunning && <div className="stop-hold-fill" style={{ width: `${stopHoldPct}%` }} />}
