@@ -50,7 +50,7 @@ export function resolveTally(
     return payload.assignments[myId] ?? payload.all;
   }
   if (ctx.autoMode) {
-    return ctx.selfIsRunning ? 'live' : 'standby';
+    return ctx.selfIsRunning ? 'live' : 'off';
   }
   return ctx.manualState ?? 'off';
 }

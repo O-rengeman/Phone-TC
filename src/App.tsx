@@ -1267,9 +1267,9 @@ function App() {
       });
       // 操作ログ履歴を記録（最新10件）
       const camLabel = cameraLabels[clientId] || clientId.slice(0, 6);
-      const stateLabel = s === 'live' ? 'ON AIR' : s === 'preview' ? 'PREVIEW' : s === 'standby' ? 'READY' : 'OFF';
+      const stateKey = s === 'standby' ? 'preview' : s;
       const tc = currentTcRef.current;
-      setTallyActionLog(prev => [{ time: tc, cam: camLabel, state: stateLabel }, ...prev].slice(0, 10));
+      setTallyActionLog(prev => [{ time: tc, cam: camLabel, state: stateKey }, ...prev].slice(0, 10));
     }
   };
 
@@ -1732,7 +1732,7 @@ function App() {
               )}
               {tallyMode === 'manual' && (
                 <div className="tally-state-row">
-                  {(['live', 'standby', 'off'] as TallyState[]).map(s => (
+                  {(['live', 'preview', 'off'] as TallyState[]).map(s => (
                     <button
                       key={s}
                       className={`tally-state-btn ${manualTally === s ? 'active' : ''}`}
@@ -1762,7 +1762,7 @@ function App() {
                         </div>
                         {tallyMode === 'manual' && (
                           <div className="client-tally-controls" style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
-                            {(['live', 'preview', 'standby', 'off'] as TallyState[]).map(s => {
+                            {(['live', 'preview', 'off'] as TallyState[]).map(s => {
                                const isActive = tallyPayload?.assignments?.[id] === s;
                                return (
                                  <button
@@ -1937,8 +1937,8 @@ function App() {
         const isConnected = p2pRole === 'client' && (Date.now() - lastHeartbeatTimeRef.current < 3000);
         // P5-1: 状態UIを3択（ON AIR / PREVIEW / OFF）に制限
         const uiState = tallyState === 'standby' ? 'preview' : tallyState;
-        const stateLabel = uiState === 'live' ? 'ON AIR' : uiState === 'preview' ? 'PREVIEW' : 'OFF';
-        const stateSubLabel = uiState === 'live' ? '本番中' : uiState === 'preview' ? '次点・確認中' : 'オフ';
+        const stateLabel = tr(tallyLabelKey(uiState));
+        const stateSubLabel = tr(`tally.sub.${uiState}`);
         return (
           <div
             className={`tally-overlay tally-${uiState}`}
@@ -2055,7 +2055,8 @@ function App() {
                           />
                           <div className="director-cam-meta">
                             <span className={`director-state-chip state-${uiAssignedState}`}>
-                              {uiAssignedState === 'live' ? '● ON AIR' : uiAssignedState === 'preview' ? '◐ PREVIEW' : '— OFF'}
+                              {uiAssignedState === 'live' ? '● ' : uiAssignedState === 'preview' ? '◐ ' : '— '}
+                              {tr(tallyLabelKey(uiAssignedState))}
                             </span>
                             <span className="director-cam-rtt">{stats.rtt.toFixed(0)}ms</span>
                           </div>
@@ -2084,8 +2085,8 @@ function App() {
                   <div className="director-log-title">操作ログ</div>
                   {tallyActionLog.map((entry, i) => (
                     <div key={i} className="director-log-row">
-                      <span className={`director-log-state state-text-${entry.state === 'ON AIR' ? 'live' : entry.state === 'PREVIEW' ? 'preview' : 'off'}`}>
-                        {entry.state}
+                      <span className={`director-log-state state-text-${entry.state === 'live' ? 'live' : entry.state === 'preview' ? 'preview' : 'off'}`}>
+                        {tr(tallyLabelKey(entry.state as TallyState))}
                       </span>
                       <span className="director-log-cam">{entry.cam}</span>
                       <span className="director-log-tc">{entry.time}</span>

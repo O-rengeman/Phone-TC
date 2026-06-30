@@ -23,9 +23,9 @@ describe('resolveTally', () => {
     expect(resolveTally(p, 'CAM9', { connected: true, autoMode: false, selfIsRunning: false })).toBe('standby');
   });
 
-  it('AUTO derives live/standby from local LTC when not connected', () => {
+  it('AUTO derives live/off from local LTC when not connected', () => {
     expect(resolveTally(null, 'X', { connected: false, autoMode: true, selfIsRunning: true })).toBe('live');
-    expect(resolveTally(null, 'X', { connected: false, autoMode: true, selfIsRunning: false })).toBe('standby');
+    expect(resolveTally(null, 'X', { connected: false, autoMode: true, selfIsRunning: false })).toBe('off');
   });
 
   it('is off when standalone and AUTO is disabled', () => {
@@ -35,7 +35,7 @@ describe('resolveTally', () => {
   it('ignores a payload when not connected (standalone wins)', () => {
     const p = payload(5, 'live', { X: 'live' });
     expect(resolveTally(p, 'X', { connected: false, autoMode: false, selfIsRunning: false })).toBe('off');
-    expect(resolveTally(p, 'X', { connected: false, autoMode: true, selfIsRunning: false })).toBe('standby');
+    expect(resolveTally(p, 'X', { connected: false, autoMode: true, selfIsRunning: false })).toBe('off');
   });
 
   it('standalone MANUAL returns the explicit manualState', () => {
