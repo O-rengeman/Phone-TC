@@ -125,9 +125,26 @@ function App() {
   const [tallyPayload, setTallyPayload] = useState<TallyPayload | null>(null);
   const tallyRevRef = useRef<number>(0);
   const lastHeartbeatTimeRef = useRef<number>(0);
+  const [tallyTime, setTallyTime] = useState<string>('00:00:00:00');
+  const tallyTimeRef = useRef<string>(tallyTime);
+  const tallyOpenRef = useRef<boolean>(tallyOpen);
+  const [tallyControlsOpen, setTallyControlsOpen] = useState(false);
+  const [tallyDimmerOpacity, setTallyDimmerOpacity] = useState(0); // 0 = transparent (bright), 0.5 = dim, 0.9 = very dark
+  const tallyControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isResyncing, setIsResyncing] = useState(false);
   const [lang, setLang] = useState<Lang>(() => getInitialLang());
   const langRef = useRef<Lang>(lang);
+  
+  useEffect(() => {
+    tallyOpenRef.current = tallyOpen;
+    if (!tallyOpen) {
+      setTallyControlsOpen(false);
+      if (tallyControlsTimerRef.current) {
+        clearTimeout(tallyControlsTimerRef.current);
+        tallyControlsTimerRef.current = null;
+      }
+    }
+  }, [tallyOpen]);
   const tr = (key: string, vars?: Record<string, string | number>) => translate(key, lang, vars);
   useEffect(() => { langRef.current = lang; persistLang(lang); }, [lang]);
   // Battery readout: level, charging state and an estimated time-to-empty so
@@ -1035,6 +1052,11 @@ function App() {
         setSlateTime(tc);
       }
 
+      if (tallyOpenRef.current && tallyTimeRef.current !== tc) {
+        tallyTimeRef.current = tc;
+        setTallyTime(tc);
+      }
+
       // Draw Logic
       const ctx = canvas.getContext('2d', { alpha: true });
       if (!ctx) return;
@@ -1258,6 +1280,55 @@ function App() {
       if (turnOn) applyTorch(false);
     };
   }, [tallyState, tallyTorchEnabled]);
+
+  const handleTallyScreenClick = () => {
+    setTallyControlsOpen(prev => {
+      const next = !prev;
+      if (next) {
+        if (tallyControlsTimerRef.current) clearTimeout(tallyControlsTimerRef.current);
+        tallyControlsTimerRef.current = setTimeout(() => {
+          setTallyControlsOpen(false);
+        }, 3000);
+      } else {
+        if (tallyControlsTimerRef.current) {
+          clearTimeout(tallyControlsTimerRef.current);
+          tallyControlsTimerRef.current = null;
+        }
+      }
+      return next;
+    });
+  };
+
+  const handleDimmerCycle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTallyDimmerOpacity(prev => {
+      if (prev === 0) return 0.5;
+      if (prev === 0.5) return 0.85;
+      return 0;
+    });
+    if (tallyControlsTimerRef.current) {
+      clearTimeout(tallyControlsTimerRef.current);
+      tallyControlsTimerRef.current = setTimeout(() => {
+        setTallyControlsOpen(false);
+      }, 3000);
+    }
+  };
+
+  const handleTorchToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTallyTorchEnabled(prev => !prev);
+    if (tallyControlsTimerRef.current) {
+      clearTimeout(tallyControlsTimerRef.current);
+      tallyControlsTimerRef.current = setTimeout(() => {
+        setTallyControlsOpen(false);
+      }, 3000);
+    }
+  };
+
+  const handleTallyExit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTallyOpen(false);
+  };
 
   return (
     <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
@@ -1767,10 +1838,46 @@ function App() {
         <div
           className={`tally-overlay tally-${tallyState}`}
           style={{ background: TALLY_COLORS[tallyState] }}
-          onClick={() => setTallyOpen(false)}
+          onClick={handleTallyScreenClick}
         >
-          <div className="tally-overlay-label">{tr(tallyLabelKey(tallyState))}</div>
-          <div className="tally-overlay-hint">{tr('tally.closeHint')}</div>
+          <div className="tally-dimmer" style={{ opacity: tallyDimmerOpacity }} />
+
+          <div className="tally-header">
+            <div className="tally-header-left">
+              <div>ID: {peerId || 'LOCAL'}</div>
+              <div>ROLE: {p2pRole ? p2pRole.toUpperCase() : 'STANDALONE'}</div>
+            </div>
+            <div className="tally-header-right">
+              <div className="tally-status-indicator">
+                <span className={`tally-conn-dot ${p2pRole === 'client' && (Date.now() - lastHeartbeatTimeRef.current < 3000) ? '' : 'disconnected'}`} />
+                <span>{p2pRole === 'client' && (Date.now() - lastHeartbeatTimeRef.current < 3000) ? 'SYNCED' : 'STANDALONE'}</span>
+              </div>
+              <div>BATTERY: {batteryLevel !== null ? `${batteryLevel}%` : 'N/A'}</div>
+            </div>
+          </div>
+
+          {tallyControlsOpen && (
+            <div className="tally-controls-popup">
+              <button className="tally-ctrl-btn" onClick={handleDimmerCycle}>
+                DIM: {tallyDimmerOpacity === 0 ? '0%' : tallyDimmerOpacity === 0.5 ? '50%' : '85%'}
+              </button>
+              <button className="tally-ctrl-btn" onClick={handleTorchToggle}>
+                TORCH: {tallyTorchEnabled ? 'ON' : 'OFF'}
+              </button>
+              <button className="tally-ctrl-btn exit-btn" onClick={handleTallyExit}>
+                CLOSE
+              </button>
+            </div>
+          )}
+
+          <div className="tally-body">
+            <div className="tally-timecode">{tallyTime}</div>
+            <div className="tally-overlay-label">{tr(tallyLabelKey(tallyState))}</div>
+          </div>
+
+          <div className="tally-footer">
+            {tallyControlsOpen ? 'TAP SCREEN TO HIDE CONTROLS' : 'TAP SCREEN FOR CONTROLS'}
+          </div>
         </div>
       )}
 
