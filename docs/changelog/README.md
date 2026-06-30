@@ -39,5 +39,6 @@ docs/changelog/YYYY-MM-DD-NN-<slug>.md
 | 15 | ♻️ 変更 | [モバイル密度のさらなる改善＋言語不変の総仕上げ](./2026-06-29-15-mobile-density2-lang.md) | `src/App.css` |
 | 16 | ♻️ 変更 | [上部バー(ヘッダー)の整理・スマート化](./2026-06-29-16-header-tidy.md) | `src/App.tsx`, `src/App.css` |
 | 17 | ✨ 追加 | [任意TC開始(FREE)モード＋精度表示を実測値のみに](./2026-06-29-17-freerun-grounded-accuracy.md) | `src/App.tsx`, `src/utils/i18n.ts` ほか |
+| 18 | 🛠 修正 | [停止=リセット/一時停止=保持 ＋ LTC監査(BPCビット)](./2026-06-29-18-stop-reset-ltc-audit.md) | `src/App.tsx`, `src/audio/ltcWorkletSource.ts` |
 
 > 種別凡例: ✨ 追加 / ♻️ 変更 / 🛠 修正 / 🧱 基盤

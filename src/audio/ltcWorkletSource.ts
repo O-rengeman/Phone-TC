@@ -103,6 +103,14 @@ export const LTC_WORKLET_SOURCE = `
           for (let i = 0; i < 8; i++) setBits(bits, 4 + (i * 8), 4, parseInt(this.settings.ubit[i], 16) || 0);
           const sync = [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1];
           for (let i = 0; i < 16; i++) bits[64 + i] = sync[i];
+          // Biphase mark polarity correction (SMPTE 12M): set the BPC bit so the
+          // 80-bit frame contains an even number of 0-bits, keeping the sync word
+          // unambiguous regardless of payload. Bit 27 for 25-fps systems, bit 59
+          // otherwise (both positions are otherwise unused).
+          const bpc = this.settings.framesPerSec === 25 ? 27 : 59;
+          let zeros = 0;
+          for (let i = 0; i < 80; i++) if (bits[i] === 0) zeros++;
+          if (zeros % 2 !== 0) bits[bpc] = 1;
           return bits;
         }
 

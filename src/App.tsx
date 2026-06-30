@@ -769,7 +769,7 @@ function App() {
         stopHoldRafRef.current = null;
         setStopHoldPct(0);
         setIsPaused(false);
-        stopEngine();
+        stopEngine(true);
       } else {
         stopHoldRafRef.current = requestAnimationFrame(tick);
       }
@@ -808,7 +808,7 @@ function App() {
   const handleStartStop = async () => {
     if (isRunning) {
       setIsPaused(false); // Stop means fully reset
-      stopEngine();
+      stopEngine(true);
     } else {
       // Create/Resume AudioContext IMMEDIATELY on user gesture
       if (!audioCtxRef.current) {
@@ -1076,7 +1076,9 @@ function App() {
     return () => cancelAnimationFrame(rafId);
   }, [isRunning, isMobile]);
 
-  const stopEngine = () => {
+  // reset=true  -> STOP: return the timecode to its start reference.
+  // reset=false -> PAUSE: keep the current position so RESUME continues.
+  const stopEngine = (reset = false) => {
     if (workletNodeRef.current) {
       workletNodeRef.current.port.onmessage = null;
       workletNodeRef.current.disconnect();
@@ -1091,13 +1093,23 @@ function App() {
     setIsRunning(false);
     driftMonitorRef.current.reset();
     setDriftStatus(null);
+    if (reset && engineRef.current) {
+      if (syncMode === 'freerun') {
+        engineRef.current.setManualTimecode(manualTimecode);
+      } else if (syncMode === 'network' && lastNetworkOffsetRef.current !== null) {
+        engineRef.current.syncWithOffset(lastNetworkOffsetRef.current);
+      } else {
+        engineRef.current.resetToSystemTime();
+      }
+      currentTcRef.current = engineRef.current.getTimecodeString();
+    }
     TimecodeNativeBridge.stopBackgroundMode();
   };
 
   const handlePause = () => {
     if (isRunning && engineRef.current) {
       setIsPaused(true);
-      setManualTimecode(engineRef.current.getTimecodeString());
+      // PAUSE keeps the engine's current timecode; RESUME continues from it.
       stopEngine();
     }
   };
