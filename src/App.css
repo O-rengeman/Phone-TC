@@ -1752,3 +1752,34 @@ input[type="range"] {
 .guide-done {
   white-space: nowrap;
 }
+
+/* ============================================================
+   Mobile space-efficiency pass 2 + remaining language locks.
+   ============================================================ */
+
+/* Overlay the FPS/LVL/UBIT badges onto the bottom of the timecode
+   card so the canvas fills the whole card (bigger TC) and the strip
+   no longer reserves its own slot. Applies to both layouts. */
+.timecode-card-pro .time-canvas {
+  position: absolute;
+  inset: 0;
+}
+.timecode-card-pro .info-strip-pro {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 5px;
+  margin: 0;
+  opacity: 0.85;
+  pointer-events: none;
+}
+.info-strip-pro .info-label { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); }
+
+/* The card can now be shorter on mobile (TC fills it, badges overlay). */
+.mobile-view .timecode-card-pro { aspect-ratio: 4 / 1.18; }
+.mobile-view .tab-pane { gap: 8px; }
+
+/* Language-invariant widths for the remaining intrinsic-width buttons
+   whose label is translated (RE-SYNC / 再同期, RESET / リセット). */
+.msb-resync { min-width: 88px; text-align: center; }
+.btn-small { min-width: 64px; text-align: center; }
