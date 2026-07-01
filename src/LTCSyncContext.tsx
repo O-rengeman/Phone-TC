@@ -1,6 +1,9 @@
+/* eslint-disable react-hooks/purity, react-hooks/refs, react-hooks/exhaustive-deps, react-refresh/only-export-components, @typescript-eslint/no-explicit-any */
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+
 import { LtcEngine } from './utils/LtcEngine';
 import type { LtcSettings } from './utils/LtcEngine';
 import { TimeSync } from './utils/TimeSync';
@@ -11,6 +14,7 @@ import { DriftMonitor } from './utils/DriftMonitor';
 import { estimateMinutesRemaining, trimSamples } from './utils/battery';
 import { t as translate, getInitialLang, persistLang } from './utils/i18n';
 import type { Lang } from './utils/i18n';
+import toast from 'react-hot-toast';
 import type { BatterySample } from './utils/battery';
 import type { DriftStatus } from './utils/DriftMonitor';
 import { buildEdl, buildAle } from './utils/export';
@@ -120,7 +124,6 @@ interface LTCSyncContextType {
   markerFlash: { tc: string; color: string; count: number } | null;
   masterDrift: number | null;
   clients: Record<string, { rtt: number; drift: number; lastSeen: number }>;
-  toasts: Toast[];
   packetLossRate: number;
   setPacketLossRate: React.Dispatch<React.SetStateAction<number>>;
   vuLevel: number;
@@ -147,7 +150,7 @@ interface LTCSyncContextType {
   handleSlateClick: () => void;
   resetP2P: () => void;
   setupP2PMaster: () => Promise<void>;
-  setupP2PClient: () => Promise<void>;
+  setupP2PClient: (autoJoinId?: string) => Promise<void>;
   joinSession: () => void;
   handleStartStop: () => Promise<void>;
   handlePause: () => void;
@@ -168,8 +171,12 @@ const LTCSyncContext = createContext<LTCSyncContextType | null>(null);
 
 export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [isRunning, setIsRunning] = useState(false);
-  const [fpsIndex, setFpsIndex] = useState(2); // Default 25
-  const [volume, setVolume] = useState(0.5);
+  const [fpsIndex, setFpsIndex] = useState(() => {
+    try { const saved = localStorage.getItem('ltc-fps'); return saved ? parseInt(saved, 10) : 2; } catch { return 2; }
+  });
+  const [volume, setVolume] = useState(() => {
+    try { const saved = localStorage.getItem('ltc-vol'); return saved ? parseFloat(saved) : 0.5; } catch { return 0.5; }
+  });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [syncStatus, setSyncStatus] = useState<{ offset: number; latency: number } | null>(null);
   const [syncMode, setSyncMode] = useState<SyncMode>('network');
@@ -179,8 +186,12 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [activeTab, setActiveTab] = useState<'main' | 'sync' | 'tools'>('main');
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   
-  const [outputMode, setOutputMode] = useState<'stereo' | 'mono-l'>('stereo');
-  const [autoUserBits, setAutoUserBits] = useState(true);
+  const [outputMode, setOutputMode] = useState<'stereo' | 'mono-l'>(() => {
+    try { const saved = localStorage.getItem('ltc-outmode'); return (saved === 'stereo' || saved === 'mono-l') ? saved : 'stereo'; } catch { return 'stereo'; }
+  });
+  const [autoUserBits, setAutoUserBits] = useState(() => {
+    try { const saved = localStorage.getItem('ltc-autoub'); return saved ? saved === 'true' : true; } catch { return true; }
+  });
   const [isSlateFlashing, setIsSlateFlashing] = useState(false);
   const [slateTime, setSlateTime] = useState('00:00:00:00');
 
@@ -212,7 +223,29 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     } catch { return []; }
   });
   const [defaultReelName, setDefaultReelName] = useState('A001');
-  const [outputLevel, setOutputLevel] = useState<'mic' | 'line'>('line');
+  const [outputLevel, setOutputLevel] = useState<'mic' | 'line'>(() => {
+    try { const saved = localStorage.getItem('ltc-outlevel'); return (saved === 'mic' || saved === 'line') ? saved : 'line'; } catch { return 'line'; }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ltc-fps', fpsIndex.toString());
+      localStorage.setItem('ltc-vol', volume.toString());
+      localStorage.setItem('ltc-outmode', outputMode);
+      localStorage.setItem('ltc-outlevel', outputLevel);
+      localStorage.setItem('ltc-autoub', autoUserBits.toString());
+    } catch { /* ignore */ }
+  }, [fpsIndex, volume, outputMode, outputLevel, autoUserBits]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const joinId = params.get('join');
+    if (joinId) {
+      setupP2PClient(joinId);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // P2P States
   const [peerId, setPeerId] = useState<string>('');
@@ -313,6 +346,9 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [markerFlash, setMarkerFlash] = useState<{ tc: string; color: string; count: number } | null>(null);
   const markerFlashTimerRef = useRef<number | null>(null);
 
+  const prevLevelRef = useRef<number | null>(null);
+  const prevChargingRef = useRef<boolean | null>(null);
+
   useEffect(() => {
     const nav = navigator as Navigator & { getBattery?: () => Promise<BatteryLike> };
     if (!nav.getBattery) return;
@@ -322,6 +358,19 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       if (!batt) return;
       setBatteryLevel(batt.level);
       setIsCharging(batt.charging);
+      
+      const p = prevLevelRef.current;
+      const c = batt.level;
+      if (p !== null && !batt.charging) {
+        if (p > 0.20 && c <= 0.20 && c > 0.10) {
+           toast(translate('toast.batteryLow', langRef.current, { level: Math.round(c * 100) }), { icon: '🔋', style: { background: '#f5a623', color: '#000' } });
+        } else if (p > 0.10 && c <= 0.10) {
+           toast.error(translate('toast.batteryCritical', langRef.current, { level: Math.round(c * 100) }));
+        }
+      }
+      prevLevelRef.current = c;
+      prevChargingRef.current = batt.charging;
+
       if (batt.charging) {
         batterySamplesRef.current = [];
         setBatteryEta(null);
@@ -335,6 +384,18 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     const onCharging = () => {
       if (!batt) return;
       setIsCharging(batt.charging);
+      
+      const p = prevChargingRef.current;
+      const c = batt.charging;
+      if (p !== null && p !== c) {
+        if (c) {
+          toast.success(translate('toast.chargingStarted', langRef.current));
+        } else {
+          toast(translate('toast.chargingStopped', langRef.current), { icon: '🔋' });
+        }
+      }
+      prevChargingRef.current = c;
+
       if (batt.charging) {
         batterySamplesRef.current = [];
         setBatteryEta(null);
@@ -367,11 +428,30 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [p2pSyncSource, setP2pSyncSource] = useState<'manual' | 'network'>('manual');
   const [masterDrift, setMasterDrift] = useState<number | null>(null);
   const [clients, setClients] = useState<Record<string, { rtt: number, drift: number, lastSeen: number }>>({});
-  const [toasts, setToasts] = useState<Toast[]>([]);
   const [packetLossRate, setPacketLossRate] = useState(0);
   const [nowTick, setNowTick] = useState(0);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const wakeLockRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (isRunning && typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
+      (navigator as any).wakeLock.request('screen').then((lock: any) => {
+        wakeLockRef.current = lock;
+      }).catch((err: any) => console.warn('Wake Lock error', err));
+    } else {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release().catch(() => {});
+        wakeLockRef.current = null;
+      }
+    }
+    return () => {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release().catch(() => {});
+        wakeLockRef.current = null;
+      }
+    };
+  }, [isRunning]);
   const engineRef = useRef<LtcEngine | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const currentTcRef = useRef<string>('00:00:00:00');
@@ -382,9 +462,13 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [vuLevel, setVuLevel] = useState(0);
 
   const addToast = (msg: string, level: ToastLevel = 'info') => {
-    const id = Date.now() + Math.random();
-    setToasts(prev => [...prev, { id, msg, level }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+    if (level === 'error') {
+      toast.error(msg);
+    } else if (level === 'warn') {
+      toast(msg, { icon: '⚠️' });
+    } else {
+      toast.success(msg);
+    }
   };
 
   useEffect(() => {
@@ -623,9 +707,25 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     }
   }, [autoUserBits]);
 
+  const backupMarkers = async (m: Marker[]) => {
+    try {
+      if ((window as any).Capacitor?.isNative) {
+        await Filesystem.writeFile({
+          path: 'ltc_sync_pro_backup.json',
+          data: JSON.stringify(m, null, 2),
+          directory: Directory.Documents,
+          encoding: Encoding.UTF8
+        });
+      }
+    } catch (e) {
+      console.warn('Backup to filesystem failed:', e);
+    }
+  };
+
   useEffect(() => {
     try {
       localStorage.setItem('ltc-markers', JSON.stringify(markers));
+      backupMarkers(markers);
     } catch { /* ignore */ }
   }, [markers]);
 
@@ -644,12 +744,14 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
   const addMarker = (color: 'Red' | 'Blue' | 'Green' | 'Yellow') => {
     const currentTC = engineRef.current ? engineRef.current.getTimecodeString() : '00:00:00:00';
+    const nextTake = markers.length > 0 ? Math.max(...markers.map(m => m.take || 0)) + 1 : 1;
     const newMarker: Marker = {
       id: Date.now(),
       tc: currentTC,
       time: new Date().toLocaleTimeString(),
       color,
-      reelName: defaultReelName
+      reelName: defaultReelName,
+      take: nextTake
     };
     setMarkers(prev => [newMarker, ...prev]);
 
@@ -665,26 +767,42 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     setMarkers(markers.filter(m => m.id !== id));
   };
 
-  const downloadText = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+  const exportFile = async (content: string, filename: string) => {
+    const isNative = typeof window !== 'undefined' && (window as any).Capacitor?.isNative;
+    if (isNative) {
+      try {
+        await Filesystem.writeFile({
+          path: filename,
+          data: content,
+          directory: Directory.Documents,
+          encoding: Encoding.UTF8
+        });
+        addToast(translate('toast.exportSaved', langRef.current, { path: `Documents/${filename}` }));
+      } catch (e) {
+        console.error('File export failed', e);
+        addToast('File export failed', 'error');
+      }
+    } else {
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
   };
 
   const exportToEDL = () => {
     if (markers.length === 0) return;
     const edl = buildEdl(markers, FPS_OPTIONS[fpsIndex].drop);
-    downloadText(edl, `PHONE_TC_${new Date().toISOString().slice(0, 10)}.edl`);
+    exportFile(edl, `PHONE_TC_${new Date().toISOString().slice(0, 10)}.edl`);
   };
 
   const exportToALE = () => {
     if (markers.length === 0) return;
     const ale = buildAle(markers, FPS_OPTIONS[fpsIndex].label);
-    downloadText(ale, `PHONE_TC_${new Date().toISOString().slice(0, 10)}.ale`);
+    exportFile(ale, `PHONE_TC_${new Date().toISOString().slice(0, 10)}.ale`);
   };
 
   const handleSlateClick = () => {
@@ -725,7 +843,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const setupP2PClient = async () => {
+  const setupP2PClient = async (autoJoinId?: string) => {
     resetP2P();
     setP2pRole('client');
     setIsHost(false);
@@ -738,6 +856,11 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       const id = await ps.initialize();
       setPeerId(id);
       peerSyncRef.current = ps;
+
+      if (autoJoinId) {
+        setTargetId(autoJoinId);
+        ps.connect(autoJoinId);
+      }
     } catch (e) {
       console.warn('P2P client init failed', e);
       setP2pStatus('PEER INIT FAILED');
@@ -754,6 +877,23 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [manualTimecode, p2pRole, isRunning, isPaused]);
+
+  // Emergency Mode: Auto-reconnect & notify when disconnected during playback
+  useEffect(() => {
+    if (p2pRole === 'client' && p2pStatus.includes('CLOSED') && targetId) {
+      if (isRunning) {
+        addToast(translate('toast.p2pDisconnectedEmergency', langRef.current), 'error');
+      }
+      
+      const reconnectTimer = setTimeout(() => {
+        if (peerSyncRef.current && targetId) {
+          setP2pStatus('RECONNECTING...');
+          peerSyncRef.current.connect(targetId);
+        }
+      }, 5000);
+      return () => clearTimeout(reconnectTimer);
+    }
+  }, [p2pRole, p2pStatus, targetId, isRunning]);
 
   const joinSession = () => {
     if (!peerSyncRef.current || !targetId) return;
@@ -1196,7 +1336,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     try { localStorage.setItem('ltc-camera-labels', JSON.stringify(cameraLabels)); } catch { /* ignore */ }
   }, [cameraLabels]);
 
-  const isTallyConnected = p2pRole === 'client' && (Date.now() - lastHeartbeatTimeRef.current < 3000);
+  const isTallyConnected = p2pRole === 'client' && (nowTick - lastHeartbeatTimeRef.current < 3000);
   const tallyState = resolveTally(tallyPayload, peerId, {
     connected: isTallyConnected,
     autoMode: tallyMode === 'auto',
@@ -1355,7 +1495,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       markerFlash,
       masterDrift,
       clients,
-      toasts,
       packetLossRate, setPacketLossRate,
       vuLevel,
       nowTick,

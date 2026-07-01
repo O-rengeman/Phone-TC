@@ -81,7 +81,7 @@ const en: Dict = {
   'guide.step5': "Press START, then confirm the camera's timecode matches the value on screen.",
   'guide.tip': 'Keep the app running in the foreground or via background mode. Re-jam whenever you see RE-SYNC RECOMMENDED.',
 
-  'slate.close': 'TAP FOR CLAPPER / LONG PRESS TO CLOSE',
+  'slate.close': 'TAP ANYWHERE TO CLAP',
 
   'label.tally': 'TALLY',
   'tally.live': 'ON AIR',
@@ -102,10 +102,17 @@ const en: Dict = {
   'toast.p2pClientFailed': 'P2P CLIENT INIT FAILED — CHECK NETWORK',
   'toast.resynced': 'RE-SYNCED',
   'toast.resyncFailed': 'RE-SYNC FAILED — CHECK NETWORK',
+  'toast.p2pDisconnectedEmergency': 'CONNECTION LOST — FREE RUNNING LOCALLY',
   'toast.ntpCached': 'NTP SERVERS UNREACHABLE — USING CACHED OFFSET',
   'toast.ntpFailed': 'NTP SYNC FAILED — USING SYSTEM CLOCK',
   'toast.startFailed': 'START FAILED — CHECK CONNECTION',
   'toast.micDenied': 'MIC ACCESS DENIED — CHECK BROWSER PERMISSIONS',
+  'toast.batteryLow': 'BATTERY LOW — {level}% REMAINING',
+  'toast.batteryCritical': 'BATTERY CRITICAL — {level}% REMAINING',
+  'toast.chargingStarted': 'CHARGING STARTED',
+  'toast.chargingStopped': 'CHARGING STOPPED',
+  'toast.backupSaved': 'BACKUP SAVED: {path}',
+  'toast.exportSaved': 'SAVED TO {path}',
 };
 
 const ja: Dict = {
@@ -175,7 +182,7 @@ const ja: Dict = {
   'guide.step5': 'STARTを押し、カメラのタイムコードが画面の値と一致するか確認します。',
   'guide.tip': 'アプリは前面、またはバックグラウンドモードで動かし続けてください。「要再同期」が出たら再同期してください。',
 
-  'slate.close': 'タップでカチンコ / 長押しで閉じる',
+  'slate.close': '画面タップでカチンコ',
 
   'label.tally': 'タリー',
   'tally.live': 'ON AIR',
@@ -196,10 +203,17 @@ const ja: Dict = {
   'toast.p2pClientFailed': 'P2Pクライアント初期化に失敗 — ネットワークを確認',
   'toast.resynced': '再同期しました',
   'toast.resyncFailed': '再同期に失敗 — ネットワークを確認',
+  'toast.p2pDisconnectedEmergency': '通信切断 — ローカル生成(フリラン)に移行しました',
   'toast.ntpCached': 'NTPサーバーに接続できません — キャッシュのオフセットを使用',
   'toast.ntpFailed': 'NTP同期に失敗 — システムクロックを使用',
   'toast.startFailed': '開始に失敗 — 接続を確認',
   'toast.micDenied': 'マイクへのアクセスが拒否されました — ブラウザの権限を確認',
+  'toast.batteryLow': 'バッテリー低下 — 残り {level}%',
+  'toast.batteryCritical': 'バッテリー残量警告 — 残り {level}%',
+  'toast.chargingStarted': '給電を開始しました',
+  'toast.chargingStopped': '給電が停止しました',
+  'toast.backupSaved': 'バックアップを保存: {path}',
+  'toast.exportSaved': '{path} に保存しました',
 };
 
 const DICTS: Record<Lang, Dict> = { en, ja };

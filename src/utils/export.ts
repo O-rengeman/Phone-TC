@@ -9,6 +9,7 @@ export interface Marker {
   time: string;
   color: MarkerColor;
   reelName: string;
+  take: number;
 }
 
 /** Strips characters that would corrupt the line-based EDL/ALE layout. */
@@ -33,7 +34,7 @@ export function buildEdl(markers: Marker[], isDropFrame: boolean): string {
     const reelLabel = sanitize(m.reelName || 'AX');
     const time = sanitize(m.time);
     edl += `${eventNum}  ${reel} V     C        ${tc} ${tc} ${tc} ${tc}\n`;
-    edl += ` |C:ResolveColor${m.color} |M:${reelLabel} at ${time} |D:1\n\n`;
+    edl += ` |C:ResolveColor${m.color} |M:Take ${m.take} (${reelLabel}) at ${time} |D:1\n\n`;
   });
 
   return edl;
@@ -42,8 +43,8 @@ export function buildEdl(markers: Marker[], isDropFrame: boolean): string {
 /** Builds an Avid ALE string from logged markers. */
 export function buildAle(markers: Marker[], fpsLabel: string): string {
   let ale = `Heading\nFIELD_DELIM\tTABS\nVIDEO_FORMAT\t1080\nFPS\t${fpsLabel}\n\nColumn\nName\tTracks\tStart\tEnd\tDescription\n\nData\n`;
-  markers.forEach((m, i) => {
-    ale += `MARKER_${markers.length - i}\tV\t${m.tc}\t${m.tc}\t${m.color} marker at ${m.time}\n`;
+  markers.forEach((m) => {
+    ale += `Take ${m.take}\tV\t${m.tc}\t${m.tc}\t${m.color} marker at ${m.time}\n`;
   });
   return ale;
 }

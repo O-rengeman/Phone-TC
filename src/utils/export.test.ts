@@ -4,8 +4,8 @@ import type { Marker } from './export';
 
 const markers: Marker[] = [
   // App stores newest-first.
-  { id: 2, tc: '00:00:10:00', time: '10:00:10', color: 'Blue', reelName: 'A002' },
-  { id: 1, tc: '00:00:05:00', time: '10:00:05', color: 'Red', reelName: 'A001' },
+  { id: 2, tc: '00:00:10:00', time: '10:00:10', color: 'Blue', reelName: 'A002', take: 2 },
+  { id: 1, tc: '00:00:05:00', time: '10:00:05', color: 'Red', reelName: 'A001', take: 1 },
 ];
 
 describe('buildEdl', () => {
@@ -32,8 +32,8 @@ describe('buildEdl', () => {
 
   it('falls back to AX and strips control characters from reel names', () => {
     const dirty: Marker[] = [
-      { id: 1, tc: '00:00:01:00', time: 't', color: 'Green', reelName: 'RE\tEL\n1' },
-      { id: 2, tc: '00:00:02:00', time: 't', color: 'Yellow', reelName: '' },
+      { id: 1, tc: '00:00:01:00', time: 't', color: 'Green', reelName: 'RE\tEL\n1', take: 1 },
+      { id: 2, tc: '00:00:02:00', time: 't', color: 'Yellow', reelName: '', take: 2 },
     ];
     const edl = buildEdl(dirty, false);
     expect(edl).not.toMatch(/\tEL/);
@@ -57,8 +57,8 @@ describe('buildAle', () => {
 
   it('emits one descending-numbered row per marker with tab delimiters', () => {
     const ale = buildAle(markers, '30');
-    expect(ale).toContain('MARKER_2\tV\t00:00:10:00\t00:00:10:00\tBlue marker at 10:00:10');
-    expect(ale).toContain('MARKER_1\tV\t00:00:05:00\t00:00:05:00\tRed marker at 10:00:05');
+    expect(ale).toContain('Take 2\tV\t00:00:10:00\t00:00:10:00\tBlue marker at 10:00:10');
+    expect(ale).toContain('Take 1\tV\t00:00:05:00\t00:00:05:00\tRed marker at 10:00:05');
   });
 
   it('produces no data rows for an empty marker list', () => {

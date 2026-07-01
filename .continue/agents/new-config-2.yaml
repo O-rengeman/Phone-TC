@@ -1,4 +1,4 @@
-name: "●●● AI X1 Pro Config"
+name: "Local AI Development Config"
 version: 1.3.0
 schema: v1
 
@@ -13,13 +13,12 @@ rules:
       コード内のコメントは日本語で記載し、解説も丁寧な日本語で行ってください。
 
 models:
-  # ─── 1. Agent主力（iGPU環境での速度・精度バランス最良）
-  - name: "Ornith:9b-q4_K_M (Agent)"
+  # ─── 1. Agent主力（推論・リファクタリング・ツール使用）
+  - name: "Ornith 1.0 9B (Agent)"
     provider: ollama
     model: "ornith:9b-q4_K_M"
     apiBase: "http://localhost:11434"
     roles:
-      - chat
       - edit
       - apply
     capabilities:
@@ -29,7 +28,19 @@ models:
       temperature: 0.3
       keepAlive: 300
 
-  # ─── 4. 高速サブチャット
+  # ─── 2. サブ主力（高精度なコード生成・汎用チャット）
+  - name: "Qwen 3.5 9B"
+    provider: ollama
+    model: "qwen3.5:9b"
+    apiBase: "http://localhost:11434"
+    roles:
+      - chat
+    defaultCompletionOptions:
+      contextLength: 32768
+      temperature: 0.3
+      keepAlive: 300
+
+  # ─── 3. 高速サブチャット（簡単な質問・壁打ち用）
   - name: "Qwen 3.5 4B"
     provider: ollama
     model: "qwen3.5:4b"
@@ -41,10 +52,10 @@ models:
       temperature: 0.7
       keepAlive: 300
 
-  # ─── 6. タブ補完専用（速度優先で7B）
-  - name: "Qwen2.5 Coder 3B (Autocomplete)"
+  # ─── 4. タブ補完専用（速度最優先・インライン補完）
+  - name: "Qwen 3.5 2B (Autocomplete)"
     provider: ollama
-    model: "qwen2.5-coder:3b"
+    model: "qwen3.5:2b"
     apiBase: "http://localhost:11434"
     roles:
       - autocomplete
@@ -54,9 +65,9 @@ models:
       keepAlive: 600
 
 tabAutocompleteModel:
-  name: "Qwen2.5 Coder 3B (Autocomplete)"
+  name: "Qwen 3.5 2B (Autocomplete)"
   provider: "ollama"
-  model: "qwen2.5-coder:3b"
+  model: "qwen3.5:2b"
   apiBase: "http://localhost:11434"
   completionOptions:
     temperature: 0.0

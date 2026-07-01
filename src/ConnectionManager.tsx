@@ -18,8 +18,16 @@ export function ConnectionManager() {
     joinSession,
     p2pStatus,
     packetLossRate,
-    setPacketLossRate
+    setPacketLossRate,
+    addToast
   } = useLTC();
+
+  const copyInviteLink = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('join', peerId);
+    navigator.clipboard.writeText(url.toString());
+    addToast('Invite Link Copied!', 'info');
+  };
 
   return (
     <>
@@ -27,8 +35,8 @@ export function ConnectionManager() {
         <label className="section-label">{tr('label.p2p')}</label>
         {!p2pRole ? (
           <div className="p2p-init-pro">
-            <button onClick={setupP2PMaster}>{tr('btn.createMaster')}</button>
-            <button onClick={setupP2PClient}>{tr('btn.joinClient')}</button>
+            <button onClick={() => setupP2PMaster()}>{tr('btn.createMaster')}</button>
+            <button onClick={() => setupP2PClient()}>{tr('btn.joinClient')}</button>
           </div>
         ) : (
           <div className="p2p-panel-pro">
@@ -38,7 +46,14 @@ export function ConnectionManager() {
             </div>
             {p2pRole === 'master' && (
               <div className="p2p-master-box">
-                <div className="id-display">ID: <span>{peerId || '...'}</span></div>
+                <div className="id-display" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <span>ID: {peerId || '...'}</span>
+                  {peerId && (
+                    <button className="btn-small" onClick={copyInviteLink} style={{ padding: '4px 8px' }}>
+                      🔗 COPY LINK
+                    </button>
+                  )}
+                </div>
                 
                 <div className="control-section">
                   <label className="section-label">START SOURCE</label>

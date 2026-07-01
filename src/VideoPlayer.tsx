@@ -56,7 +56,12 @@ export function VideoPlayer() {
         setDirectorTime(tc);
       }
 
-      // 描画ロジック
+      // 描画ロジック（バッテリー消費対策：バックグラウンド時は描画スキップ）
+      if (document.hidden) {
+        rafId = requestAnimationFrame(render);
+        return;
+      }
+      
       const ctx = canvas.getContext('2d', { alpha: true });
       if (!ctx) return;
 

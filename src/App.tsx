@@ -7,6 +7,8 @@ import type { TallyState } from './utils/tally';
 import type { SyncMode } from './LTCSyncContext';
 import { formatSyncAge } from './utils/DriftMonitor';
 import { formatDuration } from './utils/battery';
+import { Toaster, toast } from 'react-hot-toast';
+import './App.css';
 
 function MainApp() {
   const {
@@ -73,7 +75,6 @@ function MainApp() {
     batteryEta,
     markerFlash,
     clients,
-    toasts,
     nowTick,
     vuLevel,
     tr,
@@ -95,8 +96,19 @@ function MainApp() {
     isTallyConnected,
     handleDimmerCycle,
     handleTorchToggle,
-    handleTallyExit
+    handleTallyExit,
+    holdStoppedRef
   } = useLTC();
+
+  const handleOutputModeChange = (mode: 'stereo' | 'mono-l') => {
+    setOutputMode(mode);
+    if (mode === 'mono-l') {
+      toast('⚠️ HEADPHONES REQUIRED for L-TC / R-AUDIO mode to prevent audio feedback loop!', {
+        icon: '🎧',
+        style: { background: '#f5a623', color: '#000', fontWeight: 'bold' }
+      });
+    }
+  };
 
   return (
     <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
@@ -235,8 +247,8 @@ function MainApp() {
                 <div className="control-section">
                   <label className="section-label">{tr('label.outputMode')}</label>
                   <div className="sync-toggle-pro">
-                    <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => setOutputMode('stereo')}>STEREO TC</button>
-                    <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => setOutputMode('mono-l')}>L-TC / R-AUDIO</button>
+                    <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')}>STEREO TC</button>
+                    <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')}>L-TC / R-AUDIO</button>
                   </div>
                 </div>
                 {outputMode === 'mono-l' && (
@@ -456,8 +468,8 @@ function MainApp() {
                   <div className="tool-card span-2">
                     <label className="section-label">{tr('label.outputMode')}</label>
                     <div className="sync-toggle-pro">
-                      <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => setOutputMode('stereo')}>STEREO TC</button>
-                      <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => setOutputMode('mono-l')}>L-TC / R-AUDIO</button>
+                      <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')}>STEREO TC</button>
+                      <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')}>L-TC / R-AUDIO</button>
                     </div>
                   </div>
                   {outputMode === 'mono-l' && (
@@ -501,6 +513,7 @@ function MainApp() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <div className={`color-dot ${m.color.toLowerCase()}`}>{m.color.charAt(0)}</div>
                         <span className="m-tc">{m.tc}</span>
+                        {m.take && <span className="m-take" style={{ fontSize: '0.85rem', color: '#aaa', marginLeft: '4px' }}>Take {m.take}</span>}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <span className="m-time">{m.time}</span>
@@ -529,7 +542,7 @@ function MainApp() {
             <button
               className={`btn-main-action ${isRunning ? 'running danger' : isPreparing ? 'preparing' : 'start'}`}
               onClick={() => {
-                if (useLTC().holdStoppedRef.current) { useLTC().holdStoppedRef.current = false; return; }
+                if (holdStoppedRef.current) { holdStoppedRef.current = false; return; }
                 if (!isRunning) void handleStartStop();
               }}
               onPointerDown={() => { if (isRunning) beginStopHold(); }}
@@ -562,11 +575,7 @@ function MainApp() {
         </div>
       </footer>
 
-      <div className="toast-container" aria-live="polite">
-        {toasts.map(t => (
-          <div key={t.id} className={`toast toast-${t.level}`}>{t.msg}</div>
-        ))}
-      </div>
+      <Toaster position="top-center" toastOptions={{ style: { background: '#333', color: '#fff' } }} />
 
       {tallyOpen && (() => {
         const isConnected = isTallyConnected;
@@ -731,18 +740,22 @@ function MainApp() {
       })()}
 
       {isVisualSlate && (
-        <div className={`visual-slate-overlay ${isSlateFlashing ? 'flashing' : ''}`} onClick={handleSlateClick}>
-          <div className="slate-tc">{slateTime}</div>
-          <div className="slate-info">
-            {FPS_OPTIONS[fpsIndex].label} FPS | UBIT: {userBits}
+        <div className={`visual-slate-overlay ${isSlateFlashing ? 'flashing' : ''}`}>
+          <div className="slate-tap-area" onClick={handleSlateClick} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }} />
+          <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
+            <div className="slate-tc">{slateTime}</div>
+            <div className="slate-info">
+              {FPS_OPTIONS[fpsIndex].label} FPS | UBIT: {userBits}
+            </div>
+            <div className="slate-qr">
+              <QRCodeCanvas value={slateTime} size={256} level="L" includeMargin={true} />
+            </div>
+            <div className="slate-close">{tr('slate.close')}</div>
           </div>
-          <div className="slate-qr">
-            <QRCodeCanvas value={slateTime} size={256} level="L" includeMargin={true} />
-          </div>
-          <div className="slate-close">{tr('slate.close')}</div>
           <button 
-            style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', color: '#666', fontSize: '2rem' }} 
+            style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(0,0,0,0.5)', border: '2px solid #555', borderRadius: '50%', width: '50px', height: '50px', color: '#fff', fontSize: '1.8rem', zIndex: 3, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
             onClick={(e) => { e.stopPropagation(); setIsVisualSlate(false); }}
+            aria-label="Close Slate"
           >
             ×
           </button>
