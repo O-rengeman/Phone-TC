@@ -10,6 +10,8 @@ export interface Marker {
   color: MarkerColor;
   reelName: string;
   take: number;
+  sceneName: string;
+  comment: string;
 }
 
 /** Strips characters that would corrupt the line-based EDL/ALE layout. */
@@ -32,9 +34,11 @@ export function buildEdl(markers: Marker[], isDropFrame: boolean): string {
     const reel = sanitize(m.reelName || 'AX').substring(0, 8).padEnd(8);
     const tc = sanitize(m.tc);
     const reelLabel = sanitize(m.reelName || 'AX');
+    const sceneLabel = sanitize(m.sceneName || '001');
     const time = sanitize(m.time);
+    const commentLabel = m.comment ? ` |N:${sanitize(m.comment)}` : '';
     edl += `${eventNum}  ${reel} V     C        ${tc} ${tc} ${tc} ${tc}\n`;
-    edl += ` |C:ResolveColor${m.color} |M:Take ${m.take} (${reelLabel}) at ${time} |D:1\n\n`;
+    edl += ` |C:ResolveColor${m.color} |M:Scene ${sceneLabel} Take ${m.take} (${reelLabel}) at ${time}${commentLabel} |D:1\n\n`;
   });
 
   return edl;
@@ -42,9 +46,10 @@ export function buildEdl(markers: Marker[], isDropFrame: boolean): string {
 
 /** Builds an Avid ALE string from logged markers. */
 export function buildAle(markers: Marker[], fpsLabel: string): string {
-  let ale = `Heading\nFIELD_DELIM\tTABS\nVIDEO_FORMAT\t1080\nFPS\t${fpsLabel}\n\nColumn\nName\tTracks\tStart\tEnd\tDescription\n\nData\n`;
+  let ale = `Heading\nFIELD_DELIM\tTABS\nVIDEO_FORMAT\t1080\nFPS\t${fpsLabel}\n\nColumn\nName\tTracks\tStart\tEnd\tScene\tTake\tDescription\n\nData\n`;
   markers.forEach((m) => {
-    ale += `Take ${m.take}\tV\t${m.tc}\t${m.tc}\t${m.color} marker at ${m.time}\n`;
+    const commentPart = m.comment ? ` - ${m.comment}` : '';
+    ale += `Scene ${m.sceneName} Take ${m.take}\tV\t${m.tc}\t${m.tc}\t${m.sceneName}\t${m.take}\t${m.color} marker at ${m.time}${commentPart}\n`;
   });
   return ale;
 }

@@ -113,6 +113,10 @@ const en: Dict = {
   'toast.chargingStopped': 'CHARGING STOPPED',
   'toast.backupSaved': 'BACKUP SAVED: {path}',
   'toast.exportSaved': 'SAVED TO {path}',
+  'label.defaultScene': 'Default Scene',
+  'label.comment': 'Note / Comment',
+  'placeholder.comment': 'Add note (e.g. NG, OK)',
+  'label.clip': 'CLIP',
 };
 
 const ja: Dict = {
@@ -214,6 +218,10 @@ const ja: Dict = {
   'toast.chargingStopped': '給電が停止しました',
   'toast.backupSaved': 'バックアップを保存: {path}',
   'toast.exportSaved': '{path} に保存しました',
+  'label.defaultScene': 'デフォルトシーン名',
+  'label.comment': 'メモ・コメント',
+  'placeholder.comment': 'メモを追加 (例: NG, OK)',
+  'label.clip': 'クリップ',
 };
 
 const DICTS: Record<Lang, Dict> = { en, ja };

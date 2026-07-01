@@ -77,10 +77,14 @@ function MainApp() {
     clients,
     nowTick,
     vuLevel,
+    isClipping,
+    sceneName,
+    setSceneName,
     tr,
     playHapticFeedback,
     addMarker,
     removeMarker,
+    updateMarkerComment,
     exportToEDL,
     exportToALE,
     handleSlateClick,
@@ -254,8 +258,15 @@ function MainApp() {
                 {outputMode === 'mono-l' && (
                   <div className="control-section vu-meter-container">
                     <label className="vu-label">MIC INPUT LEVEL {!isRunning && '(START TO MONITOR)'}</label>
-                    <div className="vu-bar-track">
-                      <div className="vu-bar-fill" style={{ width: `${Math.min(vuLevel * 120, 100)}%` }} />
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
+                      <div className="vu-bar-track" style={{ flex: 1 }}>
+                        <div className="vu-bar-fill" style={{ width: `${Math.min(vuLevel * 120, 100)}%` }} />
+                      </div>
+                      {isClipping && (
+                        <span className="vu-clip-badge" style={{ background: '#ff3b30', color: '#fff', fontSize: '0.75rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '3px' }}>
+                          CLIP
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}
@@ -452,6 +463,15 @@ function MainApp() {
                   placeholder="A001"
                 />
               </div>
+              <div className="tool-card span-2">
+                <label>{tr('label.defaultScene')}</label>
+                <input
+                  value={sceneName}
+                  onChange={e => setSceneName(e.target.value.toUpperCase())}
+                  maxLength={8}
+                  placeholder="001"
+                />
+              </div>
               {!isMobile && (
                 <>
                   <div className="tool-card span-2">
@@ -475,8 +495,15 @@ function MainApp() {
                   {outputMode === 'mono-l' && (
                     <div className="tool-card span-2 vu-meter-container">
                       <label className="vu-label">MIC INPUT LEVEL {!isRunning && '(START TO MONITOR)'}</label>
-                      <div className="vu-bar-track">
-                        <div className="vu-bar-fill" style={{ width: `${Math.min(vuLevel * 120, 100)}%` }} />
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
+                        <div className="vu-bar-track" style={{ flex: 1 }}>
+                          <div className="vu-bar-fill" style={{ width: `${Math.min(vuLevel * 120, 100)}%` }} />
+                        </div>
+                        {isClipping && (
+                          <span className="vu-clip-badge" style={{ background: '#ff3b30', color: '#fff', fontSize: '0.75rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '3px' }}>
+                            CLIP
+                          </span>
+                        )}
                       </div>
                     </div>
                   )}
@@ -509,15 +536,37 @@ function MainApp() {
                   <div className="empty-msg">{tr('markers.none')}</div>
                 ) : (
                   markers.map(m => (
-                    <div key={m.id} className="marker-row-pro">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div className={`color-dot ${m.color.toLowerCase()}`}>{m.color.charAt(0)}</div>
-                        <span className="m-tc">{m.tc}</span>
-                        {m.take && <span className="m-take" style={{ fontSize: '0.85rem', color: '#aaa', marginLeft: '4px' }}>Take {m.take}</span>}
+                    <div key={m.id} className="marker-row-pro" style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '10px 12px', height: 'auto' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div className={`color-dot ${m.color.toLowerCase()}`}>{m.color.charAt(0)}</div>
+                          <span className="m-tc">{m.tc}</span>
+                          <span className="m-take" style={{ fontSize: '0.85rem', color: '#aaa', marginLeft: '4px' }}>
+                            Sc.{m.sceneName || '001'} Tk.{m.take}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span className="m-time">{m.time}</span>
+                          <button className="btn-delete-marker" onClick={() => removeMarker(m.id)}>✕</button>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span className="m-time">{m.time}</span>
-                        <button className="btn-delete-marker" onClick={() => removeMarker(m.id)}>✕</button>
+                      <div style={{ display: 'flex', width: '100%', marginTop: '4px' }}>
+                        <input
+                          type="text"
+                          className="marker-comment-input"
+                          value={m.comment || ''}
+                          onChange={(e) => updateMarkerComment(m.id, e.target.value)}
+                          placeholder={tr('placeholder.comment')}
+                          style={{
+                            flex: 1,
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '4px',
+                            color: '#fff',
+                            fontSize: '0.8rem',
+                            padding: '4px 8px'
+                          }}
+                        />
                       </div>
                     </div>
                   ))
@@ -744,6 +793,11 @@ function MainApp() {
           <div className="slate-tap-area" onClick={handleSlateClick} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }} />
           <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
             <div className="slate-tc">{slateTime}</div>
+            <div className="slate-metadata-row" style={{ display: 'flex', gap: '20px', fontSize: '2rem', fontWeight: 'bold', color: '#fff', margin: '15px 0' }}>
+              <div>REEL: {defaultReelName}</div>
+              <div>SCENE: {sceneName}</div>
+              <div>TAKE: {markers.length > 0 ? Math.max(...markers.map(m => m.take || 0)) + 1 : 1}</div>
+            </div>
             <div className="slate-info">
               {FPS_OPTIONS[fpsIndex].label} FPS | UBIT: {userBits}
             </div>

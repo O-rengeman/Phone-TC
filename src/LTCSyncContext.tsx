@@ -127,6 +127,9 @@ interface LTCSyncContextType {
   packetLossRate: number;
   setPacketLossRate: React.Dispatch<React.SetStateAction<number>>;
   vuLevel: number;
+  isClipping: boolean;
+  sceneName: string;
+  setSceneName: React.Dispatch<React.SetStateAction<string>>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   engineRef: React.MutableRefObject<LtcEngine | null>;
   currentTcRef: React.MutableRefObject<string>;
@@ -145,6 +148,7 @@ interface LTCSyncContextType {
   addToast: (msg: string, level?: ToastLevel) => void;
   addMarker: (color: 'Red' | 'Blue' | 'Green' | 'Yellow') => void;
   removeMarker: (id: number) => void;
+  updateMarkerComment: (id: number, comment: string) => void;
   exportToEDL: () => void;
   exportToALE: () => void;
   handleSlateClick: () => void;
@@ -223,9 +227,18 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     } catch { return []; }
   });
   const [defaultReelName, setDefaultReelName] = useState('A001');
+  const [sceneName, setSceneName] = useState(() => {
+    try { const saved = localStorage.getItem('ltc-scene'); return saved || '001'; } catch { return '001'; }
+  });
   const [outputLevel, setOutputLevel] = useState<'mic' | 'line'>(() => {
     try { const saved = localStorage.getItem('ltc-outlevel'); return (saved === 'mic' || saved === 'line') ? saved : 'line'; } catch { return 'line'; }
   });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ltc-scene', sceneName);
+    } catch { /* ignore */ }
+  }, [sceneName]);
 
   useEffect(() => {
     try {
@@ -460,6 +473,8 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const [vuLevel, setVuLevel] = useState(0);
+  const [isClipping, setIsClipping] = useState(false);
+  const clipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const addToast = (msg: string, level: ToastLevel = 'info') => {
     if (level === 'error') {
@@ -751,7 +766,9 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       time: new Date().toLocaleTimeString(),
       color,
       reelName: defaultReelName,
-      take: nextTake
+      take: nextTake,
+      sceneName: sceneName,
+      comment: ''
     };
     setMarkers(prev => [newMarker, ...prev]);
 
@@ -765,6 +782,10 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
   const removeMarker = (id: number) => {
     setMarkers(markers.filter(m => m.id !== id));
+  };
+
+  const updateMarkerComment = (id: number, comment: string) => {
+    setMarkers(prev => prev.map(m => m.id === id ? { ...m, comment } : m));
   };
 
   const exportFile = async (content: string, filename: string) => {
@@ -974,6 +995,13 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
           if (abs > peak) peak = abs;
         }
         setVuLevel(peak);
+        if (peak >= 0.95) {
+          setIsClipping(true);
+          if (clipTimeoutRef.current) clearTimeout(clipTimeoutRef.current);
+          clipTimeoutRef.current = setTimeout(() => {
+            setIsClipping(false);
+          }, 3000);
+        }
       }
       rafId = requestAnimationFrame(update);
     };
@@ -981,6 +1009,11 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelAnimationFrame(rafId);
       setVuLevel(0);
+      setIsClipping(false);
+      if (clipTimeoutRef.current) {
+        clearTimeout(clipTimeoutRef.current);
+        clipTimeoutRef.current = null;
+      }
     };
   }, [isRunning, outputMode]);
 
@@ -1497,6 +1530,8 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       clients,
       packetLossRate, setPacketLossRate,
       vuLevel,
+      isClipping,
+      sceneName, setSceneName,
       nowTick,
       canvasRef,
       engineRef,
@@ -1515,6 +1550,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       addToast,
       addMarker,
       removeMarker,
+      updateMarkerComment,
       exportToEDL,
       exportToALE,
       handleSlateClick,
