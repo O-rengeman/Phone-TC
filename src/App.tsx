@@ -1471,39 +1471,39 @@ function App() {
       )}
 
       <main className={isMobile ? 'tab-content' : 'desktop-dashboard'}>
-        {isMobile ? (
-          <>
-            {activeTab === 'main' && (
-              <div className="tab-pane main-pane">
-                <div className="timecode-card-pro" onClick={() => setIsVisualSlate(true)}>
-                  <canvas ref={canvasRef} className="time-canvas" />
-                  <div className="info-strip-pro">
-                    <span className="info-label">FPS: {FPS_OPTIONS[fpsIndex].label}</span>
-                    <span className="info-label">LVL: {outputLevel.toUpperCase()}</span>
-                    <span className="info-label">UBIT: {userBits}</span>
-                    {p2pRole === 'client' && masterDrift !== null && (
-                      <span className={`info-label ${masterDrift >= 0.5 ? 'warn' : 'ok'}`}>
-                        {masterDrift >= 0.5 ? '⚠ ' : '✓ '}Δ {masterDrift < 0.01 ? '<0.01' : masterDrift.toFixed(2)}s
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {syncMode === 'network' && (
-                  <div className="main-sync-bar">
-                    <div className="msb-info">
-                      <span className="msb-label">{tr('sync.label')}</span>
-                      <span className="msb-mode">{tr('sync.network')}</span>
-                      {isRunning && driftStatus && driftStatus.hasSync && (
-                        <span className="msb-age">{formatSyncAge(driftStatus.msSinceSync)}</span>
-                      )}
-                    </div>
-                    <button type="button" className="msb-resync" onClick={handleManualResync} disabled={isResyncing}>
-                      {isResyncing ? tr('sync.resyncing') : tr('sync.resync')}
-                    </button>
-                  </div>
+        {(isMobile ? activeTab === 'main' : true) && (
+          <div className="tab-pane main-pane">
+            <div className="timecode-card-pro" onClick={() => setIsVisualSlate(true)}>
+              <canvas ref={canvasRef} className="time-canvas" />
+              <div className="info-strip-pro">
+                <span className="info-label">FPS: {FPS_OPTIONS[fpsIndex].label}</span>
+                <span className="info-label">LVL: {outputLevel.toUpperCase()}</span>
+                <span className="info-label">UBIT: {userBits}</span>
+                {p2pRole === 'client' && masterDrift !== null && (
+                  <span className={`info-label ${masterDrift >= 0.5 ? 'warn' : 'ok'}`}>
+                    {masterDrift >= 0.5 ? '⚠ ' : '✓ '}Δ {masterDrift < 0.01 ? '<0.01' : masterDrift.toFixed(2)}s
+                  </span>
                 )}
+              </div>
+            </div>
 
+            {syncMode === 'network' && (
+              <div className="main-sync-bar">
+                <div className="msb-info">
+                  <span className="msb-label">{tr('sync.label')}</span>
+                  <span className="msb-mode">{tr('sync.network')}</span>
+                  {isRunning && driftStatus && driftStatus.hasSync && (
+                    <span className="msb-age">{formatSyncAge(driftStatus.msSinceSync)}</span>
+                  )}
+                </div>
+                <button type="button" className="msb-resync" onClick={handleManualResync} disabled={isResyncing}>
+                  {isResyncing ? tr('sync.resyncing') : tr('sync.resync')}
+                </button>
+              </div>
+            )}
+
+            {isMobile && (
+              <>
                 <div className="control-section">
                   <label className="section-label">{tr('label.frameRate')}</label>
                   <div className="fps-grid-compact">
@@ -1546,345 +1546,15 @@ function App() {
                     </div>
                   </div>
                 )}
-              </div>
+              </>
             )}
+          </div>
+        )}
 
-            {activeTab === 'sync' && (
-              <div className="tab-pane sync-pane">
-                <div className="control-section">
-                  <label className="section-label">{tr('label.syncMethod')}</label>
-                  <div className="sync-toggle-pro">
-                    {(['system', 'network', 'p2p', 'freerun'] as SyncMode[]).map((m) => (
-                      <button 
-                        key={m}
-                        className={syncMode === m ? 'active' : ''}
-                        onClick={() => setSyncMode(m)}
-                        disabled={isRunning || (m === 'p2p' && !p2pRole)}
-                      >
-                        {m === 'freerun' ? tr('mode.freerun') : m.toUpperCase()}
-                      </button>
-                    ))}
-                  </div>
-                  {syncStatus && syncMode === 'network' && (
-                    <div className="sync-detail">Latency: {syncStatus.latency.toFixed(1)}ms | Offset: {syncStatus.offset.toFixed(1)}ms</div>
-                  )}
-                  {syncMode === 'network' && isRunning && driftStatus && driftStatus.hasSync && (
-                    <div className="drift-panel">
-                      <div className="drift-row">
-                        <span>{tr('drift.lastSync')}</span>
-                        <span>{formatSyncAge(driftStatus.msSinceSync)} {tr('drift.ago')}</span>
-                      </div>
-                      {driftStatus.msSinceSync >= 3600000 && (
-                        <div className="drift-rejam">⚠ {tr('drift.rejam')}</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {syncMode === 'freerun' && (
-                  <div className="control-section">
-                    <label className="section-label">{tr('label.startTc')}</label>
-                    <div className="section-content">
-                      <input
-                        className="tc-input"
-                        value={manualTimecode}
-                        onChange={(e) => setManualTimecode(e.target.value)}
-                        disabled={isRunning}
-                        placeholder="HH:MM:SS:FF"
-                        inputMode="numeric"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="control-section">
-                  <label className="section-label">{tr('label.p2p')}</label>
-                  {!p2pRole ? (
-                    <div className="p2p-init-pro">
-                      <button onClick={setupP2PMaster}>{tr('btn.createMaster')}</button>
-                      <button onClick={setupP2PClient}>{tr('btn.joinClient')}</button>
-                    </div>
-                  ) : (
-                    <div className="p2p-panel-pro">
-                      <div className="p2p-header">
-                        <span className="role-tag">{p2pRole.toUpperCase()}</span>
-                        <button className="btn-small" onClick={resetP2P}>{tr('btn.reset')}</button>
-                      </div>
-                      {p2pRole === 'master' && (
-                        <div className="p2p-master-box">
-                          <div className="id-display">ID: <span>{peerId || '...'}</span></div>
-                          
-                          <div className="control-section">
-                            <label className="section-label">START SOURCE</label>
-                            <div className="sync-toggle-pro">
-                              <button 
-                                className={p2pSyncSource === 'manual' ? 'active' : ''} 
-                                onClick={() => setP2pSyncSource('manual')}
-                                disabled={isRunning}
-                              >
-                                MANUAL TC
-                              </button>
-                              <button 
-                                className={p2pSyncSource === 'network' ? 'active' : ''} 
-                                onClick={() => setP2pSyncSource('network')}
-                                disabled={isRunning}
-                              >
-                                NETWORK TIME
-                              </button>
-                            </div>
-                          </div>
-
-                          {p2pSyncSource === 'manual' && (
-                            <div className="start-tc-input">
-                              <label>START TC</label>
-                              <input value={manualTimecode} onChange={e => setManualTimecode(e.target.value)} disabled={isRunning} />
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {p2pRole === 'client' && (
-                        <div className="p2p-client-box">
-                          <input placeholder="ENTER MASTER ID" value={targetId} onChange={e => setTargetId(e.target.value)} />
-                          <button onClick={joinSession}>LINK</button>
-                        </div>
-                      )}
-                      <div className={`p2p-status-mini ${p2pStatus.includes('ERROR') ? 'error' : ''}`}>{p2pStatus}</div>
-                    </div>
-                  )}
-                </div>
-
-                {import.meta.env.DEV && (
-                  <div className="control-section dev-panel">
-                    <label className="section-label dev-label">DEV: PACKET LOSS SIM</label>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                      <input
-                        type="range" min="0" max="0.5" step="0.01"
-                        value={packetLossRate}
-                        onChange={e => setPacketLossRate(parseFloat(e.target.value))}
-                        style={{ flex: 1 }}
-                      />
-                      <span style={{ fontSize: '0.7rem', color: '#666', minWidth: '30px', fontFamily: 'var(--font-mono)' }}>
-                        {(packetLossRate * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'tools' && (
-              <div className="tab-pane tools-pane">
-                <div className="control-section tally-section">
-                  <label className="section-label">{tr('label.tally')}</label>
-                  <div className="tally-controls">
-                    <button
-                      className={`btn-pill ${tallyMode === 'manual' ? 'active' : ''}`}
-                      onClick={() => setTallyMode('manual')}
-                    >{tr('tally.manual')}</button>
-                    <button
-                      className={`btn-pill ${tallyMode === 'auto' ? 'active' : ''}`}
-                      onClick={() => setTallyMode('auto')}
-                    >{tr('tally.auto')}</button>
-                  </div>
-                  <div className="tally-options" style={{ marginTop: '8px' }}>
-                    <label className="toggle-label">
-                      <input
-                        type="checkbox"
-                        checked={tallyTorchEnabled}
-                        onChange={(e) => setTallyTorchEnabled(e.target.checked)}
-                      />
-                      <span>Torch LED</span>
-                    </label>
-                  </div>
-                  {isHost && (
-                    <button
-                      className="tally-open-btn"
-                      style={{
-                        marginTop: '10px',
-                        background: 'linear-gradient(90deg, #ff3b30, #ff9500)',
-                        borderColor: '#ff9500',
-                        color: '#fff'
-                      }}
-                      onClick={() => setDirectorPanelOpen(true)}
-                    >
-                      DIRECTOR SWITCHER PANEL
-                    </button>
-                  )}
-                  {tallyMode === 'manual' && (
-                    <div className="tally-state-row">
-                      {(['live', 'preview', 'off'] as TallyState[]).map(s => (
-                        <button
-                          key={s}
-                          className={`tally-state-btn ${manualTally === s ? 'active' : ''}`}
-                          style={manualTally === s ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
-                          onClick={() => handleManualTallyChange(s)}
-                        >{tr(tallyLabelKey(s))}</button>
-                      ))}
-                    </div>
-                  )}
-                  <button className="tally-open-btn" onClick={() => setTallyOpen(true)}>{tr('tally.fullscreen')}</button>
-                </div>
-
-                {isHost && Object.keys(clients).length > 0 && (
-                  <div className="control-section clients-list-section">
-                    <label className="section-label">CONNECTED CLIENTS ({Object.keys(clients).length})</label>
-                    <div className="clients-grid">
-                      {Object.entries(clients).map(([id, stats]: [string, { rtt: number, drift: number, lastSeen: number }]) => {
-                        const isOffline = nowTick - stats.lastSeen > 30000;
-                        return (
-                          <div key={id} className={`client-card ${isOffline ? 'offline' : ''}`}>
-                            <div className="client-id">{id}</div>
-                            <div className="client-stats">
-                              <span className="stat">RTT: {stats.rtt.toFixed(0)}ms</span>
-                              <span className={`stat ${stats.drift >= 0.5 ? 'drift-warn' : ''}`}>
-                                Δ: {stats.drift.toFixed(2)}s
-                              </span>
-                            </div>
-                            {tallyMode === 'manual' && (
-                              <div className="client-tally-controls" style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
-                                {(['live', 'preview', 'off'] as TallyState[]).map(s => {
-                                  const isActive = tallyPayload?.assignments?.[id] === s;
-                                  return (
-                                    <button
-                                      key={s}
-                                      className={`tally-state-btn mini ${isActive ? 'active' : ''}`}
-                                      style={{
-                                        flex: 1, padding: '4px', fontSize: '0.7rem',
-                                        ...(isActive ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s], color: '#fff' } : {})
-                                      }}
-                                      onClick={() => handleClientTallyChange(id, s)}
-                                    >
-                                      {tr(tallyLabelKey(s))}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div className="tools-grid-pro">
-                  <div className="tool-card span-2">
-                    <label>{tr('label.userBits')}</label>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                      <input value={userBits} onChange={e => setUserBits(e.target.value.toUpperCase())} maxLength={8} disabled={autoUserBits} />
-                      <button className={`btn-pill ${autoUserBits ? 'active' : ''}`} onClick={() => setAutoUserBits(!autoUserBits)}>{tr('btn.auto')}</button>
-                    </div>
-                  </div>
-                  <div className="tool-card span-2">
-                    <label>{tr('label.defaultReel')}</label>
-                    <input
-                      value={defaultReelName}
-                      onChange={e => setDefaultReelName(e.target.value.toUpperCase())}
-                      maxLength={8}
-                      placeholder="A001"
-                    />
-                  </div>
-                </div>
-                
-                <div className="control-section mobile-marker-section">
-                  <label className="section-label">{tr('label.quickMark')}</label>
-                  <div className="marker-buttons-grid">
-                    <button className="btn-mark-large red" onClick={() => addMarker('Red')}>{tr('color.red')}</button>
-                    <button className="btn-mark-large blue" onClick={() => addMarker('Blue')}>{tr('color.blue')}</button>
-                    <button className="btn-mark-large green" onClick={() => addMarker('Green')}>{tr('color.green')}</button>
-                    <button className="btn-mark-large yellow" onClick={() => addMarker('Yellow')}>{tr('color.yellow')}</button>
-                  </div>
-                </div>
-
-                <div className="marker-section-pro">
-                  <div className="marker-header">
-                    <label>{tr('label.loggedTakes')}</label>
-                    <div className="export-group">
-                      <button className="btn-export-pro" onClick={exportToEDL} disabled={markers.length === 0}>EDL</button>
-                      <button className="btn-export-pro" onClick={exportToALE} disabled={markers.length === 0}>ALE</button>
-                    </div>
-                  </div>
-                  <div className="marker-scroll">
-                    {markers.length === 0 ? (
-                      <div className="empty-msg">{tr('markers.none')}</div>
-                    ) : (
-                      markers.map(m => (
-                        <div key={m.id} className="marker-row-pro">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div className={`color-dot ${m.color.toLowerCase()}`}>{m.color.charAt(0)}</div>
-                            <span className="m-tc">{m.tc}</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <span className="m-time">{m.time}</span>
-                            <button className="btn-delete-marker" onClick={() => removeMarker(m.id)}>×</button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        ) : (
-          /* =========================================
-             DESKTOP DASHBOARD (BENTO GRID)
-             ========================================= */
-          <>
-            <div className="dashboard-hero">
-              <div className="dashboard-hero-left">
-                <div className="timecode-card-pro" onClick={() => setIsVisualSlate(true)}>
-                  <canvas ref={canvasRef} className="time-canvas" />
-                  <div className="info-strip-pro">
-                    <span className="info-label">FPS: {FPS_OPTIONS[fpsIndex].label}</span>
-                    <span className="info-label">LVL: {outputLevel.toUpperCase()}</span>
-                    <span className="info-label">UBIT: {userBits}</span>
-                    {p2pRole === 'client' && masterDrift !== null && (
-                      <span className={`info-label ${masterDrift >= 0.5 ? 'warn' : 'ok'}`}>
-                        {masterDrift >= 0.5 ? '⚠ ' : '✓ '}Δ {masterDrift < 0.01 ? '<0.01' : masterDrift.toFixed(2)}s
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="dashboard-hero-right">
-                <div className="dashboard-transport">
-                  <button
-                    className={`btn-main-action ${isRunning ? 'running danger' : isPreparing ? 'preparing' : 'start'}`}
-                    onClick={() => {
-                      if (holdStoppedRef.current) { holdStoppedRef.current = false; return; }
-                      if (!isRunning) void handleStartStop();
-                    }}
-                    onPointerDown={() => { if (isRunning) beginStopHold(); }}
-                    onPointerUp={cancelStopHold}
-                    onPointerLeave={cancelStopHold}
-                    onContextMenu={(e) => e.preventDefault()}
-                    disabled={isPreparing}
-                  >
-                    {isRunning && <div className="stop-hold-fill" style={{ width: `${stopHoldPct}%` }} />}
-                    <div className="btn-icon"></div>
-                    <div className="btn-text">
-                      {isRunning ? (stopHoldPct > 0 ? tr('btn.holding') : tr('btn.holdToStop')) : isPreparing ? tr('btn.prep') : isPaused ? tr('btn.resume') : tr('btn.start')}
-                    </div>
-                  </button>
-                  {isRunning && (
-                    <button className="btn-main-action pause" onClick={handlePause}>
-                      <div className="btn-text">{tr('btn.pause')}</div>
-                    </button>
-                  )}
-                  
-                  <div className="mark-colors-container desktop-mark" style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                    <button className="btn-mark-color red" onClick={() => addMarker('Red')} title={tr('marker.redTitle')}>R</button>
-                    <button className="btn-mark-color blue" onClick={() => addMarker('Blue')} title={tr('marker.blueTitle')}>B</button>
-                    <button className="btn-mark-color green" onClick={() => addMarker('Green')} title={tr('marker.greenTitle')}>G</button>
-                    <button className="btn-mark-color yellow" onClick={() => addMarker('Yellow')} title={tr('marker.yellowTitle')}>Y</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bento-card">
-              <div className="bento-card-title">{tr('label.syncMethod')}</div>
+        {(isMobile ? activeTab === 'sync' : true) && (
+          <div className="tab-pane sync-pane">
+            <div className="control-section">
+              <label className="section-label">{tr('label.syncMethod')}</label>
               <div className="sync-toggle-pro">
                 {(['system', 'network', 'p2p', 'freerun'] as SyncMode[]).map((m) => (
                   <button 
@@ -1900,22 +1570,8 @@ function App() {
               {syncStatus && syncMode === 'network' && (
                 <div className="sync-detail">Latency: {syncStatus.latency.toFixed(1)}ms | Offset: {syncStatus.offset.toFixed(1)}ms</div>
               )}
-              {syncMode === 'network' && (
-                <div className="main-sync-bar" style={{ marginTop: 8 }}>
-                  <div className="msb-info">
-                    <span className="msb-label">{tr('sync.label')}</span>
-                    <span className="msb-mode">{tr('sync.network')}</span>
-                    {isRunning && driftStatus && driftStatus.hasSync && (
-                      <span className="msb-age">{formatSyncAge(driftStatus.msSinceSync)}</span>
-                    )}
-                  </div>
-                  <button type="button" className="msb-resync" onClick={handleManualResync} disabled={isResyncing}>
-                    {isResyncing ? tr('sync.resyncing') : tr('sync.resync')}
-                  </button>
-                </div>
-              )}
               {syncMode === 'network' && isRunning && driftStatus && driftStatus.hasSync && (
-                <div className="drift-panel" style={{ marginTop: 8 }}>
+                <div className="drift-panel">
                   <div className="drift-row">
                     <span>{tr('drift.lastSync')}</span>
                     <span>{formatSyncAge(driftStatus.msSinceSync)} {tr('drift.ago')}</span>
@@ -1925,9 +1581,12 @@ function App() {
                   )}
                 </div>
               )}
-              {syncMode === 'freerun' && (
-                <div className="control-section" style={{ marginTop: 8 }}>
-                  <label className="section-label">{tr('label.startTc')}</label>
+            </div>
+
+            {syncMode === 'freerun' && (
+              <div className="control-section">
+                <label className="section-label">{tr('label.startTc')}</label>
+                <div className="section-content">
                   <input
                     className="tc-input"
                     value={manualTimecode}
@@ -1937,26 +1596,11 @@ function App() {
                     inputMode="numeric"
                   />
                 </div>
-              )}
-              <div className="control-section" style={{ marginTop: 12 }}>
-                <label className="section-label">{tr('label.frameRate')}</label>
-                <div className="fps-grid-compact">
-                  {FPS_OPTIONS.map((opt, i) => (
-                    <button 
-                      key={opt.label} 
-                      className={`btn-pill ${fpsIndex === i ? 'active' : ''}`}
-                      onClick={() => setFpsIndex(i)}
-                      disabled={isRunning}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
               </div>
-            </div>
+            )}
 
-            <div className="bento-card">
-              <div className="bento-card-title">P2P Network</div>
+            <div className="control-section">
+              <label className="section-label">{tr('label.p2p')}</label>
               {!p2pRole ? (
                 <div className="p2p-init-pro">
                   <button onClick={setupP2PMaster}>{tr('btn.createMaster')}</button>
@@ -1971,15 +1615,29 @@ function App() {
                   {p2pRole === 'master' && (
                     <div className="p2p-master-box">
                       <div className="id-display">ID: <span>{peerId || '...'}</span></div>
-                      <div className="control-section" style={{ marginTop: 8 }}>
+                      
+                      <div className="control-section">
                         <label className="section-label">START SOURCE</label>
                         <div className="sync-toggle-pro">
-                          <button className={p2pSyncSource === 'manual' ? 'active' : ''} onClick={() => setP2pSyncSource('manual')} disabled={isRunning}>MANUAL TC</button>
-                          <button className={p2pSyncSource === 'network' ? 'active' : ''} onClick={() => setP2pSyncSource('network')} disabled={isRunning}>NETWORK TIME</button>
+                          <button 
+                            className={p2pSyncSource === 'manual' ? 'active' : ''} 
+                            onClick={() => setP2pSyncSource('manual')}
+                            disabled={isRunning}
+                          >
+                            MANUAL TC
+                          </button>
+                          <button 
+                            className={p2pSyncSource === 'network' ? 'active' : ''} 
+                            onClick={() => setP2pSyncSource('network')}
+                            disabled={isRunning}
+                          >
+                            NETWORK TIME
+                          </button>
                         </div>
                       </div>
+
                       {p2pSyncSource === 'manual' && (
-                        <div className="start-tc-input" style={{ marginTop: 8 }}>
+                        <div className="start-tc-input">
                           <label>START TC</label>
                           <input value={manualTimecode} onChange={e => setManualTimecode(e.target.value)} disabled={isRunning} />
                         </div>
@@ -1997,29 +1655,83 @@ function App() {
               )}
             </div>
 
-            <div className="bento-card">
-              <div className="bento-card-title">{tr('label.tally')} & DIRECTOR</div>
+            {import.meta.env.DEV && (
+              <div className="control-section dev-panel">
+                <label className="section-label dev-label">DEV: PACKET LOSS SIM</label>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input
+                    type="range" min="0" max="0.5" step="0.01"
+                    value={packetLossRate}
+                    onChange={e => setPacketLossRate(parseFloat(e.target.value))}
+                    style={{ flex: 1 }}
+                  />
+                  <span style={{ fontSize: '0.7rem', color: '#666', minWidth: '30px', fontFamily: 'var(--font-mono)' }}>
+                    {(packetLossRate * 100).toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {!isMobile && (
+              <div className="control-section">
+                <label className="section-label">{tr('label.frameRate')}</label>
+                <div className="fps-grid-compact">
+                  {FPS_OPTIONS.map((opt, i) => (
+                    <button 
+                      key={opt.label} 
+                      className={`btn-pill ${fpsIndex === i ? 'active' : ''}`}
+                      onClick={() => setFpsIndex(i)}
+                      disabled={isRunning}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {(isMobile ? activeTab === 'tools' : true) && (
+          <div className="tab-pane tools-pane">
+            <div className="control-section tally-section">
+              <label className="section-label">{tr('label.tally')}</label>
               <div className="tally-controls">
-                <button className={`btn-pill ${tallyMode === 'manual' ? 'active' : ''}`} onClick={() => setTallyMode('manual')}>{tr('tally.manual')}</button>
-                <button className={`btn-pill ${tallyMode === 'auto' ? 'active' : ''}`} onClick={() => setTallyMode('auto')}>{tr('tally.auto')}</button>
+                <button
+                  className={`btn-pill ${tallyMode === 'manual' ? 'active' : ''}`}
+                  onClick={() => setTallyMode('manual')}
+                >{tr('tally.manual')}</button>
+                <button
+                  className={`btn-pill ${tallyMode === 'auto' ? 'active' : ''}`}
+                  onClick={() => setTallyMode('auto')}
+                >{tr('tally.auto')}</button>
               </div>
               <div className="tally-options" style={{ marginTop: '8px' }}>
                 <label className="toggle-label">
-                  <input type="checkbox" checked={tallyTorchEnabled} onChange={(e) => setTallyTorchEnabled(e.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={tallyTorchEnabled}
+                    onChange={(e) => setTallyTorchEnabled(e.target.checked)}
+                  />
                   <span>Torch LED</span>
                 </label>
               </div>
               {isHost && (
                 <button
                   className="tally-open-btn"
-                  style={{ marginTop: '10px', background: 'linear-gradient(90deg, #ff3b30, #ff9500)', borderColor: '#ff9500', color: '#fff' }}
+                  style={{
+                    marginTop: '10px',
+                    background: 'linear-gradient(90deg, #ff3b30, #ff9500)',
+                    borderColor: '#ff9500',
+                    color: '#fff'
+                  }}
                   onClick={() => setDirectorPanelOpen(true)}
                 >
                   DIRECTOR SWITCHER PANEL
                 </button>
               )}
               {tallyMode === 'manual' && (
-                <div className="tally-state-row" style={{ marginTop: '10px' }}>
+                <div className="tally-state-row">
                   {(['live', 'preview', 'off'] as TallyState[]).map(s => (
                     <button
                       key={s}
@@ -2030,87 +1742,114 @@ function App() {
                   ))}
                 </div>
               )}
-              {isHost && Object.keys(clients).length > 0 && (
-                <div className="control-section clients-list-section" style={{ marginTop: '16px' }}>
-                  <label className="section-label">CONNECTED CLIENTS ({Object.keys(clients).length})</label>
-                  <div className="clients-grid">
-                    {Object.entries(clients).map(([id, stats]: [string, { rtt: number, drift: number, lastSeen: number }]) => {
-                      const isOffline = nowTick - stats.lastSeen > 30000;
-                      return (
-                        <div key={id} className={`client-card ${isOffline ? 'offline' : ''}`}>
-                          <div className="client-id">{id}</div>
-                          <div className="client-stats">
-                            <span className="stat">RTT: {stats.rtt.toFixed(0)}ms</span>
-                            <span className={`stat ${stats.drift >= 0.5 ? 'drift-warn' : ''}`}>Δ: {stats.drift.toFixed(2)}s</span>
-                          </div>
-                          {tallyMode === 'manual' && (
-                            <div className="client-tally-controls" style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
-                              {(['live', 'preview', 'off'] as TallyState[]).map(s => {
-                                 const isActive = tallyPayload?.assignments?.[id] === s;
-                                 return (
-                                   <button
-                                     key={s}
-                                     className={`tally-state-btn mini ${isActive ? 'active' : ''}`}
-                                     style={{ flex: 1, padding: '4px', fontSize: '0.7rem', ...(isActive ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s], color: '#fff' } : {}) }}
-                                     onClick={() => handleClientTallyChange(id, s)}
-                                   >
-                                     {tr(tallyLabelKey(s))}
-                                   </button>
-                                 );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              <button className="tally-open-btn" onClick={() => setTallyOpen(true)}>{tr('tally.fullscreen')}</button>
             </div>
 
-            <div className="bento-card">
-              <div className="bento-card-title">AUDIO & SETTINGS</div>
-              <div className="control-section">
-                <label className="section-label">{tr('label.outputVolume')}</label>
-                <div className="volume-row">
-                  <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} />
-                  <div className="level-toggle">
-                    <button className={outputLevel === 'mic' ? 'active' : ''} onClick={() => setOutputLevel('mic')}>MIC</button>
-                    <button className={outputLevel === 'line' ? 'active' : ''} onClick={() => setOutputLevel('line')}>LINE</button>
-                  </div>
+            {isHost && Object.keys(clients).length > 0 && (
+              <div className="control-section clients-list-section">
+                <label className="section-label">CONNECTED CLIENTS ({Object.keys(clients).length})</label>
+                <div className="clients-grid">
+                  {Object.entries(clients).map(([id, stats]: [string, { rtt: number, drift: number, lastSeen: number }]) => {
+                    const isOffline = nowTick - stats.lastSeen > 30000;
+                    return (
+                      <div key={id} className={`client-card ${isOffline ? 'offline' : ''}`}>
+                        <div className="client-id">{id}</div>
+                        <div className="client-stats">
+                          <span className="stat">RTT: {stats.rtt.toFixed(0)}ms</span>
+                          <span className={`stat ${stats.drift >= 0.5 ? 'drift-warn' : ''}`}>
+                            Δ: {stats.drift.toFixed(2)}s
+                          </span>
+                        </div>
+                        {tallyMode === 'manual' && (
+                          <div className="client-tally-controls" style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
+                            {(['live', 'preview', 'off'] as TallyState[]).map(s => {
+                               const isActive = tallyPayload?.assignments?.[id] === s;
+                               return (
+                                 <button
+                                   key={s}
+                                   className={`tally-state-btn mini ${isActive ? 'active' : ''}`}
+                                   style={{
+                                     flex: 1, padding: '4px', fontSize: '0.7rem',
+                                     ...(isActive ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s], color: '#fff' } : {})
+                                   }}
+                                   onClick={() => handleClientTallyChange(id, s)}
+                                 >
+                                   {tr(tallyLabelKey(s))}
+                                 </button>
+                               );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-              <div className="control-section" style={{ marginTop: 12 }}>
-                <label className="section-label">{tr('label.outputMode')}</label>
-                <div className="sync-toggle-pro">
-                  <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => setOutputMode('stereo')}>STEREO TC</button>
-                  <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => setOutputMode('mono-l')}>L-TC / R-AUDIO</button>
-                </div>
-              </div>
-              {outputMode === 'mono-l' && (
-                <div className="control-section vu-meter-container" style={{ marginTop: 12 }}>
-                  <label className="vu-label">MIC INPUT LEVEL {!isRunning && '(START TO MONITOR)'}</label>
-                  <div className="vu-bar-track">
-                    <div className="vu-bar-fill" style={{ width: `${Math.min(vuLevel * 120, 100)}%` }} />
-                  </div>
-                </div>
-              )}
-              <div className="control-section" style={{ marginTop: 16 }}>
-                <label className="section-label">{tr('label.userBits')}</label>
+            )}
+
+            <div className="tools-grid-pro">
+              <div className="tool-card span-2">
+                <label>{tr('label.userBits')}</label>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <input className="tc-input" value={userBits} onChange={e => setUserBits(e.target.value.toUpperCase())} maxLength={8} disabled={autoUserBits} />
+                  <input value={userBits} onChange={e => setUserBits(e.target.value.toUpperCase())} maxLength={8} disabled={autoUserBits} />
                   <button className={`btn-pill ${autoUserBits ? 'active' : ''}`} onClick={() => setAutoUserBits(!autoUserBits)}>{tr('btn.auto')}</button>
                 </div>
               </div>
-              <div className="control-section" style={{ marginTop: 12 }}>
-                <label className="section-label">{tr('label.defaultReel')}</label>
-                <input className="tc-input" value={defaultReelName} onChange={e => setDefaultReelName(e.target.value.toUpperCase())} maxLength={8} placeholder="A001" />
+              <div className="tool-card span-2">
+                <label>{tr('label.defaultReel')}</label>
+                <input
+                  value={defaultReelName}
+                  onChange={e => setDefaultReelName(e.target.value.toUpperCase())}
+                  maxLength={8}
+                  placeholder="A001"
+                />
               </div>
-            </div>
+              {!isMobile && (
+                <>
+                  <div className="tool-card span-2">
+                    <label className="section-label">{tr('label.outputVolume')}</label>
+                    <div className="volume-row">
+                      <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} />
+                      <div className="level-toggle">
+                        <button className={outputLevel === 'mic' ? 'active' : ''} onClick={() => setOutputLevel('mic')}>MIC</button>
+                        <button className={outputLevel === 'line' ? 'active' : ''} onClick={() => setOutputLevel('line')}>LINE</button>
+                      </div>
+                    </div>
+                  </div>
 
-            <div className="bento-card">
-              <div className="bento-card-title">MARKERS</div>
-              <div className="marker-header" style={{ marginBottom: '12px' }}>
+                  <div className="tool-card span-2">
+                    <label className="section-label">{tr('label.outputMode')}</label>
+                    <div className="sync-toggle-pro">
+                      <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => setOutputMode('stereo')}>STEREO TC</button>
+                      <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => setOutputMode('mono-l')}>L-TC / R-AUDIO</button>
+                    </div>
+                  </div>
+                  {outputMode === 'mono-l' && (
+                    <div className="tool-card span-2 vu-meter-container">
+                      <label className="vu-label">MIC INPUT LEVEL {!isRunning && '(START TO MONITOR)'}</label>
+                      <div className="vu-bar-track">
+                        <div className="vu-bar-fill" style={{ width: `${Math.min(vuLevel * 120, 100)}%` }} />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            
+            {isMobile && (
+              <div className="control-section mobile-marker-section">
+                <label className="section-label">{tr('label.quickMark')}</label>
+                <div className="marker-buttons-grid">
+                  <button className="btn-mark-large red" onClick={() => addMarker('Red')}>{tr('color.red')}</button>
+                  <button className="btn-mark-large blue" onClick={() => addMarker('Blue')}>{tr('color.blue')}</button>
+                  <button className="btn-mark-large green" onClick={() => addMarker('Green')}>{tr('color.green')}</button>
+                  <button className="btn-mark-large yellow" onClick={() => addMarker('Yellow')}>{tr('color.yellow')}</button>
+                </div>
+              </div>
+            )}
+
+            <div className="marker-section-pro">
+              <div className="marker-header">
                 <label>{tr('label.loggedTakes')}</label>
                 <div className="export-group">
                   <button className="btn-export-pro" onClick={exportToEDL} disabled={markers.length === 0}>EDL</button>
@@ -2136,7 +1875,7 @@ function App() {
                 )}
               </div>
             </div>
-          </>
+          </div>
         )}
       </main>
 
@@ -2147,46 +1886,46 @@ function App() {
           <span className="mf-count">#{markerFlash.count}</span>
         </div>
       )}
-      {isMobile && (
-        <footer className="fixed-footer">
-          <div className="footer-buttons">
-            <div className="footer-left">
-              <button
-                className={`btn-main-action ${isRunning ? 'running danger' : isPreparing ? 'preparing' : 'start'}`}
-                onClick={() => {
-                  if (holdStoppedRef.current) { holdStoppedRef.current = false; return; }
-                  if (!isRunning) void handleStartStop();
-                }}
-                onPointerDown={() => { if (isRunning) beginStopHold(); }}
-                onPointerUp={cancelStopHold}
-                onPointerLeave={cancelStopHold}
-                onContextMenu={(e) => e.preventDefault()}
-                disabled={isPreparing}
-              >
-                {isRunning && <div className="stop-hold-fill" style={{ width: `${stopHoldPct}%` }} />}
-                <div className="btn-icon"></div>
-                <div className="btn-text">
-                  {isRunning ? (stopHoldPct > 0 ? tr('btn.holding') : tr('btn.holdToStop')) : isPreparing ? tr('btn.prep') : isPaused ? tr('btn.resume') : tr('btn.start')}
-                </div>
-              </button>
-              {isRunning && (
-                <button className="btn-main-action pause" onClick={handlePause}>
-                  <div className="btn-text">{tr('btn.pause')}</div>
-                </button>
-              )}
-            </div>
-            <div className="footer-right">
-              <div className="mark-label">{tr('btn.mark')}</div>
-              <div className="mark-colors-container">
-                <button className="btn-mark-color red" onClick={() => addMarker('Red')} title={tr('marker.redTitle')}>R</button>
-                <button className="btn-mark-color blue" onClick={() => addMarker('Blue')} title={tr('marker.blueTitle')}>B</button>
-                <button className="btn-mark-color green" onClick={() => addMarker('Green')} title={tr('marker.greenTitle')}>G</button>
-                <button className="btn-mark-color yellow" onClick={() => addMarker('Yellow')} title={tr('marker.yellowTitle')}>Y</button>
+      <footer className="fixed-footer">
+        <div className="footer-buttons">
+          <div className="footer-left">
+            <button
+              className={`btn-main-action ${isRunning ? 'running danger' : isPreparing ? 'preparing' : 'start'}`}
+              onClick={() => {
+                // Swallow the trailing click that fires when the finger lifts
+                // after a completed hold-to-stop (it would otherwise restart).
+                if (holdStoppedRef.current) { holdStoppedRef.current = false; return; }
+                if (!isRunning) void handleStartStop();
+              }}
+              onPointerDown={() => { if (isRunning) beginStopHold(); }}
+              onPointerUp={cancelStopHold}
+              onPointerLeave={cancelStopHold}
+              onContextMenu={(e) => e.preventDefault()}
+              disabled={isPreparing}
+            >
+              {isRunning && <div className="stop-hold-fill" style={{ width: `${stopHoldPct}%` }} />}
+              <div className="btn-icon"></div>
+              <div className="btn-text">
+                {isRunning ? (stopHoldPct > 0 ? tr('btn.holding') : tr('btn.holdToStop')) : isPreparing ? tr('btn.prep') : isPaused ? tr('btn.resume') : tr('btn.start')}
               </div>
+            </button>
+            {isRunning && (
+              <button className="btn-main-action pause" onClick={handlePause}>
+                <div className="btn-text">{tr('btn.pause')}</div>
+              </button>
+            )}
+          </div>
+          <div className="footer-right">
+            <div className="mark-label">{tr('btn.mark')}</div>
+            <div className="mark-colors-container">
+              <button className="btn-mark-color red" onClick={() => addMarker('Red')} title={tr('marker.redTitle')}>R</button>
+              <button className="btn-mark-color blue" onClick={() => addMarker('Blue')} title={tr('marker.blueTitle')}>B</button>
+              <button className="btn-mark-color green" onClick={() => addMarker('Green')} title={tr('marker.greenTitle')}>G</button>
+              <button className="btn-mark-color yellow" onClick={() => addMarker('Yellow')} title={tr('marker.yellowTitle')}>Y</button>
             </div>
           </div>
-        </footer>
-      )}
+        </div>
+      </footer>
 
       <div className="toast-container" aria-live="polite">
         {toasts.map(t => (
