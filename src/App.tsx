@@ -146,6 +146,7 @@ function App() {
         navigator.vibrate(30);
       }
       // ビープ音 (Beep)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
@@ -156,7 +157,7 @@ function App() {
       gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.05); // 50msでフェードアウト
       osc.start(audioCtx.currentTime);
       osc.stop(audioCtx.currentTime + 0.05);
-    } catch (e) {
+    } catch {
       // 自動再生ポリシーなどのエラーは無視
     }
   };
@@ -1280,8 +1281,10 @@ function App() {
 
 
   // Phase 1/2: tally state resolution
+  // eslint-disable-next-line react-hooks/refs, react-hooks/purity
+  const isTallyConnected = p2pRole === 'client' && (Date.now() - lastHeartbeatTimeRef.current < 3000);
   const tallyState = resolveTally(tallyPayload, peerId, {
-    connected: p2pRole === 'client' && (Date.now() - lastHeartbeatTimeRef.current < 3000),
+    connected: isTallyConnected,
     autoMode: tallyMode === 'auto',
     selfIsRunning: isRunning,
     manualState: manualTally,
@@ -1318,6 +1321,7 @@ function App() {
     const applyTorch = async (on: boolean) => {
       await TimecodeNativeBridge.setTorch(on);
       // Web Fallback (when not on native capacitor)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const isNative = (window as any).Capacitor?.isNative;
       if (!isNative) {
         try {
@@ -1329,11 +1333,11 @@ function App() {
               videoTrackRef.current = stream.getVideoTracks()[0];
             }
             if (videoTrackRef.current) {
-              await videoTrackRef.current.applyConstraints({ advanced: [{ torch: true }] } as any);
+              await videoTrackRef.current.applyConstraints({ advanced: [{ torch: true }] } as unknown as MediaTrackConstraints);
             }
           } else {
             if (videoTrackRef.current) {
-              await videoTrackRef.current.applyConstraints({ advanced: [{ torch: false }] } as any);
+              await videoTrackRef.current.applyConstraints({ advanced: [{ torch: false }] } as unknown as MediaTrackConstraints);
               videoTrackRef.current.stop();
               videoTrackRef.current = null;
             }
@@ -1772,6 +1776,7 @@ function App() {
                                      flex: 1, padding: '4px', fontSize: '0.7rem',
                                      ...(isActive ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s], color: '#fff' } : {})
                                    }}
+                                   // eslint-disable-next-line react-hooks/refs
                                    onClick={() => handleClientTallyChange(id, s)}
                                  >
                                    {tr(tallyLabelKey(s))}
@@ -1934,7 +1939,7 @@ function App() {
       </div>
 
       {tallyOpen && (() => {
-        const isConnected = p2pRole === 'client' && (Date.now() - lastHeartbeatTimeRef.current < 3000);
+        const isConnected = isTallyConnected;
         // P5-1: 状態UIを3択（ON AIR / PREVIEW / OFF）に制限
         const uiState = tallyState === 'standby' ? 'preview' : tallyState;
         const stateLabel = tr(tallyLabelKey(uiState));
@@ -2035,7 +2040,7 @@ function App() {
                     <div className="director-no-clients-sub">P2P でクライアント端末を接続してください</div>
                   </div>
                 ) : (
-                  Object.entries(clients).map(([id, stats]: [string, any], idx) => {
+                  Object.entries(clients).map(([id, stats]: [string, { rtt: number, drift: number, lastSeen: number }], idx) => {
                     const isOffline = Date.now() - stats.lastSeen > 30000;
                     const assignedState = tallyPayload?.assignments?.[id] ?? tallyPayload?.all ?? 'off';
                     // P5-1: 個別表示でもstandbyをpreviewにマッピングして3択に
