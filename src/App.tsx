@@ -231,7 +231,7 @@ function MainApp() {
                         key={opt.label} 
                         className={`btn-pill ${fpsIndex === i ? 'active' : ''}`}
                         onClick={() => setFpsIndex(i)}
-                        disabled={isRunning}
+                        disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')}
                       >
                         {opt.label}
                       </button>
@@ -261,7 +261,7 @@ function MainApp() {
                 <div className="control-section">
                   <label className="section-label">TC OFFSET (FRAMES)</label>
                   <div className="offset-control" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} style={{ flex: 1 }} disabled={isRunning} />
+                    <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} style={{ flex: 1 }} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} />
                     <span style={{ minWidth: '40px', textAlign: 'right', fontWeight: 'bold' }}>{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
                   </div>
                 </div>
@@ -338,7 +338,7 @@ function MainApp() {
                       key={opt.label} 
                       className={`btn-pill ${fpsIndex === i ? 'active' : ''}`}
                       onClick={() => setFpsIndex(i)}
-                      disabled={isRunning}
+                      disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')}
                     >
                       {opt.label}
                     </button>
@@ -500,7 +500,7 @@ function MainApp() {
                   <div className="tool-card span-2">
                     <label className="section-label">TC OFFSET (FRAMES)</label>
                     <div className="offset-control" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} style={{ flex: 1 }} disabled={isRunning} />
+                      <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} style={{ flex: 1 }} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} />
                       <span style={{ minWidth: '40px', textAlign: 'right', fontWeight: 'bold' }}>{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
                     </div>
                   </div>
@@ -601,7 +601,7 @@ function MainApp() {
               onPointerUp={cancelStopHold}
               onPointerLeave={cancelStopHold}
               onContextMenu={(e) => e.preventDefault()}
-              disabled={isPreparing}
+              disabled={isPreparing || (syncMode === 'p2p' && p2pRole === 'client')}
             >
               {isRunning && <div className="stop-hold-fill" style={{ width: `${stopHoldPct}%` }} />}
               <div className="btn-icon"></div>
@@ -610,7 +610,11 @@ function MainApp() {
               </div>
             </button>
             {isRunning && (
-              <button className="btn-main-action pause" onClick={handlePause}>
+              <button 
+                className="btn-main-action pause" 
+                onClick={handlePause}
+                disabled={syncMode === 'p2p' && p2pRole === 'client'}
+              >
                 <div className="btn-text">{tr('btn.pause')}</div>
               </button>
             )}

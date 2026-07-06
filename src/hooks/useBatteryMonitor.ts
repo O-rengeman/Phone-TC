@@ -94,6 +94,8 @@ export function useBatteryMonitor(langRef: React.RefObject<Lang>): UseBatteryMon
       batt = b;
       setBatteryLevel(b.level);
       setIsCharging(b.charging);
+      prevLevelRef.current = b.level;
+      prevChargingRef.current = b.charging;
       b.addEventListener('levelchange', onLevel);
       b.addEventListener('chargingchange', onCharging);
     }).catch(() => { /* battery info unavailable */ });

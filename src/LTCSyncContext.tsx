@@ -417,6 +417,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
             fps: FPS_OPTIONS[fpsIndex].value,
             isDropFrame: FPS_OPTIONS[fpsIndex].drop,
             isRunning: isRunning,
+            isPaused: isPaused,
             clientTimestamp: msg.clientTimestamp
           };
           peerSyncRef.current?.send(response);
@@ -464,7 +465,39 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
           const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
           const shouldSync = (Math.abs(diff) >= 0.03 && isRttStable) || timeSinceLastSync >= 15000;
 
-          if (shouldSync) {
+          // FPSの同期
+          const masterFpsVal = msg.fps;
+          const masterDrop = msg.isDropFrame;
+          const matchedFpsIdx = FPS_OPTIONS.findIndex(opt => opt.value === masterFpsVal && opt.drop === masterDrop);
+          if (matchedFpsIdx !== -1 && matchedFpsIdx !== fpsIndex) {
+            setFpsIndex(matchedFpsIdx);
+          }
+
+          // 再生状態の同期
+          const masterRunning = msg.isRunning;
+          const masterPaused = msg.isPaused ?? false;
+
+          if (masterRunning !== isRunning || masterPaused !== isPaused) {
+            if (masterRunning && !isRunning) {
+              void handleStartStop();
+            } else if (!masterRunning) {
+              if (masterPaused && isRunning) {
+                handlePause();
+              } else if (!masterPaused && (isRunning || isPaused)) {
+                if (isRunning) {
+                  void handleStartStop();
+                } else {
+                  setIsPaused(false);
+                  if (engineRef.current) {
+                    engineRef.current.setManualTimecode(manualTimecode);
+                    currentTcRef.current = engineRef.current.getTimecodeString();
+                  }
+                }
+              }
+            }
+          }
+
+          if (shouldSync && msg.isRunning) {
             applySyncToWorklet(
               msg.masterTimecode,
               oneWayLatency,
@@ -493,7 +526,39 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
           const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
           const shouldSync = Math.abs(diff) >= 0.05 || timeSinceLastSync >= 15000;
 
-          if (shouldSync) {
+          // FPSの同期
+          const masterFpsVal = msg.fps;
+          const masterDrop = msg.isDropFrame;
+          const matchedFpsIdx = FPS_OPTIONS.findIndex(opt => opt.value === masterFpsVal && opt.drop === masterDrop);
+          if (matchedFpsIdx !== -1 && matchedFpsIdx !== fpsIndex) {
+            setFpsIndex(matchedFpsIdx);
+          }
+
+          // 再生状態の同期
+          const masterRunning = msg.isRunning;
+          const masterPaused = msg.isPaused ?? false;
+
+          if (masterRunning !== isRunning || masterPaused !== isPaused) {
+            if (masterRunning && !isRunning) {
+              void handleStartStop();
+            } else if (!masterRunning) {
+              if (masterPaused && isRunning) {
+                handlePause();
+              } else if (!masterPaused && (isRunning || isPaused)) {
+                if (isRunning) {
+                  void handleStartStop();
+                } else {
+                  setIsPaused(false);
+                  if (engineRef.current) {
+                    engineRef.current.setManualTimecode(manualTimecode);
+                    currentTcRef.current = engineRef.current.getTimecodeString();
+                  }
+                }
+              }
+            }
+          }
+
+          if (shouldSync && msg.isRunning) {
             applySyncToWorklet(msg.masterTimecode, 0.03, msg.isRunning);
             lastSyncTimeRef.current = Date.now();
           }
@@ -612,6 +677,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
           fps: FPS_OPTIONS[fpsIndex].value,
           isDropFrame: FPS_OPTIONS[fpsIndex].drop,
           isRunning: isRunning,
+          isPaused: isPaused,
           tally: tallyPayload ?? undefined
         });
       }, 100);

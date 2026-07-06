@@ -10,6 +10,7 @@ export interface SyncMessage {
   fps: number;
   isDropFrame: boolean;
   isRunning: boolean;
+  isPaused?: boolean;
   clientTimestamp?: number;
   clientId?: string; // Identifier for the sender
   rtt?: number;      // Reported RTT from client
