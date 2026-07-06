@@ -12,11 +12,9 @@ import { PeerSync } from './utils/PeerSync';
 import type { SyncMessage } from './utils/PeerSync';
 import { TimecodeNativeBridge } from './utils/TimecodeNativeBridge';
 import { DriftMonitor } from './utils/DriftMonitor';
-import { estimateMinutesRemaining, trimSamples } from './utils/battery';
 import { t as translate, getInitialLang, persistLang } from './utils/i18n';
 import type { Lang } from './utils/i18n';
 import toast from 'react-hot-toast';
-import type { BatterySample } from './utils/battery';
 import type { DriftStatus } from './utils/DriftMonitor';
 import { buildEdl, buildAle } from './utils/export';
 import type { Marker } from './utils/export';
@@ -24,17 +22,11 @@ import { resolveTally, adoptTally } from './utils/tally';
 import type { TallyState, TallyPayload } from './utils/tally';
 import { LTC_WORKLET_SOURCE } from './audio/ltcWorkletSource';
 import { FPS_OPTIONS } from './constants';
+import { useBatteryMonitor } from './hooks/useBatteryMonitor';
 
 export type SyncMode = 'system' | 'network' | 'p2p' | 'freerun';
 export type ToastLevel = 'info' | 'warn' | 'error';
 export type Toast = { id: number; msg: string; level: ToastLevel };
-
-type BatteryLike = {
-  level: number;
-  charging: boolean;
-  addEventListener: (type: string, cb: () => void) => void;
-  removeEventListener: (type: string, cb: () => void) => void;
-};
 
 interface LTCSyncContextType {
   isRunning: boolean;
@@ -342,84 +334,9 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const tr = (key: string, vars?: Record<string, string | number>) => translate(key, lang, vars);
   useEffect(() => { langRef.current = lang; persistLang(lang); }, [lang]);
 
-  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
-  const [isCharging, setIsCharging] = useState(false);
-  const [batteryEta, setBatteryEta] = useState<number | null>(null);
-  const batterySamplesRef = useRef<BatterySample[]>([]);
+  const { batteryLevel, isCharging, batteryEta } = useBatteryMonitor(langRef);
   const [markerFlash, setMarkerFlash] = useState<{ tc: string; color: string; count: number } | null>(null);
   const markerFlashTimerRef = useRef<number | null>(null);
-
-  const prevLevelRef = useRef<number | null>(null);
-  const prevChargingRef = useRef<boolean | null>(null);
-
-  useEffect(() => {
-    const nav = navigator as Navigator & { getBattery?: () => Promise<BatteryLike> };
-    if (!nav.getBattery) return;
-    let batt: BatteryLike | null = null;
-    let cancelled = false;
-    const onLevel = () => {
-      if (!batt) return;
-      setBatteryLevel(batt.level);
-      setIsCharging(batt.charging);
-      
-      const p = prevLevelRef.current;
-      const c = batt.level;
-      if (p !== null && !batt.charging) {
-        if (p > 0.20 && c <= 0.20 && c > 0.10) {
-           toast(translate('toast.batteryLow', langRef.current, { level: Math.round(c * 100) }), { icon: '🔋', style: { background: '#f5a623', color: '#000' } });
-        } else if (p > 0.10 && c <= 0.10) {
-           toast.error(translate('toast.batteryCritical', langRef.current, { level: Math.round(c * 100) }));
-        }
-      }
-      prevLevelRef.current = c;
-      prevChargingRef.current = batt.charging;
-
-      if (batt.charging) {
-        batterySamplesRef.current = [];
-        setBatteryEta(null);
-        return;
-      }
-      const now = Date.now();
-      const buf = trimSamples([...batterySamplesRef.current, { level: batt.level, at: now }], now, 15 * 60_000);
-      batterySamplesRef.current = buf;
-      setBatteryEta(estimateMinutesRemaining(buf));
-    };
-    const onCharging = () => {
-      if (!batt) return;
-      setIsCharging(batt.charging);
-      
-      const p = prevChargingRef.current;
-      const c = batt.charging;
-      if (p !== null && p !== c) {
-        if (c) {
-          toast.success(translate('toast.chargingStarted', langRef.current));
-        } else {
-          toast(translate('toast.chargingStopped', langRef.current), { icon: '🔋' });
-        }
-      }
-      prevChargingRef.current = c;
-
-      if (batt.charging) {
-        batterySamplesRef.current = [];
-        setBatteryEta(null);
-      }
-    };
-    nav.getBattery().then((b) => {
-      if (cancelled) return;
-      batt = b;
-      setBatteryLevel(b.level);
-      setIsCharging(b.charging);
-      b.addEventListener('levelchange', onLevel);
-      b.addEventListener('chargingchange', onCharging);
-    }).catch(() => { /* battery info unavailable */ });
-    return () => {
-      cancelled = true;
-      if (batt) {
-        batt.removeEventListener('levelchange', onLevel);
-        batt.removeEventListener('chargingchange', onCharging);
-      }
-    };
-  }, []);
 
   useEffect(() => () => {
     if (markerFlashTimerRef.current !== null) clearTimeout(markerFlashTimerRef.current);
