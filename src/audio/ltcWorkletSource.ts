@@ -164,5 +164,9 @@ export const LTC_WORKLET_SOURCE = `
           return true;
         }
       }
-      registerProcessor('ltc-processor', LtcProcessor);
+      try {
+        registerProcessor('ltc-processor', LtcProcessor);
+      } catch (e) {
+        // Already registered
+      }
     `;

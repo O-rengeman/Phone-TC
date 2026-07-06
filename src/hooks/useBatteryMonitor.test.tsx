@@ -84,7 +84,7 @@ describe('useBatteryMonitor', () => {
   it('toasts a low-battery warning when level crosses below 20%% while discharging', async () => {
     fakeBattery = new FakeBattery(0.25, false);
     (navigator as unknown as { getBattery: () => Promise<FakeBattery> }).getBattery = () => Promise.resolve(fakeBattery);
-    const { result } = renderHook(() => useBatteryMonitor(testLangRef));
+    renderHook(() => useBatteryMonitor(testLangRef));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 
     act(() => fakeBattery.setLevel(0.18));
@@ -94,7 +94,7 @@ describe('useBatteryMonitor', () => {
   it('toasts a critical-battery error when level crosses below 10%%', async () => {
     fakeBattery = new FakeBattery(0.15, false);
     (navigator as unknown as { getBattery: () => Promise<FakeBattery> }).getBattery = () => Promise.resolve(fakeBattery);
-    const { result } = renderHook(() => useBatteryMonitor(testLangRef));
+    renderHook(() => useBatteryMonitor(testLangRef));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 
     act(() => fakeBattery.setLevel(0.08));
@@ -104,7 +104,7 @@ describe('useBatteryMonitor', () => {
   it('does not toast low/critical battery warnings while charging', async () => {
     fakeBattery = new FakeBattery(0.25, true);
     (navigator as unknown as { getBattery: () => Promise<FakeBattery> }).getBattery = () => Promise.resolve(fakeBattery);
-    const { result } = renderHook(() => useBatteryMonitor(testLangRef));
+    renderHook(() => useBatteryMonitor(testLangRef));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 
     act(() => fakeBattery.setLevel(0.05));
@@ -122,7 +122,7 @@ describe('useBatteryMonitor', () => {
   });
 
   it('toasts charging-started and charging-stopped on chargingchange transitions', async () => {
-    const { result } = renderHook(() => useBatteryMonitor(testLangRef));
+    renderHook(() => useBatteryMonitor(testLangRef));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 
     act(() => fakeBattery.setCharging(true));

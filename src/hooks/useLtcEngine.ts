@@ -156,15 +156,19 @@ export function useLtcEngine({
     const ctx = audioCtxRef.current;
     if (ctx.state === 'suspended') await ctx.resume();
 
-    const workletCode = LTC_WORKLET_SOURCE;
-    const blob = new Blob([workletCode], { type: 'application/javascript' });
-    const url = URL.createObjectURL(blob);
+    const customCtx = ctx as any;
+    if (!customCtx.__ltcWorkletAdded) {
+      const workletCode = LTC_WORKLET_SOURCE;
+      const blob = new Blob([workletCode], { type: 'application/javascript' });
+      const url = URL.createObjectURL(blob);
 
-    try {
-      await ctx.audioWorklet.addModule(url);
-    } catch (e) {
-      console.error('Worklet addition failed', e);
-      return;
+      try {
+        await ctx.audioWorklet.addModule(url);
+        customCtx.__ltcWorkletAdded = true;
+      } catch (e) {
+        console.error('Worklet addition failed', e);
+        return;
+      }
     }
 
     const currentTC = engineRef.current!.getTimecodeString().split(':').map(Number);
