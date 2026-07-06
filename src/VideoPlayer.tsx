@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { useLTC, FPS_OPTIONS } from "./LTCSyncContext";
+import { useLTC } from "./LTCSyncContext";
+import { FPS_OPTIONS } from "./constants";
 import { TimecodeNativeBridge } from "./utils/TimecodeNativeBridge";
 
 export function VideoPlayer() {
@@ -126,7 +127,7 @@ export function VideoPlayer() {
 
     rafId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(rafId);
-  }, [isRunning, isMobile, setSlateTime, setTallyTime, setDirectorTime, canvasRef, engineRef, currentTcRef, isVisualSlateRef, tallyOpenRef, directorTimeRef, directorPanelOpenRef]);
+  }, [isRunning, isMobile, setSlateTime, setTallyTime, setDirectorTime, canvasRef, engineRef, currentTcRef, isVisualSlateRef, slateTimeRef, tallyTimeRef, tallyOpenRef, directorTimeRef, directorPanelOpenRef]);
 
   return (
     <div className="timecode-card-pro" onClick={() => setIsVisualSlate(true)}>

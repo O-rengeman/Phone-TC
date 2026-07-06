@@ -1,4 +1,5 @@
-import { LTCSyncProvider, useLTC, FPS_OPTIONS, MARKER_HEX } from './LTCSyncContext';
+import { LTCSyncProvider, useLTC } from './LTCSyncContext';
+import { FPS_OPTIONS, MARKER_HEX } from './constants';
 import { VideoPlayer } from './VideoPlayer';
 import { ConnectionManager } from './ConnectionManager';
 import { QRCodeCanvas } from 'qrcode.react';

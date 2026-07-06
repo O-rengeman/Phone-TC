@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/purity, react-hooks/refs, react-hooks/exhaustive-deps, react-refresh/only-export-components, @typescript-eslint/no-explicit-any */
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import Timecode from 'smpte-timecode';
 import { Capacitor } from '@capacitor/core';
@@ -24,19 +23,7 @@ import type { Marker } from './utils/export';
 import { resolveTally, adoptTally } from './utils/tally';
 import type { TallyState, TallyPayload } from './utils/tally';
 import { LTC_WORKLET_SOURCE } from './audio/ltcWorkletSource';
-
-export const FPS_OPTIONS = [
-  { label: '23.976', value: 23.976, drop: false, fpsNum: 24000, fpsDen: 1001 },
-  { label: '24', value: 24, drop: false, fpsNum: 24000, fpsDen: 1000 },
-  { label: '25', value: 25, drop: false, fpsNum: 25000, fpsDen: 1000 },
-  { label: '29.97', value: 29.97, drop: false, fpsNum: 30000, fpsDen: 1001 },
-  { label: '29.97 DF', value: 29.97, drop: true, fpsNum: 30000, fpsDen: 1001 },
-  { label: '30', value: 30, drop: false, fpsNum: 30000, fpsDen: 1000 },
-];
-
-export const MARKER_HEX: Record<string, string> = {
-  Red: '#ff3b40', Blue: '#3b82f6', Green: '#22c55e', Yellow: '#f59e0b',
-};
+import { FPS_OPTIONS } from './constants';
 
 export type SyncMode = 'system' | 'network' | 'p2p' | 'freerun';
 export type ToastLevel = 'info' | 'warn' | 'error';
@@ -538,6 +525,10 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       fpsDen: FPS_OPTIONS[fpsIndex].fpsDen
     };
     engineRef.current = new LtcEngine(settings);
+    // Mount-only: builds the engine from the initial settings snapshot. Later
+    // changes to fps/volume/userBits/outputMode are pushed by dedicated
+    // effects elsewhere, not by re-running this one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -922,6 +913,10 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       setupP2PClient(joinId);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+    // Mount-only by design: re-running on every setupP2PClient identity
+    // change would re-trigger the auto-join whenever the function is
+    // recreated, not just once at startup.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -1007,7 +1002,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       clearInterval(interval);
       if (hbInterval) clearInterval(hbInterval);
     };
-  }, [isHost, p2pRole, fpsIndex, masterDrift, isRunning, tallyPayload]);
+  }, [isHost, p2pRole, fpsIndex, masterDrift, isRunning, tallyPayload, getUnshiftedTc]);
 
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -1070,6 +1065,8 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
   const beginStopHold = () => {
     if (stopHoldRafRef.current !== null) return;
+    // Invoked from a press-and-hold button handler, never during render.
+    // eslint-disable-next-line react-hooks/purity
     stopHoldStartRef.current = performance.now();
     const tick = () => {
       const pct = Math.min(100, ((performance.now() - stopHoldStartRef.current) / STOP_HOLD_MS) * 100);
@@ -1181,10 +1178,13 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
               fps: 0,
               isDropFrame: false,
               isRunning: false,
+              // Runs from the START button's async handler, not during render.
+              // eslint-disable-next-line react-hooks/purity
               clientTimestamp: performance.now()
             };
             peerSyncRef.current.broadcast(msg);
           }
+          // eslint-disable-next-line react-hooks/purity
           lastSyncTimeRef.current = Date.now();
         } else if (engineRef.current) {
           if (syncMode === 'freerun' || (syncMode === 'p2p' && p2pRole === 'master' && p2pSyncSource === 'manual')) {
@@ -1386,6 +1386,12 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     try { localStorage.setItem('ltc-camera-labels', JSON.stringify(cameraLabels)); } catch { /* ignore */ }
   }, [cameraLabels]);
 
+  // Reads a ref during render: lastHeartbeatTimeRef itself doesn't trigger a
+  // re-render when it changes, so this value's freshness currently relies on
+  // the frequent (~10Hz) heartbeat/report state updates elsewhere causing the
+  // provider to re-render anyway. Tracked for a proper state-based fix as
+  // part of the useTallyControl extraction (see task list).
+  // eslint-disable-next-line react-hooks/refs
   const isTallyConnected = p2pRole === 'client' && (nowTick - lastHeartbeatTimeRef.current < 3000);
   const tallyState = resolveTally(tallyPayload, peerId, {
     connected: isTallyConnected,
@@ -1594,6 +1600,10 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Co-exporting this hook alongside LTCSyncProvider is the standard
+// Context+Provider+hook pattern; splitting it into its own file would only
+// relocate the "non-component export" fast-refresh limitation, not remove it.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useLTC() {
   const context = useContext(LTCSyncContext);
   if (!context) {
