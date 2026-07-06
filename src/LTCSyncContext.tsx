@@ -23,6 +23,7 @@ import { FPS_OPTIONS } from './constants';
 import { useBatteryMonitor } from './hooks/useBatteryMonitor';
 import { useWakeLock } from './hooks/useWakeLock';
 import { useMarkers } from './hooks/useMarkers';
+import { useNetworkSync } from './hooks/useNetworkSync';
 
 export type SyncMode = 'system' | 'network' | 'p2p' | 'freerun';
 export type ToastLevel = 'info' | 'warn' | 'error';
@@ -168,7 +169,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     try { const saved = localStorage.getItem('ltc-vol'); return saved ? parseFloat(saved) : 0.5; } catch { return 0.5; }
   });
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [syncStatus, setSyncStatus] = useState<{ offset: number; latency: number } | null>(null);
   const [syncMode, setSyncMode] = useState<SyncMode>('network');
   const [isPreparing, setIsPreparing] = useState(false);
   const [manualTimecode, setManualTimecode] = useState('00:00:00:00');
@@ -240,7 +240,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const rttHistoryRef = useRef<number[]>([]);
   const lastNetworkOffsetRef = useRef<number | null>(null);
   const driftMonitorRef = useRef<DriftMonitor>(new DriftMonitor());
-  const [driftStatus, setDriftStatus] = useState<DriftStatus | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [stopHoldPct, setStopHoldPct] = useState(0);
   const [showGuide, setShowGuide] = useState(false);
@@ -305,7 +304,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   });
   const [tallyActionLog, setTallyActionLog] = useState<{time: string; cam: string; state: string}[]>([]);
 
-  const [isResyncing, setIsResyncing] = useState(false);
   const [lang, setLang] = useState<Lang>(() => getInitialLang());
   const langRef = useRef<Lang>(lang);
   
@@ -475,6 +473,15 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       engine.setManualTimecode(corrected);
     }
   }, [isRunning, outputOffset, fpsIndex]);
+
+  const {
+    syncStatus, setSyncStatus, driftStatus, setDriftStatus,
+    isResyncing, handleManualResync,
+  } = useNetworkSync({
+    syncMode, isRunning, p2pRole, fpsIndex, outputOffset,
+    engineRef, driftMonitorRef, lastNetworkOffsetRef,
+    applySyncToWorklet, langRef, addToast,
+  });
 
   const messageHandlerRef = useRef<(msg: SyncMessage) => void>(null);
 
@@ -814,45 +821,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   // useVuMeter() + <VuMeter>, consuming analyserRef directly, so its ~60Hz
   // state updates don't force this whole context's consumers to re-render.
 
-  useEffect(() => {
-    if (syncMode !== 'network' || !isRunning) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const result = await TimeSync.sync(1);
-        setSyncStatus(result);
-        driftMonitorRef.current.addSync(result.offset);
-        const engine = engineRef.current;
-        if (!engine || p2pRole === 'master') return;
-
-        const lastOffset = lastNetworkOffsetRef.current;
-        const offsetDelta = lastOffset !== null ? Math.abs(result.offset - lastOffset) : Infinity;
-        const targetTc = engine.getTimecodeForOffset(result.offset);
-        const driftSec = engine.getDiffSeconds(targetTc);
-        const shouldCorrect = offsetDelta >= 33 || driftSec >= 0.033;
-
-        if (shouldCorrect) {
-          applySyncToWorklet(targetTc, 0, true);
-          engine.syncWithOffset(result.offset);
-          lastNetworkOffsetRef.current = result.offset;
-        }
-      } catch (e) {
-        console.warn('Background sync failed', e);
-      }
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [syncMode, isRunning, p2pRole, applySyncToWorklet]);
-
-  useEffect(() => {
-    if (syncMode !== 'network' || !isRunning) return;
-    const fps = FPS_OPTIONS[fpsIndex].value;
-    const tick = () => setDriftStatus(driftMonitorRef.current.getStatus(fps));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [syncMode, isRunning, fpsIndex]);
-
   const STOP_HOLD_MS = 700;
 
   const cancelStopHold = () => {
@@ -887,30 +855,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => () => {
     if (stopHoldRafRef.current !== null) cancelAnimationFrame(stopHoldRafRef.current);
   }, []);
-
-  const handleManualResync = async () => {
-    if (syncMode !== 'network') return;
-    setIsResyncing(true);
-    try {
-      const result = await TimeSync.sync();
-      setSyncStatus(result);
-      driftMonitorRef.current.addSync(result.offset);
-      const engine = engineRef.current;
-      if (engine && p2pRole !== 'master') {
-        const frameMs = 1000 / FPS_OPTIONS[fpsIndex].value;
-        engine.syncWithOffset(result.offset + (outputOffset * frameMs));
-        lastNetworkOffsetRef.current = result.offset;
-        if (isRunning) {
-          applySyncToWorklet(engine.getTimecodeForOffset(result.offset), 0, true);
-        }
-      }
-      addToast(translate('toast.resynced', langRef.current), 'info');
-    } catch {
-      addToast(translate('toast.resyncFailed', langRef.current), 'error');
-    } finally {
-      setIsResyncing(false);
-    }
-  };
 
   const handleStartStop = async () => {
     if (isRunning) {
