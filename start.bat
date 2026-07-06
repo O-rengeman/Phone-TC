@@ -1,33 +1,31 @@
 @echo off
-chcp 65001 > nul
 title Phone-TC Local Dev Server
 
 echo ===================================================
-echo  Phone-TC ローカル開発サーバー起動スクリプト
+echo  Phone-TC Local Development Server Start Script
 echo ===================================================
 echo.
 
-:: プロジェクトディレクトリへ移動
+:: Go to project directory
 cd /d "C:\Users\ababg\Documents\antigravity\Phone-TC-main"
 
-:: node_modules が存在しない場合は npm install を実行
+:: Install dependencies if node_modules does not exist
 if not exist "node_modules\" (
-    echo [INFO] node_modules が見つかりません。依存関係をインストールしています...
+    echo [INFO] node_modules not found. Installing dependencies...
     call npm install
     if %errorlevel% neq 0 (
-        echo [ERROR] npm install に失敗しました。
+        echo [ERROR] npm install failed.
         pause
         exit /b 1
     )
 )
 
 echo.
-echo [INFO] 開発サーバーを起動します...
-echo サーバー起動後、ブラウザで https://localhost:5173 にアクセスしてください。
-echo (※ @vitejs/plugin-basic-ssl が有効なため、https:// になります)
+echo [INFO] Starting development server...
+echo Please access: https://localhost:5173
 echo.
 
-:: 開発サーバーを起動
+:: Run development server
 call npm run dev
 
 pause
