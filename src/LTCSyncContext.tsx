@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import Timecode from 'smpte-timecode';
-import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 
@@ -15,7 +14,7 @@ import type { Lang } from './utils/i18n';
 import toast from 'react-hot-toast';
 import type { DriftStatus } from './utils/DriftMonitor';
 import type { Marker } from './utils/export';
-import { resolveTally, adoptTally } from './utils/tally';
+import { adoptTally } from './utils/tally';
 import type { TallyState, TallyPayload } from './utils/tally';
 import { LTC_WORKLET_SOURCE } from './audio/ltcWorkletSource';
 import { FPS_OPTIONS } from './constants';
@@ -24,6 +23,7 @@ import { useWakeLock } from './hooks/useWakeLock';
 import { useMarkers } from './hooks/useMarkers';
 import { useNetworkSync } from './hooks/useNetworkSync';
 import { useP2P } from './hooks/useP2P';
+import { useTallyControl } from './hooks/useTallyControl';
 
 export type SyncMode = 'system' | 'network' | 'p2p' | 'freerun';
 export type ToastLevel = 'info' | 'warn' | 'error';
@@ -238,53 +238,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [stopHoldPct, setStopHoldPct] = useState(0);
   const [showGuide, setShowGuide] = useState(false);
   
-  const [tallyOpen, setTallyOpen] = useState(false);
-  const [tallyMode, setTallyMode] = useState<'auto' | 'manual'>('auto');
-  const [tallyTorchEnabled, setTallyTorchEnabled] = useState(false);
-  const videoTrackRef = useRef<MediaStreamTrack | null>(null);
-  const [manualTally, setManualTally] = useState<TallyState>('off');
-  const [tallyPayload, setTallyPayload] = useState<TallyPayload | null>(null);
-  const tallyRevRef = useRef<number>(0);
-  const [tallyTime, setTallyTime] = useState<string>('00:00:00:00');
-  const tallyTimeRef = useRef<string>(tallyTime);
-  const tallyOpenRef = useRef<boolean>(tallyOpen);
-  const tallyControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [tallyDimmerOpacity, setTallyDimmerOpacity] = useState(0);
-  const [tallyTcSize, setTallyTcSize] = useState<'sm' | 'md' | 'lg'>(() => {
-    try {
-      const saved = localStorage.getItem('ltc-tally-tc-size');
-      return (saved === 'sm' || saved === 'md' || saved === 'lg') ? saved : 'md';
-    } catch { return 'md'; }
-  });
-
-  const playHapticFeedback = () => {
-    try {
-      if (navigator.vibrate) {
-        navigator.vibrate(30);
-      }
-      const AudioCtx = window.AudioContext
-        || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      const audioCtx = new AudioCtx();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.frequency.value = 850;
-      gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.05);
-      osc.start(audioCtx.currentTime);
-      osc.stop(audioCtx.currentTime + 0.05);
-    } catch {
-      // Ignore haptic audio errors on auto-play policy
-    }
-  };
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('ltc-tally-tc-size', tallyTcSize);
-    } catch { /* ignore */ }
-  }, [tallyTcSize]);
-  
   const [directorPanelOpen, setDirectorPanelOpen] = useState(false);
   const [directorTime, setDirectorTime] = useState<string>('00:00:00:00');
   const directorTimeRef = useRef<string>(directorTime);
@@ -295,21 +248,10 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       return saved ? JSON.parse(saved) : {};
     } catch { return {}; }
   });
-  const [tallyActionLog, setTallyActionLog] = useState<{time: string; cam: string; state: string}[]>([]);
 
   const [lang, setLang] = useState<Lang>(() => getInitialLang());
   const langRef = useRef<Lang>(lang);
   
-  useEffect(() => {
-    tallyOpenRef.current = tallyOpen;
-    if (!tallyOpen) {
-      if (tallyControlsTimerRef.current) {
-        clearTimeout(tallyControlsTimerRef.current);
-        tallyControlsTimerRef.current = null;
-      }
-    }
-  }, [tallyOpen]);
-
   useEffect(() => {
     directorPanelOpenRef.current = directorPanelOpen;
   }, [directorPanelOpen]);
@@ -357,6 +299,19 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     peerSyncRef, messageHandlerRef, rttHistoryRef, lastSyncTimeRef, lastHeartbeatTimeRef,
     resetP2P, setupP2PMaster, setupP2PClient, joinSession,
   } = useP2P({ syncMode, setSyncMode, p2pRole, setP2pRole, isRunning, langRef, addToast });
+
+  const {
+    tallyOpen, setTallyOpen, tallyMode, setTallyMode, tallyTorchEnabled, setTallyTorchEnabled,
+    manualTally, tallyPayload, setTallyPayload, tallyTime, setTallyTime,
+    tallyDimmerOpacity, setTallyDimmerOpacity, tallyTcSize, setTallyTcSize, tallyActionLog,
+    tallyTimeRef, tallyOpenRef,
+    isTallyConnected, tallyState,
+    playHapticFeedback, handleManualTallyChange, handleClientTallyChange, handleAllTallyChange,
+    handleDimmerCycle, handleTorchToggle, handleTallyExit,
+  } = useTallyControl({
+    isHost, isRunning, p2pRole, peerId, peerSyncRef, lastHeartbeatTimeRef,
+    nowTick, cameraLabels, currentTcRef,
+  });
 
   useEffect(() => {
     if (!isHost) return;
@@ -960,172 +915,9 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleManualTallyChange = (s: TallyState) => {
-    setManualTally(s);
-    if (isHost) {
-      tallyRevRef.current += 1;
-      const newPayload: TallyPayload = {
-        rev: tallyRevRef.current,
-        all: s,
-        assignments: {}
-      };
-      setTallyPayload(newPayload);
-      peerSyncRef.current?.broadcast({
-        type: 'tally',
-        masterTimecode: '',
-        masterTimestamp: 0,
-        fps: 0,
-        isDropFrame: false,
-        isRunning: false,
-        tally: newPayload
-      });
-    }
-  };
-
-  const handleClientTallyChange = (clientId: string, s: TallyState) => {
-    if (isHost) {
-      tallyRevRef.current += 1;
-      const newPayload: TallyPayload = {
-        rev: tallyRevRef.current,
-        all: tallyPayload?.all ?? manualTally,
-        assignments: {
-          ...tallyPayload?.assignments,
-          [clientId]: s
-        }
-      };
-      setTallyPayload(newPayload);
-      peerSyncRef.current?.broadcast({
-        type: 'tally',
-        masterTimecode: '',
-        masterTimestamp: 0,
-        fps: 0,
-        isDropFrame: false,
-        isRunning: false,
-        tally: newPayload
-      });
-      const camLabel = cameraLabels[clientId] || clientId.slice(0, 6);
-      const stateKey = s === 'standby' ? 'preview' : s;
-      const tc = currentTcRef.current;
-      setTallyActionLog(prev => [{ time: tc, cam: camLabel, state: stateKey }, ...prev].slice(0, 10));
-    }
-  };
-
   useEffect(() => {
     try { localStorage.setItem('ltc-camera-labels', JSON.stringify(cameraLabels)); } catch { /* ignore */ }
   }, [cameraLabels]);
-
-  // Reads a ref during render: lastHeartbeatTimeRef itself doesn't trigger a
-  // re-render when it changes, so this value's freshness currently relies on
-  // the frequent (~10Hz) heartbeat/report state updates elsewhere causing the
-  // provider to re-render anyway. Tracked for a proper state-based fix as
-  // part of the useTallyControl extraction (see task list).
-  // eslint-disable-next-line react-hooks/refs
-  const isTallyConnected = p2pRole === 'client' && (nowTick - lastHeartbeatTimeRef.current < 3000);
-  const tallyState = resolveTally(tallyPayload, peerId, {
-    connected: isTallyConnected,
-    autoMode: tallyMode === 'auto',
-    selfIsRunning: isRunning,
-    manualState: manualTally,
-  });
-
-  useEffect(() => {
-    if (isHost && tallyMode === 'auto') {
-      const stateToBroadcast = isRunning ? 'live' : 'standby';
-      if (tallyPayload?.all !== stateToBroadcast) {
-        tallyRevRef.current += 1;
-        const newPayload: TallyPayload = {
-          rev: tallyRevRef.current,
-          all: stateToBroadcast,
-          assignments: {}
-        };
-        setTallyPayload(newPayload);
-        peerSyncRef.current?.broadcast({
-          type: 'tally',
-          masterTimecode: '',
-          masterTimestamp: 0,
-          fps: 0,
-          isDropFrame: false,
-          isRunning: isRunning,
-          tally: newPayload
-        });
-      }
-    }
-  }, [isHost, tallyMode, isRunning, tallyPayload?.all, peerSyncRef]);
-
-  useEffect(() => {
-    const turnOn = tallyTorchEnabled && tallyState === 'live';
-    const applyTorch = async (on: boolean) => {
-      await TimecodeNativeBridge.setTorch(on);
-      const isNative = Capacitor.isNativePlatform();
-      if (!isNative) {
-        try {
-          if (on) {
-            if (!videoTrackRef.current) {
-              const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' }
-              });
-              videoTrackRef.current = stream.getVideoTracks()[0];
-            }
-            if (videoTrackRef.current) {
-              await videoTrackRef.current.applyConstraints({ advanced: [{ torch: true }] } as unknown as MediaTrackConstraints);
-            }
-          } else {
-            if (videoTrackRef.current) {
-              await videoTrackRef.current.applyConstraints({ advanced: [{ torch: false }] } as unknown as MediaTrackConstraints);
-              videoTrackRef.current.stop();
-              videoTrackRef.current = null;
-            }
-          }
-        } catch (e) {
-          console.warn('Web fallback torch failed:', e);
-        }
-      }
-    };
-    applyTorch(turnOn);
-    return () => {
-      if (turnOn) applyTorch(false);
-    };
-  }, [tallyState, tallyTorchEnabled]);
-
-  const handleDimmerCycle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setTallyDimmerOpacity(prev => {
-      if (prev === 0) return 0.5;
-      if (prev === 0.5) return 0.85;
-      return 0;
-    });
-  };
-
-  const handleTorchToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setTallyTorchEnabled(prev => !prev);
-  };
-
-  const handleTallyExit = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setTallyOpen(false);
-  };
-
-  const handleAllTallyChange = (s: TallyState) => {
-    if (!isHost) return;
-    tallyRevRef.current += 1;
-    const newPayload: TallyPayload = {
-      rev: tallyRevRef.current,
-      all: s,
-      assignments: {}
-    };
-    setTallyPayload(newPayload);
-    setManualTally(s);
-    peerSyncRef.current?.broadcast({
-      type: 'tally',
-      masterTimecode: '',
-      masterTimestamp: 0,
-      fps: 0,
-      isDropFrame: false,
-      isRunning: false,
-      tally: newPayload
-    });
-  };
 
   return (
     <LTCSyncContext.Provider value={{
