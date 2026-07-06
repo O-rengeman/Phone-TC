@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/purity, react-hooks/refs, react-hooks/exhaustive-deps, react-refresh/only-export-components, @typescript-eslint/no-explicit-any */
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import Timecode from 'smpte-timecode';
+import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
@@ -298,7 +299,9 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       if (navigator.vibrate) {
         navigator.vibrate(30);
       }
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioCtx = window.AudioContext
+        || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      const audioCtx = new AudioCtx();
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.connect(gain);
@@ -445,13 +448,13 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [nowTick, setNowTick] = useState(0);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const wakeLockRef = useRef<any>(null);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   useEffect(() => {
     if (isRunning && typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
-      (navigator as any).wakeLock.request('screen').then((lock: any) => {
+      navigator.wakeLock.request('screen').then((lock) => {
         wakeLockRef.current = lock;
-      }).catch((err: any) => console.warn('Wake Lock error', err));
+      }).catch((err: unknown) => console.warn('Wake Lock error', err));
     } else {
       if (wakeLockRef.current) {
         wakeLockRef.current.release().catch(() => {});
@@ -740,7 +743,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
   const backupMarkers = async (m: Marker[]) => {
     try {
-      if ((window as any).Capacitor?.isNative) {
+      if (Capacitor.isNativePlatform()) {
         await Filesystem.writeFile({
           path: 'ltc_sync_pro_backup.json',
           data: JSON.stringify(m, null, 2),
@@ -805,7 +808,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   };
 
   const exportFile = async (content: string, filename: string) => {
-    const isNative = typeof window !== 'undefined' && (window as any).Capacitor?.isNative;
+    const isNative = Capacitor.isNativePlatform();
     if (isNative) {
       try {
         await Filesystem.writeFile({
@@ -1419,7 +1422,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     const turnOn = tallyTorchEnabled && tallyState === 'live';
     const applyTorch = async (on: boolean) => {
       await TimecodeNativeBridge.setTorch(on);
-      const isNative = (window as any).Capacitor?.isNative;
+      const isNative = Capacitor.isNativePlatform();
       if (!isNative) {
         try {
           if (on) {
