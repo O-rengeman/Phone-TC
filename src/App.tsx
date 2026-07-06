@@ -8,6 +8,7 @@ import type { SyncMode } from './LTCSyncContext';
 import { formatSyncAge } from './utils/DriftMonitor';
 import { formatDuration } from './utils/battery';
 import { Toaster, toast } from 'react-hot-toast';
+import { VuMeter } from './components/VuMeter';
 import './App.css';
 
 function MainApp() {
@@ -78,8 +79,6 @@ function MainApp() {
     markerFlash,
     clients,
     nowTick,
-    vuLevel,
-    isClipping,
     sceneName,
     setSceneName,
     tr,
@@ -268,16 +267,7 @@ function MainApp() {
                 {outputMode === 'mono-l' && (
                   <div className="control-section vu-meter-container">
                     <label className="vu-label">MIC INPUT LEVEL {!isRunning && '(START TO MONITOR)'}</label>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
-                      <div className="vu-bar-track" style={{ flex: 1 }}>
-                        <div className="vu-bar-fill" style={{ width: `${Math.min(vuLevel * 120, 100)}%` }} />
-                      </div>
-                      {isClipping && (
-                        <span className="vu-clip-badge" style={{ background: '#ff3b30', color: '#fff', fontSize: '0.75rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '3px' }}>
-                          CLIP
-                        </span>
-                      )}
-                    </div>
+                    <VuMeter />
                   </div>
                 )}
               </>
@@ -516,16 +506,7 @@ function MainApp() {
                   {outputMode === 'mono-l' && (
                     <div className="tool-card span-2 vu-meter-container">
                       <label className="vu-label">MIC INPUT LEVEL {!isRunning && '(START TO MONITOR)'}</label>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
-                        <div className="vu-bar-track" style={{ flex: 1 }}>
-                          <div className="vu-bar-fill" style={{ width: `${Math.min(vuLevel * 120, 100)}%` }} />
-                        </div>
-                        {isClipping && (
-                          <span className="vu-clip-badge" style={{ background: '#ff3b30', color: '#fff', fontSize: '0.75rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '3px' }}>
-                            CLIP
-                          </span>
-                        )}
-                      </div>
+                      <VuMeter />
                     </div>
                   )}
                 </>

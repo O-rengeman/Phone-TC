@@ -129,8 +129,11 @@ interface LTCSyncContextType {
   clients: Record<string, { rtt: number; drift: number; lastSeen: number }>;
   packetLossRate: number;
   setPacketLossRate: React.Dispatch<React.SetStateAction<number>>;
-  vuLevel: number;
-  isClipping: boolean;
+  // The analyser is exposed as a ref (stable identity, no re-renders on
+  // .current writes) so VuMeter can read live audio data via its own RAF
+  // loop without threading ~60Hz vuLevel/isClipping state through this
+  // context — that would re-render every consumer on every animation frame.
+  analyserRef: React.RefObject<AnalyserNode | null>;
   sceneName: string;
   setSceneName: React.Dispatch<React.SetStateAction<string>>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -469,9 +472,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const lastSyncTimeRef = useRef<number>(0);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
-  const [vuLevel, setVuLevel] = useState(0);
-  const [isClipping, setIsClipping] = useState(false);
-  const clipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const addToast = (msg: string, level: ToastLevel = 'info') => {
     if (level === 'error') {
@@ -1012,42 +1012,9 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     }
   }, [packetLossRate]);
 
-  useEffect(() => {
-    if (!isRunning || outputMode !== 'mono-l') {
-      return;
-    }
-    let rafId: number;
-    const update = () => {
-      if (analyserRef.current) {
-        const data = new Float32Array(analyserRef.current.fftSize);
-        analyserRef.current.getFloatTimeDomainData(data);
-        let peak = 0;
-        for (let i = 0; i < data.length; i++) {
-          const abs = Math.abs(data[i]);
-          if (abs > peak) peak = abs;
-        }
-        setVuLevel(peak);
-        if (peak >= 0.95) {
-          setIsClipping(true);
-          if (clipTimeoutRef.current) clearTimeout(clipTimeoutRef.current);
-          clipTimeoutRef.current = setTimeout(() => {
-            setIsClipping(false);
-          }, 3000);
-        }
-      }
-      rafId = requestAnimationFrame(update);
-    };
-    rafId = requestAnimationFrame(update);
-    return () => {
-      cancelAnimationFrame(rafId);
-      setVuLevel(0);
-      setIsClipping(false);
-      if (clipTimeoutRef.current) {
-        clearTimeout(clipTimeoutRef.current);
-        clipTimeoutRef.current = null;
-      }
-    };
-  }, [isRunning, outputMode]);
+  // VU meter (peak level + clip detection for mono-L mic input) now lives in
+  // useVuMeter() + <VuMeter>, consuming analyserRef directly, so its ~60Hz
+  // state updates don't force this whole context's consumers to re-render.
 
   useEffect(() => {
     if (syncMode !== 'network' || !isRunning) return;
@@ -1331,7 +1298,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       micStreamRef.current.getTracks().forEach(t => t.stop());
       micStreamRef.current = null;
     }
-    setVuLevel(0);
     setIsRunning(false);
     driftMonitorRef.current.reset();
     setDriftStatus(null);
@@ -1578,8 +1544,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       masterDrift,
       clients,
       packetLossRate, setPacketLossRate,
-      vuLevel,
-      isClipping,
+      analyserRef,
       sceneName, setSceneName,
       nowTick,
       canvasRef,
