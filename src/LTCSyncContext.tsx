@@ -23,6 +23,7 @@ import type { TallyState, TallyPayload } from './utils/tally';
 import { LTC_WORKLET_SOURCE } from './audio/ltcWorkletSource';
 import { FPS_OPTIONS } from './constants';
 import { useBatteryMonitor } from './hooks/useBatteryMonitor';
+import { useWakeLock } from './hooks/useWakeLock';
 
 export type SyncMode = 'system' | 'network' | 'p2p' | 'freerun';
 export type ToastLevel = 'info' | 'warn' | 'error';
@@ -352,26 +353,8 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [nowTick, setNowTick] = useState(0);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  useWakeLock(isRunning);
 
-  useEffect(() => {
-    if (isRunning && typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
-      navigator.wakeLock.request('screen').then((lock) => {
-        wakeLockRef.current = lock;
-      }).catch((err: unknown) => console.warn('Wake Lock error', err));
-    } else {
-      if (wakeLockRef.current) {
-        wakeLockRef.current.release().catch(() => {});
-        wakeLockRef.current = null;
-      }
-    }
-    return () => {
-      if (wakeLockRef.current) {
-        wakeLockRef.current.release().catch(() => {});
-        wakeLockRef.current = null;
-      }
-    };
-  }, [isRunning]);
   const engineRef = useRef<LtcEngine | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const currentTcRef = useRef<string>('00:00:00:00');
