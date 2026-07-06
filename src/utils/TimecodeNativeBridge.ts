@@ -1,4 +1,4 @@
-import { registerPlugin } from '@capacitor/core';
+import { registerPlugin, Capacitor } from '@capacitor/core';
 
 export interface TimecodeNativeBridgePlugin {
   /** バックグラウンド動作に必要なオーディオセッション・サービスの初期化と有効化 */
@@ -17,12 +17,16 @@ export interface TimecodeNativeBridgePlugin {
   setTorch(options: { on: boolean }): Promise<void>;
 }
 
+const isNative = Capacitor.isNativePlatform();
+
 // Capacitor プラグインとしての登録を試みます
 let nativePlugin: TimecodeNativeBridgePlugin | null = null;
-try {
-  nativePlugin = registerPlugin<TimecodeNativeBridgePlugin>('TimecodeNativeBridge');
-} catch (e) {
-  console.warn('TimecodeNativeBridge plugin not registered in native build.', e);
+if (isNative) {
+  try {
+    nativePlugin = registerPlugin<TimecodeNativeBridgePlugin>('TimecodeNativeBridge');
+  } catch (e) {
+    console.warn('TimecodeNativeBridge plugin not registered in native build.', e);
+  }
 }
 
 /**
@@ -32,7 +36,7 @@ try {
  */
 export const TimecodeNativeBridge = {
   async startBackgroundMode(): Promise<void> {
-    if (nativePlugin) {
+    if (isNative && nativePlugin) {
       try {
         await nativePlugin.startBackgroundMode();
         console.log('[NativeBridge] Native startBackgroundMode invoked.');
@@ -45,7 +49,7 @@ export const TimecodeNativeBridge = {
   },
 
   async stopBackgroundMode(): Promise<void> {
-    if (nativePlugin) {
+    if (isNative && nativePlugin) {
       try {
         await nativePlugin.stopBackgroundMode();
         console.log('[NativeBridge] Native stopBackgroundMode invoked.');
@@ -58,7 +62,7 @@ export const TimecodeNativeBridge = {
   },
 
   async updatePlaybackStatus(isRunning: boolean, timecode: string): Promise<void> {
-    if (nativePlugin) {
+    if (isNative && nativePlugin) {
       try {
         await nativePlugin.updatePlaybackStatus({ isRunning, timecode });
         return;
@@ -73,7 +77,7 @@ export const TimecodeNativeBridge = {
   },
 
   async setTorch(on: boolean): Promise<void> {
-    if (nativePlugin) {
+    if (isNative && nativePlugin) {
       // Capacitor v3/v4+ conventions
       const plugin = nativePlugin as unknown as TimecodeNativeBridgePlugin;
       if (typeof plugin.setTorch === 'function') {
@@ -95,12 +99,14 @@ export const TimecodeNativeBridge = {
    * UI 警告のためにここで began/ended を通知します。ブラウザ環境では何もしません。
    */
   addInterruptionListener(callback: (state: 'began' | 'ended') => void): void {
-    const plugin = nativePlugin as unknown as
-      | { addListener?: (event: string, handler: () => void) => void }
-      | null;
-    if (plugin && typeof plugin.addListener === 'function') {
-      plugin.addListener('interruptionBegan', () => callback('began'));
-      plugin.addListener('interruptionEnded', () => callback('ended'));
+    if (isNative && nativePlugin) {
+      const plugin = nativePlugin as unknown as
+        | { addListener?: (event: string, handler: () => void) => void }
+        | null;
+      if (plugin && typeof plugin.addListener === 'function') {
+        plugin.addListener('interruptionBegan', () => callback('began'));
+        plugin.addListener('interruptionEnded', () => callback('ended'));
+      }
     }
   }
 };
