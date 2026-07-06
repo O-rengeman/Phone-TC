@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/purity, react-hooks/refs, react-hooks/exhaustive-deps, react-refresh/only-export-components, @typescript-eslint/no-explicit-any */
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import Timecode from 'smpte-timecode';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
@@ -84,6 +85,8 @@ interface LTCSyncContextType {
   setDefaultReelName: React.Dispatch<React.SetStateAction<string>>;
   outputLevel: 'mic' | 'line';
   setOutputLevel: React.Dispatch<React.SetStateAction<'mic' | 'line'>>;
+  outputOffset: number;
+  setOutputOffset: React.Dispatch<React.SetStateAction<number>>;
   peerId: string;
   targetId: string;
   setTargetId: React.Dispatch<React.SetStateAction<string>>;
@@ -233,6 +236,9 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [outputLevel, setOutputLevel] = useState<'mic' | 'line'>(() => {
     try { const saved = localStorage.getItem('ltc-outlevel'); return (saved === 'mic' || saved === 'line') ? saved : 'line'; } catch { return 'line'; }
   });
+  const [outputOffset, setOutputOffset] = useState(() => {
+    try { const saved = localStorage.getItem('ltc-out-offset'); return saved ? parseInt(saved, 10) : 0; } catch { return 0; }
+  });
 
   useEffect(() => {
     try {
@@ -247,18 +253,9 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('ltc-outmode', outputMode);
       localStorage.setItem('ltc-outlevel', outputLevel);
       localStorage.setItem('ltc-autoub', autoUserBits.toString());
+      localStorage.setItem('ltc-out-offset', outputOffset.toString());
     } catch { /* ignore */ }
-  }, [fpsIndex, volume, outputMode, outputLevel, autoUserBits]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const joinId = params.get('join');
-    if (joinId) {
-      setupP2PClient(joinId);
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fpsIndex, volume, outputMode, outputLevel, autoUserBits, outputOffset]);
 
   // P2P States
   const [peerId, setPeerId] = useState<string>('');
@@ -538,7 +535,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       fpsDen: FPS_OPTIONS[fpsIndex].fpsDen
     };
     engineRef.current = new LtcEngine(settings);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -566,7 +562,18 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const applySyncToWorklet = useCallback((masterTcStr: string, oneWayLatencyMs: number, isMasterRunning: boolean) => {
     const engine = engineRef.current;
     if (!engine) return;
-    const corrected = engine.getCorrectedTc(masterTcStr, oneWayLatencyMs, isMasterRunning);
+    let corrected = engine.getCorrectedTc(masterTcStr, oneWayLatencyMs, isMasterRunning);
+    
+    if (outputOffset !== 0) {
+      try {
+        const tc = Timecode(corrected, FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
+        tc.add(outputOffset);
+        corrected = tc.toString();
+      } catch (e) {
+        console.warn('Failed to apply output offset:', e);
+      }
+    }
+
     const node = workletNodeRef.current;
     if (isRunning && node) {
       const diff = engine.getDiffSeconds(corrected);
@@ -582,9 +589,18 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     } else {
       engine.setManualTimecode(corrected);
     }
-  }, [isRunning]);
+  }, [isRunning, outputOffset, fpsIndex]);
 
   const messageHandlerRef = useRef<(msg: SyncMessage) => void>(null);
+
+  const getUnshiftedTc = useCallback((tcStr: string) => {
+    if (outputOffset === 0) return tcStr;
+    try {
+      const tc = Timecode(tcStr, FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
+      tc.add(-outputOffset);
+      return tc.toString();
+    } catch { return tcStr; }
+  }, [outputOffset, fpsIndex]);
 
   useEffect(() => {
     messageHandlerRef.current = (msg: SyncMessage) => {
@@ -592,7 +608,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
         if (msg.type === 'sync-request' && isHost) {
           const response: SyncMessage = {
             type: 'sync-response',
-            masterTimecode: isRunning ? currentTcRef.current : engineRef.current.getTimecodeString(),
+            masterTimecode: getUnshiftedTc(isRunning ? currentTcRef.current : engineRef.current.getTimecodeString()),
             masterTimestamp: performance.now(),
             fps: FPS_OPTIONS[fpsIndex].value,
             isDropFrame: FPS_OPTIONS[fpsIndex].drop,
@@ -828,8 +844,9 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
   const handleSlateClick = () => {
     setIsSlateFlashing(true);
-    beep(1000, 0.1);
-    setTimeout(() => setIsSlateFlashing(false), 150);
+    const beepDuration = 1 / FPS_OPTIONS[fpsIndex].value;
+    beep(1000, beepDuration);
+    setTimeout(() => setIsSlateFlashing(false), Math.max(150, beepDuration * 1000 + 20));
   };
 
   const resetP2P = () => {
@@ -888,6 +905,21 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       addToast(translate('toast.p2pClientFailed', langRef.current), 'error');
     }
   };
+
+  // Auto-join a P2P session if a `?join=<id>` query param is present at mount.
+  // Placed after setupP2PClient's declaration so the reference is not used
+  // before it is textually assigned (react-hooks/immutability).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const joinId = params.get('join');
+    if (joinId) {
+      // One-time mount action equivalent to a user clicking "join" — not a
+      // reactive state sync, so the resulting setState calls are intentional.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setupP2PClient(joinId);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   useEffect(() => {
     if (engineRef.current && p2pRole === 'master' && !isRunning && !isPaused) {
@@ -958,7 +990,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       hbInterval = setInterval(() => {
         peerSyncRef.current?.broadcast({
           type: 'heartbeat',
-          masterTimecode: isRunning ? currentTcRef.current : engineRef.current!.getTimecodeString(),
+          masterTimecode: getUnshiftedTc(isRunning ? currentTcRef.current : engineRef.current!.getTimecodeString()),
           masterTimestamp: Date.now(),
           fps: FPS_OPTIONS[fpsIndex].value,
           isDropFrame: FPS_OPTIONS[fpsIndex].drop,
@@ -1098,7 +1130,8 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       driftMonitorRef.current.addSync(result.offset);
       const engine = engineRef.current;
       if (engine && p2pRole !== 'master') {
-        engine.syncWithOffset(result.offset);
+        const frameMs = 1000 / FPS_OPTIONS[fpsIndex].value;
+        engine.syncWithOffset(result.offset + (outputOffset * frameMs));
         lastNetworkOffsetRef.current = result.offset;
         if (isRunning) {
           applySyncToWorklet(engine.getTimecodeForOffset(result.offset), 0, true);
@@ -1185,9 +1218,16 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
           lastSyncTimeRef.current = Date.now();
         } else if (engineRef.current) {
           if (syncMode === 'freerun' || (syncMode === 'p2p' && p2pRole === 'master' && p2pSyncSource === 'manual')) {
-            engineRef.current.setManualTimecode(manualTimecode);
+            try {
+              const tc = Timecode(manualTimecode, FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
+              if (outputOffset !== 0) tc.add(outputOffset);
+              engineRef.current.setManualTimecode(tc.toString());
+            } catch {
+              engineRef.current.setManualTimecode(manualTimecode);
+            }
           } else {
-            engineRef.current.syncWithOffset(offset);
+            const frameMs = 1000 / FPS_OPTIONS[fpsIndex].value;
+            engineRef.current.syncWithOffset(offset + (outputOffset * frameMs));
           }
         }
       }
@@ -1297,11 +1337,19 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     setDriftStatus(null);
     if (reset && engineRef.current) {
       if (syncMode === 'freerun') {
-        engineRef.current.setManualTimecode(manualTimecode);
+        try {
+          const tc = Timecode(manualTimecode, FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
+          if (outputOffset !== 0) tc.add(outputOffset);
+          engineRef.current.setManualTimecode(tc.toString());
+        } catch {
+          engineRef.current.setManualTimecode(manualTimecode);
+        }
       } else if (syncMode === 'network' && lastNetworkOffsetRef.current !== null) {
-        engineRef.current.syncWithOffset(lastNetworkOffsetRef.current);
+        const frameMs = 1000 / FPS_OPTIONS[fpsIndex].value;
+        engineRef.current.syncWithOffset(lastNetworkOffsetRef.current + (outputOffset * frameMs));
       } else {
-        engineRef.current.resetToSystemTime();
+        const frameMs = 1000 / FPS_OPTIONS[fpsIndex].value;
+        engineRef.current.syncWithOffset(outputOffset * frameMs);
       }
       currentTcRef.current = engineRef.current.getTimecodeString();
     }
@@ -1499,6 +1547,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       markers, setMarkers,
       defaultReelName, setDefaultReelName,
       outputLevel, setOutputLevel,
+      outputOffset, setOutputOffset,
       peerId,
       targetId, setTargetId,
       p2pStatus,

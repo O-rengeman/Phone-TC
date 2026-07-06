@@ -42,6 +42,8 @@ function MainApp() {
     setDefaultReelName,
     outputLevel,
     setOutputLevel,
+    outputOffset,
+    setOutputOffset,
     peerId,
     isHost,
     driftStatus,
@@ -255,6 +257,14 @@ function MainApp() {
                     <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')}>L-TC / R-AUDIO</button>
                   </div>
                 </div>
+
+                <div className="control-section">
+                  <label className="section-label">TC OFFSET (FRAMES)</label>
+                  <div className="offset-control" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} style={{ flex: 1 }} disabled={isRunning} />
+                    <span style={{ minWidth: '40px', textAlign: 'right', fontWeight: 'bold' }}>{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
+                  </div>
+                </div>
                 {outputMode === 'mono-l' && (
                   <div className="control-section vu-meter-container">
                     <label className="vu-label">MIC INPUT LEVEL {!isRunning && '(START TO MONITOR)'}</label>
@@ -328,6 +338,9 @@ function MainApp() {
             {!isMobile && (
               <div className="control-section">
                 <label className="section-label">{tr('label.frameRate')}</label>
+                <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '8px' }}>
+                  59.94p 撮影時は 29.97 を、50p 撮影時は 25 を選択してください。
+                </div>
                 <div className="fps-grid-compact">
                   {FPS_OPTIONS.map((opt, i) => (
                     <button 
@@ -450,7 +463,7 @@ function MainApp() {
               <div className="tool-card span-2">
                 <label>{tr('label.userBits')}</label>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <input value={userBits} onChange={e => setUserBits(e.target.value.toUpperCase())} maxLength={8} disabled={autoUserBits} />
+                  <input value={userBits} onChange={e => setUserBits(e.target.value.toUpperCase().replace(/[^0-9A-F]/g, ''))} maxLength={8} disabled={autoUserBits} />
                   <button className={`btn-pill ${autoUserBits ? 'active' : ''}`} onClick={() => setAutoUserBits(!autoUserBits)}>{tr('btn.auto')}</button>
                 </div>
               </div>
@@ -490,6 +503,14 @@ function MainApp() {
                     <div className="sync-toggle-pro">
                       <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')}>STEREO TC</button>
                       <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')}>L-TC / R-AUDIO</button>
+                    </div>
+                  </div>
+
+                  <div className="tool-card span-2">
+                    <label className="section-label">TC OFFSET (FRAMES)</label>
+                    <div className="offset-control" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} style={{ flex: 1 }} disabled={isRunning} />
+                      <span style={{ minWidth: '40px', textAlign: 'right', fontWeight: 'bold' }}>{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
                     </div>
                   </div>
                   {outputMode === 'mono-l' && (
