@@ -14,5 +14,12 @@
 2. **Gitへのコミット**
    - 作成および修正した `start.bat` を Git に追加し、コミットを行いました。
 
+3. **Webブラウザ上でのCapacitorプラグイン例外の抑制**
+   - ファイル: [TimecodeNativeBridge.ts](file:///c:/Users/ababg/Documents/antigravity/Phone-TC-main/src/utils/TimecodeNativeBridge.ts)
+   - 変更点:
+     - Web環境（ブラウザ環境）で `TimecodeNativeBridge.updatePlaybackStatus` が毎フレーム呼び出される際、ネイティブプラグインの実行を試みて `CapacitorException` 例外が大量に発生する問題を修正。
+     - `Capacitor.isNativePlatform()` を用いて、iOS/Androidなどのネイティブ環境でのみプラグインの処理を実行し、ブラウザ（Web）環境では最初からプラグイン呼び出しをスキップしてシミュレーション（フォールバック）のみを動作させるガードを追加しました。
+
 ## テスト結果
 - 初期作成時に日本語のコメント・メッセージが含まれていたため文字化けによるエラーが発生しましたが、すべて半角英数字（ASCII）に修正したことでパースエラーが解消され、正しく動作する状態になりました。
+- Webブラウザでの動作時に、コンソールへ `CapacitorException` の例外ログが大量出力（スパム）される問題が解決され、コンソールログが正常に制御されることを確認しました。
