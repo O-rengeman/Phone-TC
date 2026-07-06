@@ -1,73 +1,64 @@
-# React + TypeScript + Vite
+# LTC SYNC PRO
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A Capacitor + React + TypeScript app that generates SMPTE LTC (Linear Timecode) audio
+directly from a phone's headphone/line output, and keeps multiple devices in sync via
+NTP time servers or a peer-to-peer (PeerJS) connection. Built for multi-camera film/video
+shoots where a hardware timecode generator isn't available.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- SMPTE LTC audio generation via `AudioWorklet` (23.976 / 24 / 25 / 29.97 / 29.97 DF / 30 fps,
+  drop-frame support, SMPTE 12M biphase-mark polarity correction bit)
+- Time sync via NTP-style time servers, or direct device-to-device P2P (PeerJS)
+- Tally system: a P2P master can drive per-camera or all-camera tally state on clients,
+  including native torch (flashlight) control
+- Take/marker logging with scene, take, and comment fields; EDL and ALE export
+- Battery monitoring, wake lock, and native background-audio support (iOS/Android via
+  Capacitor plugins)
 
-## React Compiler
+## Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React 19 + TypeScript, built with Vite
+- Capacitor 8 for iOS/Android native shells (`@capacitor/status-bar`,
+  `@capacitor/screen-orientation`, `@capacitor/filesystem`, `@capacitor/preferences`,
+  plus a custom `TimecodeNativeBridge` plugin for background audio, lock-screen
+  timecode display, and torch control)
+- `smpte-timecode` for timecode math, `peerjs` for P2P sync
+- Vitest + jsdom for unit tests, ESLint (flat config) for linting
 
-## Expanding the ESLint configuration
+## Development
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev        # start the Vite dev server
+npm run lint        # eslint .
+npm run test        # vitest (watch mode)
+npm run test:cov    # vitest run --coverage (80% threshold on src/utils/**)
+npm run build        # tsc -b && vite build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+CI (`.github/workflows/ci.yml`) runs `lint` → `test:cov` → `build` on every push/PR.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Native builds
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+This is a Capacitor project — after building the web bundle, sync and open the native
+project as usual:
+
+```bash
+npm run build
+npx cap sync
+npx cap open ios       # or: npx cap open android
 ```
+
+The native layer provides background audio (so LTC keeps playing when the screen locks
+or the app backgrounds), lock-screen timecode display, and torch control for tally. See
+[docs/BACKGROUND_DESIGN.md](docs/BACKGROUND_DESIGN.md) for the background-mode
+architecture.
+
+## Design docs
+
+- [docs/BACKGROUND_DESIGN.md](docs/BACKGROUND_DESIGN.md) — background audio / native
+  bridge architecture (iOS `AVAudioSession`, Android foreground service)
+- [docs/TALLY_DESIGN.md](docs/TALLY_DESIGN.md) — tally state machine and P2P message flow
+- [docs/TALLY_PLAN.md](docs/TALLY_PLAN.md) — tally feature implementation roadmap
+- [Log/](Log/) — dated work logs from past development sessions
