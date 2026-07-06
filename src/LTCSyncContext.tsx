@@ -3,7 +3,6 @@ import Timecode from 'smpte-timecode';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
-import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 
 import { LtcEngine } from './utils/LtcEngine';
 import type { LtcSettings } from './utils/LtcEngine';
@@ -16,7 +15,6 @@ import { t as translate, getInitialLang, persistLang } from './utils/i18n';
 import type { Lang } from './utils/i18n';
 import toast from 'react-hot-toast';
 import type { DriftStatus } from './utils/DriftMonitor';
-import { buildEdl, buildAle } from './utils/export';
 import type { Marker } from './utils/export';
 import { resolveTally, adoptTally } from './utils/tally';
 import type { TallyState, TallyPayload } from './utils/tally';
@@ -24,6 +22,7 @@ import { LTC_WORKLET_SOURCE } from './audio/ltcWorkletSource';
 import { FPS_OPTIONS } from './constants';
 import { useBatteryMonitor } from './hooks/useBatteryMonitor';
 import { useWakeLock } from './hooks/useWakeLock';
+import { useMarkers } from './hooks/useMarkers';
 
 export type SyncMode = 'system' | 'network' | 'p2p' | 'freerun';
 export type ToastLevel = 'info' | 'warn' | 'error';
@@ -205,14 +204,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     slateTimeRef.current = slateTime;
   }, [slateTime]);
 
-  const [markers, setMarkers] = useState<Marker[]>(() => {
-    try {
-      const saved = localStorage.getItem('ltc-markers');
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch { return []; }
-  });
   const [defaultReelName, setDefaultReelName] = useState('A001');
   const [sceneName, setSceneName] = useState(() => {
     try { const saved = localStorage.getItem('ltc-scene'); return saved || '001'; } catch { return '001'; }
@@ -336,12 +327,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { langRef.current = lang; persistLang(lang); }, [lang]);
 
   const { batteryLevel, isCharging, batteryEta } = useBatteryMonitor(langRef);
-  const [markerFlash, setMarkerFlash] = useState<{ tc: string; color: string; count: number } | null>(null);
-  const markerFlashTimerRef = useRef<number | null>(null);
-
-  useEffect(() => () => {
-    if (markerFlashTimerRef.current !== null) clearTimeout(markerFlashTimerRef.current);
-  }, []);
 
   const stopHoldRafRef = useRef<number | null>(null);
   const holdStoppedRef = useRef(false);
@@ -372,6 +357,12 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       toast.success(msg);
     }
   };
+
+  const {
+    markers, setMarkers, markerFlash,
+    addMarker, removeMarker, updateMarkerComment,
+    exportToEDL, exportToALE,
+  } = useMarkers({ engineRef, fpsIndex, defaultReelName, sceneName, langRef, addToast });
 
   useEffect(() => {
     lastSyncTimeRef.current = Date.now();
@@ -632,28 +623,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     }
   }, [autoUserBits]);
 
-  const backupMarkers = async (m: Marker[]) => {
-    try {
-      if (Capacitor.isNativePlatform()) {
-        await Filesystem.writeFile({
-          path: 'ltc_sync_pro_backup.json',
-          data: JSON.stringify(m, null, 2),
-          directory: Directory.Documents,
-          encoding: Encoding.UTF8
-        });
-      }
-    } catch (e) {
-      console.warn('Backup to filesystem failed:', e);
-    }
-  };
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('ltc-markers', JSON.stringify(markers));
-      backupMarkers(markers);
-    } catch { /* ignore */ }
-  }, [markers]);
-
   useEffect(() => {
     if (engineRef.current) {
       engineRef.current.setUserBits(userBits);
@@ -666,75 +635,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       engineRef.current.setVolume(vol);
     }
   }, [outputLevel, volume]);
-
-  const addMarker = (color: 'Red' | 'Blue' | 'Green' | 'Yellow') => {
-    const currentTC = engineRef.current ? engineRef.current.getTimecodeString() : '00:00:00:00';
-    const nextTake = markers.length > 0 ? Math.max(...markers.map(m => m.take || 0)) + 1 : 1;
-    const newMarker: Marker = {
-      id: Date.now(),
-      tc: currentTC,
-      time: new Date().toLocaleTimeString(),
-      color,
-      reelName: defaultReelName,
-      take: nextTake,
-      sceneName: sceneName,
-      comment: ''
-    };
-    setMarkers(prev => [newMarker, ...prev]);
-
-    setMarkerFlash({ tc: currentTC, color, count: markers.length + 1 });
-    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      navigator.vibrate(40);
-    }
-    if (markerFlashTimerRef.current !== null) clearTimeout(markerFlashTimerRef.current);
-    markerFlashTimerRef.current = window.setTimeout(() => setMarkerFlash(null), 1300);
-  };
-
-  const removeMarker = (id: number) => {
-    setMarkers(markers.filter(m => m.id !== id));
-  };
-
-  const updateMarkerComment = (id: number, comment: string) => {
-    setMarkers(prev => prev.map(m => m.id === id ? { ...m, comment } : m));
-  };
-
-  const exportFile = async (content: string, filename: string) => {
-    const isNative = Capacitor.isNativePlatform();
-    if (isNative) {
-      try {
-        await Filesystem.writeFile({
-          path: filename,
-          data: content,
-          directory: Directory.Documents,
-          encoding: Encoding.UTF8
-        });
-        addToast(translate('toast.exportSaved', langRef.current, { path: `Documents/${filename}` }));
-      } catch (e) {
-        console.error('File export failed', e);
-        addToast('File export failed', 'error');
-      }
-    } else {
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-  };
-
-  const exportToEDL = () => {
-    if (markers.length === 0) return;
-    const edl = buildEdl(markers, FPS_OPTIONS[fpsIndex].drop);
-    exportFile(edl, `PHONE_TC_${new Date().toISOString().slice(0, 10)}.edl`);
-  };
-
-  const exportToALE = () => {
-    if (markers.length === 0) return;
-    const ale = buildAle(markers, FPS_OPTIONS[fpsIndex].label);
-    exportFile(ale, `PHONE_TC_${new Date().toISOString().slice(0, 10)}.ale`);
-  };
 
   const handleSlateClick = () => {
     setIsSlateFlashing(true);
