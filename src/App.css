@@ -1172,10 +1172,9 @@ input[type="range"] {
 /* ── Visual Slate ── */
 .visual-slate-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
+  width: auto;
+  height: auto;
   background: #000;
   z-index: var(--z-overlay-slate);
   display: flex;
@@ -1183,6 +1182,53 @@ input[type="range"] {
   justify-content: center;
   align-items: center;
   transition: background 0.05s;
+}
+
+.slate-tap-area {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.slate-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  max-width: 100%;
+  padding: 0 12px;
+}
+
+.slate-metadata-row {
+  display: flex;
+  flex-wrap: wrap;               /* ← はみだし解消の本命 */
+  justify-content: center;
+  gap: 8px 20px;
+  font-size: clamp(1rem, 4.5vw, 2rem);  /* ← 320pxで16px、大画面で32px */
+  font-weight: bold;
+  color: #fff;
+  margin: 15px 0;
+  text-align: center;
+}
+
+.slate-close-btn {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top));
+  right: calc(16px + env(safe-area-inset-right));
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px solid #555;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  color: #fff;
+  font-size: 1.8rem;
+  z-index: 3;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .visual-slate-overlay.flashing {

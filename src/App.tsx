@@ -797,10 +797,10 @@ function MainApp() {
 
       {isVisualSlate && (
         <div className={`visual-slate-overlay ${isSlateFlashing ? 'flashing' : ''}`}>
-          <div className="slate-tap-area" onClick={handleSlateClick} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }} />
-          <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
+          <div className="slate-tap-area" onClick={handleSlateClick} />
+          <div className="slate-content">
             <div className="slate-tc">{slateTime}</div>
-            <div className="slate-metadata-row" style={{ display: 'flex', gap: '20px', fontSize: '2rem', fontWeight: 'bold', color: '#fff', margin: '15px 0' }}>
+            <div className="slate-metadata-row">
               <div>REEL: {defaultReelName}</div>
               <div>SCENE: {sceneName}</div>
               <div>TAKE: {markers.length > 0 ? Math.max(...markers.map(m => m.take || 0)) + 1 : 1}</div>
@@ -814,7 +814,7 @@ function MainApp() {
             <div className="slate-close">{tr('slate.close')}</div>
           </div>
           <button 
-            style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(0,0,0,0.5)', border: '2px solid #555', borderRadius: '50%', width: '50px', height: '50px', color: '#fff', fontSize: '1.8rem', zIndex: 3, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
+            className="slate-close-btn"
             onClick={(e) => { e.stopPropagation(); setIsVisualSlate(false); }}
             aria-label="Close Slate"
           >
