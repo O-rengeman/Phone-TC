@@ -274,7 +274,7 @@ header {
 }
 
 .desktop-view .marker-scroll {
-  height: calc(100vh - 400px);
+  height: calc(100dvh - 400px);
 }
 
 .desktop-view .clients-list-section {
@@ -798,6 +798,9 @@ input[type="range"] {
   text-align: center;
   font-family: var(--font-mono);
   letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .p2p-status-mini.error {
@@ -1308,6 +1311,8 @@ input[type="range"] {
   margin-top: 16px;
   border-top: 1px solid var(--border);
   padding-top: 16px;
+  max-height: 40vh;
+  overflow-y: auto;
 }
 
 .clients-grid {
@@ -1342,6 +1347,9 @@ input[type="range"] {
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .client-stats {
@@ -1350,6 +1358,9 @@ input[type="range"] {
   font-size: 0.6rem;
   color: var(--text-muted);
   font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .client-stats .stat.drift-warn {
@@ -1584,6 +1595,8 @@ input[type="range"] {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
   pointer-events: none;
   animation: marker-flash-in 0.18s ease, marker-flash-out 0.3s ease 1s forwards;
+  white-space: nowrap;
+  max-width: calc(100vw - 32px);
 }
 .mf-dot {
   min-width: 18px;
@@ -2042,6 +2055,10 @@ input[type="range"] {
   font-weight: 700;
   color: rgba(255, 255, 255, 0.6);
   letter-spacing: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
 }
 .tally-header-battery {
   font-size: 0.75rem;
@@ -2383,10 +2400,13 @@ input[type="range"] {
   font-weight: 900;
   font-family: var(--font-mono);
   letter-spacing: 1px;
-  width: 80px;
+  width: 100%;
+  max-width: 110px;
   padding: 2px 0;
   outline: none;
   transition: border-color 0.15s;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .director-cam-label-input:focus { border-bottom-color: var(--primary); }
 
@@ -2575,4 +2595,19 @@ input[type="range"] {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+
+.marker-row-pro .m-take {
+  font-size: 0.85rem;
+  color: #aaa;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+@media (max-width: 360px) {
+  .status-pill { min-width: 88px; }
+  .fps-grid-compact { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 320px) {
+  .fps-grid-compact { grid-template-columns: repeat(2, 1fr); }
 }
