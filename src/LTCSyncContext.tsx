@@ -5,6 +5,7 @@ import { ScreenOrientation } from '@capacitor/screen-orientation';
 
 import { LtcEngine } from './utils/LtcEngine';
 import type { SyncMessage } from './utils/PeerSync';
+import { PEER_ID_LENGTH } from './utils/PeerSync';
 import { TimecodeNativeBridge } from './utils/TimecodeNativeBridge';
 import { DriftMonitor } from './utils/DriftMonitor';
 import { t as translate, getInitialLang, persistLang } from './utils/i18n';
@@ -367,17 +368,13 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       mediaStreamActions.removeStream(pId);
     };
 
-    signalingHandlerRef.current = (msg: any) => {
+    signalingHandlerRef.current = (msg: SyncMessage) => {
       void mediaServiceRef.current?.handleSignalingMessage(msg);
     };
 
-    if (!isHost && targetId) {
-      void service.startLocalCamera().then(() => {
-        void service.connectToPeer(targetId);
-      });
-    } else if (isHost) {
-      void service.startLocalCamera();
-    }
+    // NOTE: starting the camera/connecting to a peer happens in the separate
+    // effect below, gated on targetId reaching its full length rather than
+    // being a dependency here — see that effect's comment for why.
 
     return () => {
       service.closeAll();
@@ -385,7 +382,25 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       mediaStreamActions.clearStreams();
       signalingHandlerRef.current = null;
     };
-  }, [isVideoEnabled, isHost, peerId, targetId, peerSyncRef, signalingHandlerRef]);
+  }, [isVideoEnabled, isHost, peerId, peerSyncRef, signalingHandlerRef]);
+
+  // Client-only: start the camera and connect to the master once targetId is
+  // a complete peer id (PEER_ID_LENGTH chars), not on every keystroke while
+  // it's being typed in ConnectionManager. Kept separate from the effect
+  // above so retyping targetId doesn't tear down/recreate the whole
+  // WebRTCMediaService (which would stop the camera and drop all peer
+  // connections). connectToPeer() already no-ops if a connection to this
+  // target exists, so re-running this effect on unrelated state changes is
+  // harmless.
+  useEffect(() => {
+    if (isHost || !isVideoEnabled) return;
+    const service = mediaServiceRef.current;
+    if (!service || targetId.length !== PEER_ID_LENGTH) return;
+
+    void service.startLocalCamera().then(() => {
+      void service.connectToPeer(targetId);
+    });
+  }, [isHost, isVideoEnabled, targetId, mediaServiceRef]);
 
   useEffect(() => {
     const initMobile = async () => {
