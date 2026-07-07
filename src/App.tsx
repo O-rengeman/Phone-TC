@@ -1,5 +1,5 @@
 import { LTCSyncProvider, useLTC } from './LTCSyncContext';
-import { FPS_OPTIONS, MARKER_HEX } from './constants';
+import { FPS_OPTIONS } from './constants';
 import { VideoPlayer } from './VideoPlayer';
 import { ConnectionManager } from './ConnectionManager';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -260,9 +260,9 @@ function MainApp() {
 
                 <div className="control-section">
                   <label className="section-label">TC OFFSET (FRAMES)</label>
-                  <div className="offset-control" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} style={{ flex: 1 }} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} />
-                    <span style={{ minWidth: '40px', textAlign: 'right', fontWeight: 'bold' }}>{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
+                  <div className="offset-control">
+                    <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} />
+                    <span className="offset-value">{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
                   </div>
                 </div>
                 {outputMode === 'mono-l' && (
@@ -379,13 +379,7 @@ function MainApp() {
               </div>
               {isHost && (
                 <button
-                  className="tally-open-btn"
-                  style={{
-                    marginTop: '10px',
-                    background: 'linear-gradient(90deg, #ff3b30, #ff9500)',
-                    borderColor: '#ff9500',
-                    color: '#fff'
-                  }}
+                  className="tally-open-btn btn-director-switcher"
                   onClick={() => { setTallyOpen(false); setIsVisualSlate(false); setDirectorPanelOpen(true); }}
                 >
                   DIRECTOR SWITCHER PANEL
@@ -424,17 +418,14 @@ function MainApp() {
                           </span>
                         </div>
                         {tallyMode === 'manual' && (
-                          <div className="client-tally-controls" style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
+                          <div className="client-tally-controls">
                             {(['live', 'preview', 'off'] as TallyState[]).map(s => {
                                const isActive = tallyPayload?.assignments?.[id] === s;
                                return (
                                  <button
                                    key={s}
                                    className={`tally-state-btn mini ${isActive ? 'active' : ''}`}
-                                   style={{
-                                     flex: 1, padding: '4px', fontSize: '0.7rem',
-                                     ...(isActive ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s], color: '#fff' } : {})
-                                   }}
+                                   style={isActive ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
                                    onClick={() => handleClientTallyChange(id, s)}
                                  >
                                    {tr(tallyLabelKey(s))}
@@ -453,7 +444,7 @@ function MainApp() {
             <div className="tools-grid-pro">
               <div className="tool-card span-2">
                 <label>{tr('label.userBits')}</label>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <div className="userbits-row">
                   <input value={userBits} onChange={e => setUserBits(e.target.value.toUpperCase().replace(/[^0-9A-F]/g, ''))} maxLength={8} disabled={autoUserBits} />
                   <button className={`btn-pill ${autoUserBits ? 'active' : ''}`} onClick={() => setAutoUserBits(!autoUserBits)}>{tr('btn.auto')}</button>
                 </div>
@@ -499,9 +490,9 @@ function MainApp() {
 
                   <div className="tool-card span-2">
                     <label className="section-label">TC OFFSET (FRAMES)</label>
-                    <div className="offset-control" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} style={{ flex: 1 }} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} />
-                      <span style={{ minWidth: '40px', textAlign: 'right', fontWeight: 'bold' }}>{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
+                    <div className="offset-control">
+                      <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} />
+                      <span className="offset-value">{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
                     </div>
                   </div>
                   {outputMode === 'mono-l' && (
@@ -539,36 +530,27 @@ function MainApp() {
                   <div className="empty-msg">{tr('markers.none')}</div>
                 ) : (
                   markers.map(m => (
-                    <div key={m.id} className="marker-row-pro" style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '10px 12px', height: 'auto' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div key={m.id} className="marker-row-pro">
+                      <div className="marker-row-top">
+                        <div className="marker-row-left">
                           <div className={`color-dot ${m.color.toLowerCase()}`}>{m.color.charAt(0)}</div>
                           <span className="m-tc">{m.tc}</span>
-                          <span className="m-take" style={{ fontSize: '0.85rem', color: '#aaa', marginLeft: '4px' }}>
+                          <span className="m-take">
                             Sc.{m.sceneName || '001'} Tk.{m.take}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div className="marker-row-right">
                           <span className="m-time">{m.time}</span>
                           <button className="btn-delete-marker" onClick={() => removeMarker(m.id)}>✕</button>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', width: '100%', marginTop: '4px' }}>
+                      <div className="marker-comment-row">
                         <input
                           type="text"
                           className="marker-comment-input"
                           value={m.comment || ''}
                           onChange={(e) => updateMarkerComment(m.id, e.target.value)}
                           placeholder={tr('placeholder.comment')}
-                          style={{
-                            flex: 1,
-                            background: 'rgba(255,255,255,0.05)',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            borderRadius: '4px',
-                            color: '#fff',
-                            fontSize: '0.8rem',
-                            padding: '4px 8px'
-                          }}
                         />
                       </div>
                     </div>
@@ -581,8 +563,8 @@ function MainApp() {
       </main>
 
       {markerFlash && (
-        <div className="marker-flash" style={{ borderColor: MARKER_HEX[markerFlash.color] }}>
-          <span className="mf-dot" style={{ background: MARKER_HEX[markerFlash.color] }}>{markerFlash.color.charAt(0)}</span>
+        <div className={`marker-flash ${markerFlash.color.toLowerCase()}`}>
+          <span className={`mf-dot ${markerFlash.color.toLowerCase()}`}>{markerFlash.color.charAt(0)}</span>
           <span className="mf-text">MARK {markerFlash.tc}</span>
           <span className="mf-count">#{markerFlash.count}</span>
         </div>

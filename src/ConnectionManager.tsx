@@ -46,10 +46,10 @@ export function ConnectionManager() {
             </div>
             {p2pRole === 'master' && (
               <div className="p2p-master-box">
-                <div className="id-display" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <div className="id-display id-display-row">
                   <span>ID: {peerId || '...'}</span>
                   {peerId && (
-                    <button className="btn-small" onClick={copyInviteLink} style={{ padding: '4px 8px' }}>
+                    <button className="btn-small" onClick={copyInviteLink}>
                       🔗 COPY LINK
                     </button>
                   )}
@@ -105,7 +105,7 @@ export function ConnectionManager() {
       {import.meta.env.DEV && (
         <div className="control-section dev-panel">
           <label className="section-label dev-label">DEV: PACKET LOSS SIM</label>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div className="dev-sim-row">
             <input
               type="range" 
               min="0" 
@@ -113,9 +113,8 @@ export function ConnectionManager() {
               step="0.01"
               value={packetLossRate}
               onChange={e => setPacketLossRate(parseFloat(e.target.value))}
-              style={{ flex: 1 }}
             />
-            <span style={{ fontSize: '0.7rem', color: '#666', minWidth: '30px', fontFamily: 'var(--font-mono)' }}>
+            <span className="dev-sim-value">
               {(packetLossRate * 100).toFixed(0)}%
             </span>
           </div>

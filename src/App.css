@@ -913,11 +913,43 @@ input[type="range"] {
 
 .marker-row-pro {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border);
   transition: background 0.15s;
+}
+.marker-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+.marker-row-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;             /* flexの子のあふれ防止 */
+}
+.marker-row-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.marker-comment-row {
+  display: flex;
+  width: 100%;
+  margin-top: 4px;
+}
+.marker-comment-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.8rem;
+  padding: 4px 8px;
 }
 
 .marker-row-pro:last-child {
@@ -2610,4 +2642,89 @@ input[type="range"] {
 }
 @media (max-width: 320px) {
   .fps-grid-compact { grid-template-columns: repeat(2, 1fr); }
+}
+
+.offset-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.offset-control input[type="range"] { flex: 1; }
+.offset-value {
+  min-width: 40px;
+  text-align: right;
+  font-weight: bold;
+}
+
+.userbits-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.client-tally-controls {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+.client-tally-controls button {
+  flex: 1;
+  padding: 4px;
+  font-size: 0.7rem;
+}
+
+.btn-director-switcher {
+  margin-top: 10px;
+  background: linear-gradient(90deg, #ff3b30, #ff9500);
+  border-color: #ff9500;
+  color: #fff;
+}
+
+.marker-flash.red    { border-color: #ff3b40; }
+.marker-flash.blue   { border-color: #3b82f6; }
+.marker-flash.green  { border-color: #22c55e; }
+.marker-flash.yellow { border-color: #f59e0b; }
+.marker-flash .mf-dot.red    { background: #ff3b40; }
+.marker-flash .mf-dot.blue   { background: #3b82f6; }
+.marker-flash .mf-dot.green  { background: #22c55e; }
+.marker-flash .mf-dot.yellow { background: #f59e0b; }
+
+.vu-meter-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+.vu-meter-track { flex: 1; }
+.vu-clip-badge {
+  background: #ff3b30;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.vu-clip-badge.hidden { visibility: hidden; }
+
+.id-display-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.id-display-row .btn-small {
+  padding: 4px 8px;
+}
+.dev-sim-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.dev-sim-row input[type="range"] {
+  flex: 1;
+}
+.dev-sim-value {
+  font-size: 0.7rem;
+  color: #666;
+  min-width: 30px;
+  font-family: var(--font-mono);
 }
