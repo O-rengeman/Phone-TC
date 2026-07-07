@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import type { LtcEngine } from '../utils/LtcEngine';
@@ -110,9 +110,9 @@ export function useMarkers({
     setMarkers(markers.filter(m => m.id !== id));
   };
 
-  const updateMarkerComment = (id: number, comment: string) => {
+  const updateMarkerComment = useCallback((id: number, comment: string) => {
     setMarkers(prev => prev.map(m => m.id === id ? { ...m, comment } : m));
-  };
+  }, []);
 
   const exportFile = async (content: string, filename: string) => {
     const isNative = Capacitor.isNativePlatform();

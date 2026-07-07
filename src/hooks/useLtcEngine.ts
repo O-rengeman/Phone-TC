@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import Timecode from 'smpte-timecode';
 import { LtcEngine } from '../utils/LtcEngine';
 import type { LtcSettings } from '../utils/LtcEngine';
@@ -137,7 +137,7 @@ export function useLtcEngine({
     }
   }, [volume, userBits, outputMode, outputLevel, isRunning, workletNodeRef]);
 
-  const beep = (freq: number, duration: number) => {
+  const beep = useCallback((freq: number, duration: number) => {
     if (!audioCtxRef.current) return;
     const ctx = audioCtxRef.current;
     const osc = ctx.createOscillator();
@@ -150,7 +150,7 @@ export function useLtcEngine({
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + duration);
-  };
+  }, [audioCtxRef]);
 
   const startEngine = async () => {
     if (!audioCtxRef.current) return;
@@ -365,13 +365,13 @@ export function useLtcEngine({
     }
   };
 
-  const cancelStopHold = () => {
+  const cancelStopHold = useCallback(() => {
     if (stopHoldRafRef.current !== null) {
       cancelAnimationFrame(stopHoldRafRef.current);
       stopHoldRafRef.current = null;
     }
     setStopHoldPct(0);
-  };
+  }, [stopHoldRafRef, setStopHoldPct]);
 
   const beginStopHold = () => {
     if (stopHoldRafRef.current !== null) return;

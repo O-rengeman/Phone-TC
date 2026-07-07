@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PeerSync } from '../utils/PeerSync';
 import type { SyncMessage } from '../utils/PeerSync';
 import { t as translate } from '../utils/i18n';
@@ -85,7 +85,7 @@ export function useP2P({
     lastSyncTimeRef.current = Date.now();
   }, []);
 
-  const resetP2P = () => {
+  const resetP2P = useCallback(() => {
     if (peerSyncRef.current) {
       peerSyncRef.current.destroy();
       peerSyncRef.current = null;
@@ -95,7 +95,7 @@ export function useP2P({
     setPeerId('');
     if (syncMode === 'p2p') setSyncMode('network');
     setP2pStatus('P2P RESET');
-  };
+  }, [syncMode, setP2pRole, setSyncMode]);
 
   const setupP2PMaster = async () => {
     resetP2P();

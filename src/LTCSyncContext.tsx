@@ -272,7 +272,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
 
-  const addToast = (msg: string, level: ToastLevel = 'info') => {
+  const addToast = useCallback((msg: string, level: ToastLevel = 'info') => {
     if (level === 'error') {
       toast.error(msg);
     } else if (level === 'warn') {
@@ -280,7 +280,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     } else {
       toast.success(msg);
     }
-  };
+  }, []);
 
   const {
     markers, setMarkers, markerFlash,
@@ -339,7 +339,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
         }
       }
     });
-  }, []);
+  }, [addToast]);
 
   const applySyncToWorklet = useCallback((masterTcStr: string, oneWayLatencyMs: number, isMasterRunning: boolean) => {
     const engine = engineRef.current;
