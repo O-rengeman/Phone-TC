@@ -19,6 +19,15 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
+
+  /* z-index階層（App.tsxのToaster: 10500 と同期） */
+  --z-footer: 10;
+  --z-recording: 8900;
+  --z-overlay-slate: 9000;
+  --z-overlay-director: 9100;
+  --z-overlay-tally: 9200;
+  --z-marker-flash: 9500;
+  --z-guide: 10000;
 }
 
 * {
@@ -461,7 +470,7 @@ header {
   bottom: 0;
   pointer-events: none;
   box-shadow: inset 0 0 0 4px #ff3b71;
-  z-index: 9999;
+  z-index: var(--z-recording);
   animation: pulse-recording 2s infinite ease-in-out;
 }
 
@@ -1168,7 +1177,7 @@ input[type="range"] {
   width: 100vw;
   height: 100vh;
   background: #000;
-  z-index: 100;
+  z-index: var(--z-overlay-slate);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1318,46 +1327,6 @@ input[type="range"] {
 }
 
 /* ── Toast Notifications ── */
-.toast-container {
-  position: fixed;
-  top: 64px;
-  right: 16px;
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: 320px;
-  pointer-events: none;
-}
-
-.toast {
-  padding: 10px 16px;
-  border-radius: var(--radius-md);
-  font-size: 0.7rem;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  line-height: 1.4;
-  animation: toast-in 0.2s ease;
-}
-
-.toast-info {
-  background: #111;
-  border: 1px solid #2a2a2a;
-  color: #ccc;
-}
-
-.toast-warn {
-  background: #1a1200;
-  border: 1px solid #3a2800;
-  color: #e0a020;
-}
-
-.toast-error {
-  background: #1a0000;
-  border: 1px solid #3a0000;
-  color: #e04040;
-}
 
 @keyframes toast-in {
   from { opacity: 0; transform: translateX(24px); }
@@ -1384,7 +1353,7 @@ input[type="range"] {
 .guide-overlay {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  z-index: var(--z-guide);
   background: rgba(0, 0, 0, 0.78);
   backdrop-filter: blur(4px);
   display: flex;
@@ -1553,7 +1522,7 @@ input[type="range"] {
   left: 50%;
   bottom: calc(96px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
-  z-index: 9998;
+  z-index: var(--z-marker-flash);
   display: flex;
   align-items: center;
   gap: 9px;
@@ -1943,7 +1912,7 @@ input[type="range"] {
 .tally-overlay {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: var(--z-overlay-tally);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2128,7 +2097,7 @@ input[type="range"] {
 .director-tally-overlay {
   position: fixed;
   inset: 0;
-  z-index: 9998;
+  z-index: var(--z-overlay-director);
   background: var(--bg);
   color: var(--text-bright);
   display: flex;

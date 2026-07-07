@@ -631,7 +631,7 @@ function MainApp() {
         </div>
       </footer>
 
-      <Toaster position="top-center" toastOptions={{ style: { background: '#333', color: '#fff' } }} />
+      <Toaster position="top-center" containerStyle={{ zIndex: 10500 }} toastOptions={{ style: { background: '#333', color: '#fff' } }} />
 
       {tallyOpen && (() => {
         const isConnected = isTallyConnected;
