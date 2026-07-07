@@ -1,3 +1,5 @@
+import { normalizeDropFrame, advanceTimecode, generateLtcBits } from './ltcFrame';
+
 // LTC AudioWorklet processor source.
 //
 // An AudioWorklet module must be fetched as a standalone script, so this is kept
@@ -8,7 +10,14 @@
 // The worklet is the single source of truth for the running LTC signal: it owns
 // timecode advance, drop-frame handling, bit generation and sample synthesis,
 // and applies jam/nudge/config corrections received from the main thread.
-export const LTC_WORKLET_SOURCE = `
+//
+// The pure timecode/bit-generation logic (normalizeDropFrame, advanceTimecode,
+// generateLtcBits) lives in ltcFrame.ts so it can be unit tested outside the
+// AudioWorklet sandbox. It is re-serialized here via Function.prototype.toString()
+// and spliced into the worklet's script text. Each is bound to an explicit
+// `const <name> = ...` so the class body below can call it by its canonical
+// name even if a minifier renames the function's own internal identifier.
+const LTC_PROCESSOR_CLASS_SOURCE = `
       class LtcProcessor extends AudioWorkletProcessor {
         constructor(options) {
           super();
@@ -23,7 +32,7 @@ export const LTC_WORKLET_SOURCE = `
           this.minutes = this.settings.m;
           this.seconds = this.settings.s;
           this.frames = this.settings.f;
-          this.normalizeDropFrame();
+          this.frames = normalizeDropFrame(this.settings.isDrop, this.minutes, this.seconds, this.frames);
 
           // Pending sync correction (frames). >0 = skip ahead, <0 = hold/fall back.
           this.pendingNudge = 0;
@@ -35,7 +44,7 @@ export const LTC_WORKLET_SOURCE = `
             const d = e.data || {};
             if (d.type === 'jam') {
               this.hours = d.h; this.minutes = d.m; this.seconds = d.s; this.frames = d.f;
-              this.normalizeDropFrame();
+              this.frames = normalizeDropFrame(this.settings.isDrop, this.minutes, this.seconds, this.frames);
               // Regenerate the in-flight frame buffer from the new TC immediately.
               this.currentFrameSamples = null;
               this.sampleOffset = 0;
@@ -50,68 +59,17 @@ export const LTC_WORKLET_SOURCE = `
           };
         }
 
-        /** SMPTE drop-frame: :00 and :01 are invalid at the start of non-10th minutes. */
-        normalizeDropFrame() {
-          if (
-            this.settings.isDrop &&
-            this.minutes % 10 !== 0 &&
-            this.seconds === 0 &&
-            this.frames < 2
-          ) {
-            this.frames = 2;
-          }
-        }
-
         addFrame() {
-          this.frames++;
-          const maxFrames = this.settings.framesPerSec;
-          if (this.frames >= maxFrames) {
-            this.frames = 0;
-            this.seconds++;
-            if (this.seconds >= 60) {
-              this.seconds = 0;
-              this.minutes++;
-              if (this.minutes >= 60) {
-                this.minutes = 0;
-                this.hours++;
-                if (this.hours >= 24) this.hours = 0;
-              }
-              // Drop two frame numbers at each minute boundary except every 10th minute.
-              if (this.settings.isDrop && this.minutes % 10 !== 0) {
-                this.frames = 2;
-              }
-            }
-          }
+          const next = advanceTimecode(
+            { hours: this.hours, minutes: this.minutes, seconds: this.seconds, frames: this.frames },
+            this.settings.isDrop,
+            this.settings.framesPerSec,
+          );
+          this.hours = next.hours; this.minutes = next.minutes; this.seconds = next.seconds; this.frames = next.frames;
 
           this.port.postMessage({
             tc: \`\${String(this.hours).padStart(2, '0')}:\${String(this.minutes).padStart(2, '0')}:\${String(this.seconds).padStart(2, '0')}:\${String(this.frames).padStart(2, '0')}\`
           });
-        }
-
-        generateBits() {
-          const bits = new Array(80).fill(0);
-          const f = this.frames, s = this.seconds, m = this.minutes, h = this.hours;
-          const setBits = (arr, start, count, val) => {
-            for (let i = 0; i < count; i++) arr[start + i] = (val >> i) & 1;
-          };
-          setBits(bits, 0, 4, f % 10); setBits(bits, 8, 2, Math.floor(f / 10));
-          bits[10] = this.settings.isDrop ? 1 : 0;
-          setBits(bits, 16, 4, s % 10); setBits(bits, 24, 3, Math.floor(s / 10));
-          setBits(bits, 32, 4, m % 10); setBits(bits, 40, 3, Math.floor(m / 10));
-          setBits(bits, 48, 4, h % 10); setBits(bits, 56, 2, Math.floor(h / 10));
-          // User bits
-          for (let i = 0; i < 8; i++) setBits(bits, 4 + (i * 8), 4, parseInt(this.settings.ubit[i], 16) || 0);
-          const sync = [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1];
-          for (let i = 0; i < 16; i++) bits[64 + i] = sync[i];
-          // Biphase mark polarity correction (SMPTE 12M): set the BPC bit so the
-          // 80-bit frame contains an even number of 0-bits, keeping the sync word
-          // unambiguous regardless of payload. Bit 27 for 25-fps systems, bit 59
-          // otherwise (both positions are otherwise unused).
-          const bpc = this.settings.framesPerSec === 25 ? 27 : 59;
-          let zeros = 0;
-          for (let i = 0; i < 80; i++) if (bits[i] === 0) zeros++;
-          if (zeros % 2 !== 0) bits[bpc] = 1;
-          return bits;
         }
 
         process(inputs, outputs) {
@@ -122,7 +80,12 @@ export const LTC_WORKLET_SOURCE = `
 
           for (let i = 0; i < outputL.length; i++) {
             if (!this.currentFrameSamples || this.sampleOffset >= this.currentFrameSamples.length) {
-              const bits = this.generateBits();
+              const bits = generateLtcBits(
+                { hours: this.hours, minutes: this.minutes, seconds: this.seconds, frames: this.frames },
+                this.settings.isDrop,
+                this.settings.ubit,
+                this.settings.framesPerSec,
+              );
               const sr = sampleRate;
               const nextEnd = Math.floor((this.frameCount + 1) * sr * this.settings.fpsDen / this.settings.fpsNum);
               const curStart = Math.floor(this.frameCount * sr * this.settings.fpsDen / this.settings.fpsNum);
@@ -170,3 +133,9 @@ export const LTC_WORKLET_SOURCE = `
         // Already registered
       }
     `;
+
+export const LTC_WORKLET_SOURCE =
+  `const normalizeDropFrame = ${normalizeDropFrame.toString()};\n` +
+  `const advanceTimecode = ${advanceTimecode.toString()};\n` +
+  `const generateLtcBits = ${generateLtcBits.toString()};\n` +
+  LTC_PROCESSOR_CLASS_SOURCE;
