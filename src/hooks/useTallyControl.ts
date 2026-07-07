@@ -206,9 +206,9 @@ export function useTallyControl({
         }
       }
     };
-    applyTorch(turnOn);
+    void applyTorch(turnOn);
     return () => {
-      if (turnOn) applyTorch(false);
+      if (turnOn) void applyTorch(false);
     };
   }, [tallyState, tallyTorchEnabled]);
 

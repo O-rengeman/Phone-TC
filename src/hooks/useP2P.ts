@@ -152,7 +152,7 @@ export function useP2P({
       // One-time mount action equivalent to a user clicking "join" — not a
       // reactive state sync, so the resulting setState calls are intentional.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setupP2PClient(joinId);
+      void setupP2PClient(joinId);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
     // Mount-only by design: re-running on every setupP2PClient identity

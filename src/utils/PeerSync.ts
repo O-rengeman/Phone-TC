@@ -85,7 +85,7 @@ export class PeerSync {
       } catch (err) {
         console.error('Failed to initialize PeerJS:', err);
         this.onStatusCallback('ERROR: PeerJS NOT LOADED');
-        reject(err);
+        reject(err instanceof Error ? err : new Error(String(err)));
       }
     });
   }
@@ -137,7 +137,7 @@ export class PeerSync {
   public send(msg: SyncMessage) {
     this.connections.forEach(conn => {
       if (conn.open && Math.random() >= this.lossRate) {
-        conn.send(msg);
+        void conn.send(msg);
       }
     });
   }

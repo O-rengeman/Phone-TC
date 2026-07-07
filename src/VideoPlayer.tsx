@@ -40,7 +40,7 @@ export function VideoPlayer() {
 
       // 動作中は Worklet がタイムコード（LTC）の発信源となり、停止中はエンジンを使用する
       const tc = isRunning ? currentTcRef.current : engine.getTimecodeString();
-      TimecodeNativeBridge.updatePlaybackStatus(isRunning, tc);
+      void TimecodeNativeBridge.updatePlaybackStatus(isRunning, tc);
       
       // 必要に応じて Slate Time を更新する
       if (isVisualSlateRef.current && slateTimeRef.current !== tc) {

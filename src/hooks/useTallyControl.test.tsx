@@ -2,12 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useTallyControl } from './useTallyControl';
 import type { PeerSync } from '../utils/PeerSync';
+import type { TallyPayload } from '../utils/tally';
 
 // vi.mock factories are hoisted above regular const declarations — anything
 // referenced inside one must be created via vi.hoisted() or the factory
 // closes over a stale/undefined binding.
 const { setTorch, isNativePlatform } = vi.hoisted(() => ({
-  setTorch: vi.fn().mockResolvedValue(undefined),
+  setTorch: vi.fn<(...args: unknown[]) => Promise<undefined>>(() => Promise.resolve(undefined)),
   isNativePlatform: vi.fn(() => true), // native by default: skips the web getUserMedia fallback
 }));
 
@@ -99,20 +100,20 @@ describe('useTallyControl auto-mode broadcast', () => {
       (props: { isRunning: boolean }) => useTallyControl(makeParams({ peerSyncRef, isRunning: props.isRunning })),
       { initialProps: { isRunning: false } },
     );
-    expect(peerSyncRef.current!.broadcast).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'tally', tally: expect.objectContaining({ all: 'standby' }),
+    expect(peerSyncRef.current.broadcast).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'tally', tally: expect.objectContaining({ all: 'standby' }) as unknown as TallyPayload,
     }));
 
     rerender({ isRunning: true });
-    expect(peerSyncRef.current!.broadcast).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'tally', tally: expect.objectContaining({ all: 'live' }),
+    expect(peerSyncRef.current.broadcast).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'tally', tally: expect.objectContaining({ all: 'live' }) as unknown as TallyPayload,
     }));
   });
 
   it('does not broadcast when not host', () => {
     const peerSyncRef = makePeerSyncRef();
     renderHook(() => useTallyControl(makeParams({ peerSyncRef, isHost: false })));
-    expect(peerSyncRef.current!.broadcast).not.toHaveBeenCalled();
+    expect(peerSyncRef.current.broadcast).not.toHaveBeenCalled();
   });
 
   it('does not broadcast in manual mode', () => {
@@ -121,9 +122,9 @@ describe('useTallyControl auto-mode broadcast', () => {
     act(() => result.current.setTallyMode('manual'));
     // broadcast is a vi.fn() under the PeerSync cast in makePeerSyncRef, so
     // its static type loses the Mock methods — cast locally to call them.
-    (peerSyncRef.current!.broadcast as unknown as ReturnType<typeof vi.fn>).mockClear();
+    (peerSyncRef.current.broadcast as unknown as ReturnType<typeof vi.fn>).mockClear();
     // No further state change should trigger an auto broadcast now that mode is manual.
-    expect(peerSyncRef.current!.broadcast).not.toHaveBeenCalled();
+    expect(peerSyncRef.current.broadcast).not.toHaveBeenCalled();
   });
 });
 
@@ -134,7 +135,7 @@ describe('useTallyControl tally-change handlers', () => {
 
     act(() => result.current.handleManualTallyChange('live'));
     expect(result.current.manualTally).toBe('live');
-    expect(peerSyncRef.current!.broadcast).not.toHaveBeenCalled();
+    expect(peerSyncRef.current.broadcast).not.toHaveBeenCalled();
   });
 
   it('handleManualTallyChange broadcasts a fresh payload when host', () => {
@@ -143,13 +144,13 @@ describe('useTallyControl tally-change handlers', () => {
     // Switch to manual mode first: in auto mode the auto-broadcast effect
     // would immediately overwrite this call's payload back to live/standby.
     act(() => result.current.setTallyMode('manual'));
-    (peerSyncRef.current!.broadcast as unknown as ReturnType<typeof vi.fn>).mockClear();
+    (peerSyncRef.current.broadcast as unknown as ReturnType<typeof vi.fn>).mockClear();
 
     act(() => result.current.handleManualTallyChange('preview'));
 
     expect(result.current.tallyPayload).toMatchObject({ all: 'preview', assignments: {} });
-    expect(peerSyncRef.current!.broadcast).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'tally', isRunning: false, tally: expect.objectContaining({ all: 'preview' }),
+    expect(peerSyncRef.current.broadcast).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'tally', isRunning: false, tally: expect.objectContaining({ all: 'preview' }) as unknown as TallyPayload,
     }));
   });
 
@@ -163,7 +164,7 @@ describe('useTallyControl tally-change handlers', () => {
 
     expect(result.current.tallyPayload?.assignments).toEqual({ CAM1: 'live' });
     expect(result.current.tallyActionLog[0]).toMatchObject({ time: '00:00:20:00', cam: 'Camera A', state: 'live' });
-    expect(peerSyncRef.current!.broadcast).toHaveBeenCalled();
+    expect(peerSyncRef.current.broadcast).toHaveBeenCalled();
   });
 
   it('handleClientTallyChange maps standby to the "preview" action-log label', () => {
@@ -183,7 +184,7 @@ describe('useTallyControl tally-change handlers', () => {
     const { result } = renderHook(() => useTallyControl(makeParams({ peerSyncRef, isHost: false })));
     act(() => result.current.handleClientTallyChange('CAM1', 'live'));
     expect(result.current.tallyPayload).toBeNull();
-    expect(peerSyncRef.current!.broadcast).not.toHaveBeenCalled();
+    expect(peerSyncRef.current.broadcast).not.toHaveBeenCalled();
   });
 
   it('handleAllTallyChange sets both manualTally and the broadcast payload, host-only', () => {

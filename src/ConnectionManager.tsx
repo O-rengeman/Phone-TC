@@ -25,7 +25,7 @@ export function ConnectionManager() {
   const copyInviteLink = () => {
     const url = new URL(window.location.href);
     url.searchParams.set('join', peerId);
-    navigator.clipboard.writeText(url.toString());
+    void navigator.clipboard.writeText(url.toString());
     addToast('Invite Link Copied!', 'info');
   };
 
@@ -35,8 +35,8 @@ export function ConnectionManager() {
         <label className="section-label">{tr('label.p2p')}</label>
         {!p2pRole ? (
           <div className="p2p-init-pro">
-            <button onClick={() => setupP2PMaster()}>{tr('btn.createMaster')}</button>
-            <button onClick={() => setupP2PClient()}>{tr('btn.joinClient')}</button>
+            <button onClick={() => void setupP2PMaster()}>{tr('btn.createMaster')}</button>
+            <button onClick={() => void setupP2PClient()}>{tr('btn.joinClient')}</button>
           </div>
         ) : (
           <div className="p2p-panel-pro">

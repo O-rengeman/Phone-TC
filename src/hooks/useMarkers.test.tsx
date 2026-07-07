@@ -9,7 +9,7 @@ import type { Lang } from '../utils/i18n';
 // closes over a stale/undefined binding.
 const { isNativePlatform, writeFile } = vi.hoisted(() => ({
   isNativePlatform: vi.fn(() => false),
-  writeFile: vi.fn().mockResolvedValue(undefined),
+  writeFile: vi.fn<(...args: unknown[]) => Promise<undefined>>(() => Promise.resolve(undefined)),
 }));
 
 vi.mock('@capacitor/core', () => ({
@@ -97,7 +97,7 @@ describe('useMarkers', () => {
     act(() => result.current.addMarker('Yellow'));
     expect(result.current.markerFlash).toMatchObject({ color: 'Yellow' });
 
-    act(() => vi.advanceTimersByTime(1300));
+    act(() => { vi.advanceTimersByTime(1300); });
     expect(result.current.markerFlash).toBeNull();
     vi.useRealTimers();
   });
@@ -133,7 +133,7 @@ describe('useMarkers', () => {
     const { result } = renderHook(() => useMarkers(makeParams()));
     act(() => result.current.addMarker('Red'));
 
-    const saved = JSON.parse(localStorage.getItem('ltc-markers')!);
+    const saved = JSON.parse(localStorage.getItem('ltc-markers')!) as { color: string }[];
     expect(saved).toHaveLength(1);
     expect(saved[0].color).toBe('Red');
   });
@@ -172,7 +172,7 @@ describe('useMarkers', () => {
     });
 
     expect(writeFile).toHaveBeenCalledWith(expect.objectContaining({
-      path: expect.stringMatching(/\.edl$/),
+      path: expect.stringMatching(/\.edl$/) as unknown as string,
     }));
     expect(addToast).toHaveBeenCalledWith(expect.any(String));
   });
@@ -188,7 +188,7 @@ describe('useMarkers', () => {
     });
 
     expect(writeFile).toHaveBeenCalledWith(expect.objectContaining({
-      path: expect.stringMatching(/\.ale$/),
+      path: expect.stringMatching(/\.ale$/) as unknown as string,
     }));
   });
 });

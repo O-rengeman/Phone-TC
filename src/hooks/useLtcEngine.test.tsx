@@ -3,13 +3,14 @@ import { renderHook, act } from '@testing-library/react';
 import { useLtcEngine } from './useLtcEngine';
 import type { LtcEngine } from '../utils/LtcEngine';
 import type { Lang } from '../utils/i18n';
+import type { Dispatch, SetStateAction } from 'react';
 
-const startBackgroundMode = vi.fn().mockResolvedValue(undefined);
-const stopBackgroundMode = vi.fn().mockResolvedValue(undefined);
+const startBackgroundMode = vi.fn(() => Promise.resolve());
+const stopBackgroundMode = vi.fn(() => Promise.resolve());
 vi.mock('../utils/TimecodeNativeBridge', () => ({
   TimecodeNativeBridge: {
-    startBackgroundMode: (...a: unknown[]) => startBackgroundMode(...a),
-    stopBackgroundMode: (...a: unknown[]) => stopBackgroundMode(...a),
+    startBackgroundMode: () => startBackgroundMode(),
+    stopBackgroundMode: () => stopBackgroundMode(),
   },
 }));
 
@@ -93,7 +94,7 @@ describe('useLtcEngine — thin state-transition coverage', () => {
 
   it('beginStopHold starts a hold-to-stop RAF progression and cancelStopHold aborts it', () => {
     vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'] });
-    const setStopHoldPct = vi.fn();
+    const setStopHoldPct = vi.fn<Dispatch<SetStateAction<number>>>();
     const { result } = renderHook(() => useLtcEngine(makeParams({ setStopHoldPct })));
 
     act(() => result.current.beginStopHold());

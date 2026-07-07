@@ -4,13 +4,16 @@ import { useNetworkSync } from './useNetworkSync';
 import { DriftMonitor } from '../utils/DriftMonitor';
 import type { LtcEngine } from '../utils/LtcEngine';
 import type { Lang } from '../utils/i18n';
+import type { TimeSyncResult } from '../utils/TimeSync';
 
 // vi.mock factories are hoisted above regular const declarations — a
 // variable referenced inside one must be created via vi.hoisted() or the
 // factory closes over a stale/undefined binding (silently breaks call
 // tracking and, worse, can leave the mocked fn uncallable — see useP2P's
 // equivalent fix).
-const { syncMock } = vi.hoisted(() => ({ syncMock: vi.fn() }));
+const { syncMock } = vi.hoisted(() => ({
+  syncMock: vi.fn<(...args: unknown[]) => Promise<TimeSyncResult>>(),
+}));
 vi.mock('../utils/TimeSync', () => ({
   TimeSync: { sync: (...args: unknown[]) => syncMock(...args) },
 }));
@@ -63,14 +66,14 @@ describe('useNetworkSync periodic sync effect', () => {
     // causing an unbounded synchronous re-render loop that OOMs the worker.
     const params = makeParams({ syncMode: 'system' });
     renderHook(() => useNetworkSync(params));
-    act(() => vi.advanceTimersByTime(30000));
+    act(() => { vi.advanceTimersByTime(30000); });
     expect(syncMock).not.toHaveBeenCalled();
   });
 
   it('does not sync when not running', () => {
     const params = makeParams({ isRunning: false });
     renderHook(() => useNetworkSync(params));
-    act(() => vi.advanceTimersByTime(30000));
+    act(() => { vi.advanceTimersByTime(30000); });
     expect(syncMock).not.toHaveBeenCalled();
   });
 
@@ -106,7 +109,7 @@ describe('useNetworkSync periodic sync effect', () => {
   it('applies a worklet correction when drift exceeds the threshold', async () => {
     syncMock.mockResolvedValue({ offset: 500, latency: 5 });
     const applySyncToWorklet = vi.fn();
-    const engine = makeEngine({ getDiffSeconds: vi.fn(() => 0.5) } as Partial<LtcEngine>);
+    const engine = makeEngine({ getDiffSeconds: vi.fn(() => 0.5) });
     const lastNetworkOffsetRef = { current: 0 };
     const params = makeParams({
       applySyncToWorklet, engineRef: { current: engine }, lastNetworkOffsetRef,
@@ -125,7 +128,7 @@ describe('useNetworkSync periodic sync effect', () => {
   it('skips correction when offset delta and drift are both below threshold', async () => {
     syncMock.mockResolvedValue({ offset: 100, latency: 5 });
     const applySyncToWorklet = vi.fn();
-    const engine = makeEngine({ getDiffSeconds: vi.fn(() => 0.01) } as Partial<LtcEngine>);
+    const engine = makeEngine({ getDiffSeconds: vi.fn(() => 0.01) });
     const lastNetworkOffsetRef = { current: 100 };
     const params = makeParams({
       applySyncToWorklet, engineRef: { current: engine }, lastNetworkOffsetRef,

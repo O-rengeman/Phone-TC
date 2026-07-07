@@ -80,7 +80,7 @@ export const TimecodeNativeBridge = {
   async setTorch(on: boolean): Promise<void> {
     if (isNative && nativePlugin) {
       // Capacitor v3/v4+ conventions
-      const plugin = nativePlugin as unknown as TimecodeNativeBridgePlugin;
+      const plugin = nativePlugin;
       if (typeof plugin.setTorch === 'function') {
         try {
           await plugin.setTorch({ on });

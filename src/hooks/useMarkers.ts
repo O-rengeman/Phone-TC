@@ -50,8 +50,8 @@ export function useMarkers({
     try {
       const saved = localStorage.getItem('ltc-markers');
       if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed : [];
+      const parsed = JSON.parse(saved) as unknown;
+      return Array.isArray(parsed) ? (parsed as Marker[]) : [];
     } catch { return []; }
   });
   const [markerFlash, setMarkerFlash] = useState<MarkerFlash>(null);
@@ -79,7 +79,7 @@ export function useMarkers({
   useEffect(() => {
     try {
       localStorage.setItem('ltc-markers', JSON.stringify(markers));
-      backupMarkers(markers);
+      void backupMarkers(markers);
     } catch { /* ignore */ }
   }, [markers]);
 
@@ -143,13 +143,13 @@ export function useMarkers({
   const exportToEDL = () => {
     if (markers.length === 0) return;
     const edl = buildEdl(markers, FPS_OPTIONS[fpsIndex].drop);
-    exportFile(edl, `PHONE_TC_${new Date().toISOString().slice(0, 10)}.edl`);
+    void exportFile(edl, `PHONE_TC_${new Date().toISOString().slice(0, 10)}.edl`);
   };
 
   const exportToALE = () => {
     if (markers.length === 0) return;
     const ale = buildAle(markers, FPS_OPTIONS[fpsIndex].label);
-    exportFile(ale, `PHONE_TC_${new Date().toISOString().slice(0, 10)}.ale`);
+    void exportFile(ale, `PHONE_TC_${new Date().toISOString().slice(0, 10)}.ale`);
   };
 
   return { markers, setMarkers, markerFlash, addMarker, removeMarker, updateMarkerComment, exportToEDL, exportToALE };

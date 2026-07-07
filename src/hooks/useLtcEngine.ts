@@ -192,7 +192,7 @@ export function useLtcEngine({
         h: currentTC[0], m: currentTC[1], s: currentTC[2], f: currentTC[3]
       }
     });
-    workletNode.port.onmessage = (e) => {
+    workletNode.port.onmessage = (e: MessageEvent<{ tc?: string }>) => {
       const tc = e.data?.tc;
       if (!tc) return;
       currentTcRef.current = tc;
@@ -219,7 +219,7 @@ export function useLtcEngine({
     workletNode.connect(ctx.destination);
     workletNodeRef.current = workletNode;
     setIsRunning(true);
-    TimecodeNativeBridge.startBackgroundMode();
+    void TimecodeNativeBridge.startBackgroundMode();
   };
 
   const stopEngine = (reset = false) => {
@@ -256,7 +256,7 @@ export function useLtcEngine({
       }
       currentTcRef.current = engineRef.current.getTimecodeString();
     }
-    TimecodeNativeBridge.stopBackgroundMode();
+    void TimecodeNativeBridge.stopBackgroundMode();
   };
 
   const startSequence = async () => {

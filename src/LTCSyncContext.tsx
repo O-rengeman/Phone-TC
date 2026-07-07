@@ -244,7 +244,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [cameraLabels, setCameraLabels] = useState<Record<string, string>>(() => {
     try {
       const saved = localStorage.getItem('ltc-camera-labels');
-      return saved ? JSON.parse(saved) : {};
+      return saved ? (JSON.parse(saved) as Record<string, string>) : {};
     } catch { return {}; }
   });
 
@@ -324,22 +324,18 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
         debug('StatusBar/Orientation unavailable (non-native environment)');
       }
     };
-    initMobile();
+    void initMobile();
   }, []);
 
   useEffect(() => {
-    TimecodeNativeBridge.addInterruptionListener(async (state) => {
+    TimecodeNativeBridge.addInterruptionListener((state) => {
       if (state === 'began') {
         addToast(translate('toast.interruptBegan', langRef.current), 'error');
       } else {
         addToast(translate('toast.interruptEnded', langRef.current), 'info');
         const ctx = audioCtxRef.current;
         if (ctx && ctx.state === 'suspended') {
-          try {
-            await ctx.resume();
-          } catch (e) {
-            console.warn('AudioContext resume after interruption failed', e);
-          }
+          ctx.resume().catch((e: unknown) => console.warn('AudioContext resume after interruption failed', e));
         }
       }
     });
