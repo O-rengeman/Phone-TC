@@ -2040,8 +2040,14 @@ input[type="range"] {
 
 /* Mobile: drop the redundant FPS·MODE meta to keep the bar smart & fitting. */
 .mobile-view .status-meta { display: none; }
+.mobile-view .version { display: none; }
+.mobile-view .logo-area { flex-shrink: 0; }
 .mobile-view .hdr-divider { height: 14px; }
-.mobile-view .header-right { gap: 6px; }
+.mobile-view .header-right {
+  gap: 6px;
+  flex: 1;
+  justify-content: flex-end;
+}
 
 /* Fix #1: ヘッダー右側モバイル横あふれ防止 */
 .mobile-view .hdr-tally-btn {
