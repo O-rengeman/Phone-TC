@@ -148,7 +148,7 @@ function MainApp() {
             <button
               type="button"
               className={`hdr-tally-btn ${tallyOpen ? 'active' : ''}`}
-              onClick={() => setTallyOpen(v => !v)}
+              onClick={() => { setDirectorPanelOpen(false); setIsVisualSlate(false); setTallyOpen(v => !v); }}
               aria-label="タリーランプを開く"
               title="TALLY"
             >
@@ -164,7 +164,7 @@ function MainApp() {
               <button
                 type="button"
                 className="hdr-director-btn"
-                onClick={() => setDirectorPanelOpen(true)}
+                onClick={() => { setTallyOpen(false); setIsVisualSlate(false); setDirectorPanelOpen(true); }}
                 aria-label="ディレクターパネルを開く"
                 title="DIRECTOR"
               >
@@ -386,7 +386,7 @@ function MainApp() {
                     borderColor: '#ff9500',
                     color: '#fff'
                   }}
-                  onClick={() => setDirectorPanelOpen(true)}
+                  onClick={() => { setTallyOpen(false); setIsVisualSlate(false); setDirectorPanelOpen(true); }}
                 >
                   DIRECTOR SWITCHER PANEL
                 </button>
@@ -405,7 +405,7 @@ function MainApp() {
                   ))}
                 </div>
               )}
-              <button className="tally-open-btn" onClick={() => setTallyOpen(true)}>{tr('tally.fullscreen')}</button>
+              <button className="tally-open-btn" onClick={() => { setDirectorPanelOpen(false); setIsVisualSlate(false); setTallyOpen(true); }}>{tr('tally.fullscreen')}</button>
             </div>
 
             {isHost && Object.keys(clients).length > 0 && (

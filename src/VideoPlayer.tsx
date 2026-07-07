@@ -24,7 +24,9 @@ export function VideoPlayer() {
     directorPanelOpenRef,
     setSlateTime,
     setTallyTime,
-    setDirectorTime
+    setDirectorTime,
+    setTallyOpen,
+    setDirectorPanelOpen
   } = useLTC();
 
   useEffect(() => {
@@ -130,7 +132,7 @@ export function VideoPlayer() {
   }, [isRunning, isMobile, setSlateTime, setTallyTime, setDirectorTime, canvasRef, engineRef, currentTcRef, isVisualSlateRef, slateTimeRef, tallyTimeRef, tallyOpenRef, directorTimeRef, directorPanelOpenRef]);
 
   return (
-    <div className="timecode-card-pro" onClick={() => setIsVisualSlate(true)}>
+    <div className="timecode-card-pro" onClick={() => { setTallyOpen(false); setDirectorPanelOpen(false); setIsVisualSlate(true); }}>
       <canvas ref={canvasRef} className="time-canvas" />
       <div className="info-strip-pro">
         <span className="info-label">FPS: {FPS_OPTIONS[fpsIndex].label}</span>
