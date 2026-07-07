@@ -112,11 +112,12 @@ function answerMsg(clientId: string): SyncMessage {
   return { type: 'webrtc-answer', clientId, sdp: { type: 'answer', sdp: 'x' }, ...dummySignalingFields };
 }
 
-function candidateMsg(clientId: string, reject = false): SyncMessage {
+function candidateMsg(clientId: string, opts: { reject?: boolean; candidate?: string } = {}): SyncMessage {
+  const { reject = false, candidate = 'x' } = opts;
   return {
     type: 'webrtc-candidate',
     clientId,
-    candidate: { candidate: 'x', __reject: reject } as unknown as RTCIceCandidateInit,
+    candidate: { candidate, __reject: reject } as unknown as RTCIceCandidateInit,
     ...dummySignalingFields,
   };
 }
@@ -224,16 +225,22 @@ describe('WebRTCMediaService ICE candidate queueing (bug 5 regression)', () => {
     expect(pc.iceCandidatesAdded).toHaveLength(0);
   });
 
-  it('flushes queued candidates in order once remoteDescription is set via an answer', async () => {
+  it('flushes multiple queued candidates in the order they arrived, once remoteDescription is set', async () => {
     const peerSync = makeFakePeerSync();
     const service = new WebRTCMediaService(peerSync, 'ME', false);
     await service.connectToPeer('MASTER');
     const pc = createdPeerConnections[0];
 
-    await service.handleSignalingMessage(candidateMsg('MASTER'));
+    await service.handleSignalingMessage(candidateMsg('MASTER', { candidate: 'first' }));
+    await service.handleSignalingMessage(candidateMsg('MASTER', { candidate: 'second' }));
+    expect(pc.iceCandidatesAdded).toHaveLength(0); // still queued, remoteDescription not set yet
+
     await service.handleSignalingMessage(answerMsg('MASTER'));
 
-    expect(pc.iceCandidatesAdded).toHaveLength(1);
+    expect(pc.iceCandidatesAdded).toEqual([
+      expect.objectContaining({ candidate: 'first' }),
+      expect.objectContaining({ candidate: 'second' }),
+    ]);
   });
 
   it('adds a candidate immediately when remoteDescription is already set', async () => {
@@ -250,7 +257,7 @@ describe('WebRTCMediaService ICE candidate queueing (bug 5 regression)', () => {
     const service = new WebRTCMediaService(makeFakePeerSync(), 'ME', false);
     await service.connectToPeer('MASTER');
 
-    await service.handleSignalingMessage(candidateMsg('MASTER', true));
+    await service.handleSignalingMessage(candidateMsg('MASTER', { reject: true }));
     await expect(service.handleSignalingMessage(answerMsg('MASTER'))).resolves.not.toThrow();
   });
 });
