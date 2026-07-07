@@ -117,6 +117,13 @@ const en: Dict = {
   'label.comment': 'Note / Comment',
   'placeholder.comment': 'Add note (e.g. NG, OK)',
   'label.clip': 'CLIP',
+  'director.allControl': 'ALL CAMERAS',
+  'director.actionLog': 'ACTION LOG',
+  'tally.dim.bright': 'HIGH',
+  'tally.dim.mid': 'MID',
+  'tally.dim.dark': 'LOW',
+  'tally.conn.ok': '✓ CONNECTED TO DIRECTOR',
+  'tally.conn.lost': '⚠️ DISCONNECTED - STANDALONE MODE',
 };
 
 const ja: Dict = {
@@ -222,6 +229,13 @@ const ja: Dict = {
   'label.comment': 'メモ・コメント',
   'placeholder.comment': 'メモを追加 (例: NG, OK)',
   'label.clip': 'クリップ',
+  'director.allControl': '一括操作',
+  'director.actionLog': '操作ログ',
+  'tally.dim.bright': '明',
+  'tally.dim.mid': '中',
+  'tally.dim.dark': '暗',
+  'tally.conn.ok': '✓ ディレクターと接続中',
+  'tally.conn.lost': '⚠️ 切断 - スタンドアロン動作中',
 };
 
 const DICTS: Record<Lang, Dict> = { en, ja };

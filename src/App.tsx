@@ -319,6 +319,7 @@ function MainApp() {
                     disabled={isRunning}
                     placeholder="HH:MM:SS:FF"
                     inputMode="numeric"
+                    maxLength={11}
                   />
                 </div>
               </div>
@@ -551,6 +552,7 @@ function MainApp() {
                           value={m.comment || ''}
                           onChange={(e) => updateMarkerComment(m.id, e.target.value)}
                           placeholder={tr('placeholder.comment')}
+                          maxLength={100}
                         />
                       </div>
                     </div>
@@ -628,7 +630,7 @@ function MainApp() {
             <div className="tally-dimmer" style={{ opacity: tallyDimmerOpacity }} />
             {p2pRole === 'client' && (
               <div className={`tally-conn-banner ${isConnected ? 'connected' : 'disconnected'}`}>
-                {isConnected ? '✓ CONNECTED TO DIRECTOR' : '⚠️ DISCONNECTED - STANDALONE MODE'}
+                {isConnected ? tr('tally.conn.ok') : tr('tally.conn.lost')}
               </div>
             )}
             <div className="tally-header-slim">
@@ -647,7 +649,7 @@ function MainApp() {
             <div className="tally-control-bar">
               <button className="tally-ctrl-bar-btn" onClick={(e) => { playHapticFeedback(); handleDimmerCycle(e); }}>
                 <span className="tally-ctrl-icon">☀</span>
-                <span>{tallyDimmerOpacity === 0 ? '明' : tallyDimmerOpacity === 0.5 ? '中' : '暗'}</span>
+                <span>{tallyDimmerOpacity === 0 ? tr('tally.dim.bright') : tallyDimmerOpacity === 0.5 ? tr('tally.dim.mid') : tr('tally.dim.dark')}</span>
               </button>
               <button className={`tally-ctrl-bar-btn ${tallyTorchEnabled ? 'active' : ''}`} onClick={(e) => { playHapticFeedback(); handleTorchToggle(e); }}>
                 <span className="tally-ctrl-icon">🔦</span>
@@ -687,8 +689,7 @@ function MainApp() {
             </div>
             <div className="director-all-control">
               <div className="director-all-label">
-                <span>ALL CAMERAS</span>
-                <span className="director-all-sub">一括操作</span>
+                <span>{tr('director.allControl')}</span>
               </div>
               <div className="director-all-btns">
                 <button
@@ -760,7 +761,7 @@ function MainApp() {
               </div>
               {tallyActionLog.length > 0 && (
                 <div className="director-log">
-                  <div className="director-log-title">操作ログ</div>
+                  <div className="director-log-title">{tr('director.actionLog')}</div>
                   {tallyActionLog.map((entry, i) => (
                     <div key={i} className="director-log-row">
                       <span className={`director-log-state state-text-${entry.state === 'live' ? 'live' : entry.state === 'preview' ? 'preview' : 'off'}`}>

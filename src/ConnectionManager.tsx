@@ -25,8 +25,9 @@ export function ConnectionManager() {
   const copyInviteLink = () => {
     const url = new URL(window.location.href);
     url.searchParams.set('join', peerId);
-    void navigator.clipboard.writeText(url.toString());
-    addToast('Invite Link Copied!', 'info');
+    navigator.clipboard.writeText(url.toString())
+      .then(() => addToast('Invite Link Copied!', 'info'))
+      .catch(() => addToast('Copy failed - copy the ID manually', 'error'));
   };
 
   return (
@@ -82,6 +83,7 @@ export function ConnectionManager() {
                       value={manualTimecode} 
                       onChange={e => setManualTimecode(e.target.value)} 
                       disabled={isRunning} 
+                      maxLength={11}
                     />
                   </div>
                 )}
@@ -92,7 +94,8 @@ export function ConnectionManager() {
                 <input 
                   placeholder="ENTER MASTER ID" 
                   value={targetId} 
-                  onChange={e => setTargetId(e.target.value)} 
+                  maxLength={8}
+                  onChange={e => setTargetId(e.target.value.toUpperCase())} 
                 />
                 <button onClick={joinSession}>LINK</button>
               </div>
