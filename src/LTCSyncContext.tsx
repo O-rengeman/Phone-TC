@@ -292,6 +292,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [p2pSyncSource, setP2pSyncSource] = useState<'manual' | 'network'>('manual');
   const [nowTick, setNowTick] = useState(0);
   const [isVideoEnabled, setIsVideoEnabled] = useState(false);
+  const onMasterHeartbeatTimeoutRef = useRef<(() => void) | null>(null);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   useWakeLock(isRunning);
@@ -325,7 +326,17 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     packetLossRate, setPacketLossRate,
     peerSyncRef, messageHandlerRef, signalingHandlerRef, rttHistoryRef, lastSyncTimeRef, lastHeartbeatTimeRef,
     resetP2P, setupP2PMaster, setupP2PClient, joinSession,
-  } = useP2P({ syncMode, setSyncMode, p2pRole, setP2pRole, isRunning, langRef, addToast });
+  } = useP2P({
+    syncMode,
+    setSyncMode,
+    p2pRole,
+    setP2pRole,
+    isRunning,
+    isPaused,
+    langRef,
+    addToast,
+    onMasterHeartbeatTimeout: () => onMasterHeartbeatTimeoutRef.current?.(),
+  });
 
   const {
     tallyOpen, setTallyOpen, tallyMode, setTallyMode, tallyTorchEnabled, setTallyTorchEnabled,
@@ -481,6 +492,24 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     setSyncStatus, setDriftStatus, langRef, addToast,
   });
 
+  const syncClientToStoppedMaster = useCallback(() => {
+    if (isRunning) {
+      debug('[DEBUG-SYNC] Triggering handleStartStop to STOP');
+      void handleStartStop();
+      return;
+    }
+
+    if (isPaused) {
+      debug('[DEBUG-SYNC] Clearing paused state after master stop/timeout');
+      setIsPaused(false);
+      if (engineRef.current) {
+        engineRef.current.setManualTimecode(manualTimecode);
+        currentTcRef.current = engineRef.current.getTimecodeString();
+      }
+    }
+  }, [isRunning, isPaused, handleStartStop, setIsPaused, engineRef, manualTimecode, currentTcRef]);
+  onMasterHeartbeatTimeoutRef.current = syncClientToStoppedMaster;
+
   const getUnshiftedTc = useCallback((tcStr: string) => {
     if (outputOffset === 0) return tcStr;
     try {
@@ -573,17 +602,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
                 debug('[DEBUG-SYNC] Triggering handlePause to PAUSE');
                 handlePause();
               } else if (!masterPaused && (isRunning || isPaused)) {
-                if (isRunning) {
-                  debug('[DEBUG-SYNC] Triggering handleStartStop to STOP');
-                  void handleStartStop();
-                } else {
-                  debug('[DEBUG-SYNC] Setting client isPaused to false');
-                  setIsPaused(false);
-                  if (engineRef.current) {
-                    engineRef.current.setManualTimecode(manualTimecode);
-                    currentTcRef.current = engineRef.current.getTimecodeString();
-                  }
-                }
+                syncClientToStoppedMaster();
               }
             }
           }
@@ -641,17 +660,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
                 debug('[DEBUG-SYNC] Triggering handlePause to PAUSE');
                 handlePause();
               } else if (!masterPaused && (isRunning || isPaused)) {
-                if (isRunning) {
-                  debug('[DEBUG-SYNC] Triggering handleStartStop to STOP');
-                  void handleStartStop();
-                } else {
-                  debug('[DEBUG-SYNC] Setting client isPaused to false');
-                  setIsPaused(false);
-                  if (engineRef.current) {
-                    engineRef.current.setManualTimecode(manualTimecode);
-                    currentTcRef.current = engineRef.current.getTimecodeString();
-                  }
-                }
+                syncClientToStoppedMaster();
               }
             }
           }

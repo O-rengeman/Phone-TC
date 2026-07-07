@@ -29,6 +29,7 @@ function makeParams(overrides: Partial<Parameters<typeof useP2P>[0]> = {}) {
     p2pRole: null,
     setP2pRole: vi.fn(),
     isRunning: false,
+    isPaused: false,
     langRef: { current: 'en' as Lang },
     addToast: vi.fn(),
     ...overrides,
@@ -44,6 +45,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe('useP2P — thin state-transition coverage', () => {
@@ -123,5 +125,26 @@ describe('useP2P — thin state-transition coverage', () => {
 
     // import.meta.env.DEV is true under vitest, so this should forward.
     expect(setLossRate).toHaveBeenCalledWith(0.25);
+  });
+
+  it('stops an active client when master heartbeats time out', () => {
+    vi.useFakeTimers();
+    const addToast = vi.fn();
+    const onMasterHeartbeatTimeout = vi.fn();
+    const { result } = renderHook(() => useP2P(makeParams({
+      p2pRole: 'client',
+      isRunning: true,
+      addToast,
+      onMasterHeartbeatTimeout,
+    })));
+
+    act(() => {
+      result.current.lastHeartbeatTimeRef.current = Date.now() - 5000;
+    });
+    act(() => { vi.advanceTimersByTime(1000); });
+
+    expect(result.current.p2pStatus).toBe('MASTER TIMEOUT');
+    expect(onMasterHeartbeatTimeout).toHaveBeenCalledTimes(1);
+    expect(addToast).toHaveBeenCalledWith('MASTER LOST — CLIENT STOPPED', 'error');
   });
 });

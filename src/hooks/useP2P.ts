@@ -10,6 +10,8 @@ type P2PRole = 'master' | 'client' | null;
 type ClientStats = Record<string, { rtt: number; drift: number; lastSeen: number }>;
 
 const RECONNECT_DELAY_MS = 5000;
+const MASTER_HEARTBEAT_TIMEOUT_MS = 3000;
+const HEARTBEAT_WATCH_INTERVAL_MS = 500;
 
 interface UseP2PParams {
   syncMode: SyncMode;
@@ -17,8 +19,10 @@ interface UseP2PParams {
   p2pRole: P2PRole;
   setP2pRole: React.Dispatch<React.SetStateAction<P2PRole>>;
   isRunning: boolean;
+  isPaused: boolean;
   langRef: React.RefObject<Lang>;
   addToast: (msg: string, level?: ToastLevel) => void;
+  onMasterHeartbeatTimeout?: () => void;
 }
 
 interface UseP2PResult {
@@ -65,8 +69,10 @@ export function useP2P({
   p2pRole,
   setP2pRole,
   isRunning,
+  isPaused,
   langRef,
   addToast,
+  onMasterHeartbeatTimeout,
 }: UseP2PParams): UseP2PResult {
   const [peerId, setPeerId] = useState<string>('');
   const [targetId, setTargetId] = useState<string>('');
@@ -82,6 +88,7 @@ export function useP2P({
   const rttHistoryRef = useRef<number[]>([]);
   const lastSyncTimeRef = useRef<number>(0);
   const lastHeartbeatTimeRef = useRef<number>(0);
+  const masterTimeoutHandledRef = useRef(false);
 
   useEffect(() => {
     lastSyncTimeRef.current = Date.now();
@@ -166,6 +173,34 @@ export function useP2P({
     // recreated, not just once at startup.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (p2pRole !== 'client') {
+      masterTimeoutHandledRef.current = false;
+      return;
+    }
+
+    const timer = setInterval(() => {
+      const lastHeartbeatAt = lastHeartbeatTimeRef.current;
+      const timedOut = lastHeartbeatAt > 0 && (Date.now() - lastHeartbeatAt) >= MASTER_HEARTBEAT_TIMEOUT_MS;
+
+      if (!timedOut) {
+        masterTimeoutHandledRef.current = false;
+        return;
+      }
+      if (masterTimeoutHandledRef.current) return;
+
+      masterTimeoutHandledRef.current = true;
+      setP2pStatus('MASTER TIMEOUT');
+
+      if (isRunning || isPaused) {
+        onMasterHeartbeatTimeout?.();
+        addToast(translate('toast.p2pMasterTimedOut', langRef.current), 'error');
+      }
+    }, HEARTBEAT_WATCH_INTERVAL_MS);
+
+    return () => clearInterval(timer);
+  }, [p2pRole, isRunning, isPaused, onMasterHeartbeatTimeout, addToast, langRef]);
 
   // Emergency Mode: Auto-reconnect & notify when disconnected during playback
   useEffect(() => {
