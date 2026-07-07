@@ -8,18 +8,20 @@ export interface TimeSyncResult {
 
 const TIME_SERVERS = [
   'https://worldtimeapi.org/api/ip',
+  'https://worldtimeapi.org/api/timezone/Etc/UTC',
   'https://timeapi.io/api/Time/current/zone?timeZone=UTC',
+  'http://worldclockapi.com/api/json/utc/now',
 ];
 
 const NTP_CACHE_KEY = 'ltc-ntp-cache';
 const NTP_CACHE_TTL_MS = 3600000; // 1 hour
-const FETCH_TIMEOUT_MS = 4000; // Abort a stuck time-server request after 4s
+const FETCH_TIMEOUT_MS = 6000; // Abort a stuck time-server request after 6s
 
-// worldtimeapi.org uses `datetime`, timeapi.io uses `dateTime` — both optional
-// since only one appears in a given response.
+// worldtimeapi.org uses `datetime`, timeapi.io uses `dateTime`, worldclockapi.com uses `currentDateTime`
 interface TimeServerResponse {
   dateTime?: string;
   datetime?: string;
+  currentDateTime?: string;
 }
 
 interface CachedTimeSync {
@@ -54,6 +56,8 @@ export class TimeSync {
             serverTime = new Date(data.dateTime + (data.dateTime.endsWith('Z') ? '' : 'Z')).getTime();
           } else if (data.datetime) {
             serverTime = new Date(data.datetime).getTime();
+          } else if (data.currentDateTime) {
+            serverTime = new Date(data.currentDateTime).getTime();
           } else {
             continue;
           }
