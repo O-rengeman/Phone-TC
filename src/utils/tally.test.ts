@@ -14,38 +14,32 @@ const payload = (rev: number, all: TallyPayload['all'], assignments: TallyPayloa
 describe('resolveTally', () => {
   it('uses the per-camera assignment when connected', () => {
     const p = payload(1, 'standby', { CAM2: 'live', CAM3: 'preview' });
-    expect(resolveTally(p, 'CAM2', { connected: true, autoMode: false, selfIsRunning: false })).toBe('live');
-    expect(resolveTally(p, 'CAM3', { connected: true, autoMode: false, selfIsRunning: false })).toBe('preview');
+    expect(resolveTally(p, 'CAM2', { connected: true })).toBe('live');
+    expect(resolveTally(p, 'CAM3', { connected: true })).toBe('preview');
   });
 
   it('falls back to the `all` default when no assignment for this id', () => {
     const p = payload(1, 'standby', { CAM2: 'live' });
-    expect(resolveTally(p, 'CAM9', { connected: true, autoMode: false, selfIsRunning: false })).toBe('standby');
+    expect(resolveTally(p, 'CAM9', { connected: true })).toBe('standby');
   });
 
-  it('AUTO derives live/off from local LTC when not connected', () => {
-    expect(resolveTally(null, 'X', { connected: false, autoMode: true, selfIsRunning: true })).toBe('live');
-    expect(resolveTally(null, 'X', { connected: false, autoMode: true, selfIsRunning: false })).toBe('off');
-  });
-
-  it('is off when standalone and AUTO is disabled', () => {
-    expect(resolveTally(null, 'X', { connected: false, autoMode: false, selfIsRunning: true })).toBe('off');
+  it('is off when standalone and no manual state is set', () => {
+    expect(resolveTally(null, 'X', { connected: false })).toBe('off');
   });
 
   it('ignores a payload when not connected (standalone wins)', () => {
     const p = payload(5, 'live', { X: 'live' });
-    expect(resolveTally(p, 'X', { connected: false, autoMode: false, selfIsRunning: false })).toBe('off');
-    expect(resolveTally(p, 'X', { connected: false, autoMode: true, selfIsRunning: false })).toBe('off');
+    expect(resolveTally(p, 'X', { connected: false })).toBe('off');
   });
 
-  it('standalone MANUAL returns the explicit manualState', () => {
-    expect(resolveTally(null, 'X', { connected: false, autoMode: false, selfIsRunning: false, manualState: 'live' })).toBe('live');
-    expect(resolveTally(null, 'X', { connected: false, autoMode: false, selfIsRunning: false, manualState: 'preview' })).toBe('preview');
+  it('standalone returns the explicit manualState', () => {
+    expect(resolveTally(null, 'X', { connected: false, manualState: 'live' })).toBe('live');
+    expect(resolveTally(null, 'X', { connected: false, manualState: 'preview' })).toBe('preview');
   });
 
   it('connected but no payload yet falls through to standalone rules', () => {
-    expect(resolveTally(null, 'X', { connected: true, autoMode: true, selfIsRunning: true })).toBe('live');
-    expect(resolveTally(null, 'X', { connected: true, autoMode: false, selfIsRunning: true })).toBe('off');
+    expect(resolveTally(null, 'X', { connected: true, manualState: 'live' })).toBe('live');
+    expect(resolveTally(null, 'X', { connected: true })).toBe('off');
   });
 });
 

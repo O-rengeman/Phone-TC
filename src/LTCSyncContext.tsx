@@ -5,7 +5,6 @@ import { ScreenOrientation } from '@capacitor/screen-orientation';
 
 import { LtcEngine } from './utils/LtcEngine';
 import type { SyncMessage } from './utils/PeerSync';
-import { PEER_ID_LENGTH } from './utils/PeerSync';
 import { TimecodeNativeBridge } from './utils/TimecodeNativeBridge';
 import { DriftMonitor } from './utils/DriftMonitor';
 import { t as translate, getInitialLang, persistLang } from './utils/i18n';
@@ -26,6 +25,7 @@ import { useTallyControl } from './hooks/useTallyControl';
 import { useLtcEngine } from './hooks/useLtcEngine';
 import { WebRTCMediaService } from './utils/WebRTCMediaService';
 import { mediaStreamActions } from './hooks/useMediaStreams';
+import { shouldActivateMediaService, shouldStartClientCamera } from './utils/videoMonitoring';
 
 export type SyncMode = 'system' | 'network' | 'p2p' | 'freerun';
 export type ToastLevel = 'info' | 'warn' | 'error';
@@ -100,8 +100,6 @@ interface LTCStateType {
   setShowGuide: React.Dispatch<React.SetStateAction<boolean>>;
   tallyOpen: boolean;
   setTallyOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  tallyMode: 'auto' | 'manual';
-  setTallyMode: React.Dispatch<React.SetStateAction<'auto' | 'manual'>>;
   tallyTorchEnabled: boolean;
   setTallyTorchEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   manualTally: TallyState;
@@ -339,7 +337,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   });
 
   const {
-    tallyOpen, setTallyOpen, tallyMode, setTallyMode, tallyTorchEnabled, setTallyTorchEnabled,
+    tallyOpen, setTallyOpen, tallyTorchEnabled, setTallyTorchEnabled,
     manualTally, tallyPayload, setTallyPayload, tallyTime, setTallyTime,
     tallyDimmerOpacity, setTallyDimmerOpacity, tallyTcSize, setTallyTcSize, tallyActionLog,
     tallyTimeRef, tallyOpenRef,
@@ -347,7 +345,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     playHapticFeedback, handleManualTallyChange, handleClientTallyChange, handleAllTallyChange,
     handleDimmerCycle, handleTorchToggle, handleTallyExit,
   } = useTallyControl({
-    isHost, isRunning, p2pRole, peerId, peerSyncRef, lastHeartbeatTimeRef,
+    isHost, p2pRole, peerId, peerSyncRef, lastHeartbeatTimeRef,
     nowTick, cameraLabels, currentTcRef,
   });
 
@@ -359,7 +357,10 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
   // Manage WebRTCMediaService lifecycle
   useEffect(() => {
-    if (!isVideoEnabled || !peerSyncRef.current || !peerId) {
+    const peerSync = peerSyncRef.current;
+    const shouldActivate = Boolean(peerId) && shouldActivateMediaService(p2pRole, targetId);
+
+    if (!shouldActivate || !peerSync || !peerId) {
       if (mediaServiceRef.current) {
         mediaServiceRef.current.closeAll();
         mediaServiceRef.current = null;
@@ -368,7 +369,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const service = new WebRTCMediaService(peerSyncRef.current, peerId, isHost);
+    const service = new WebRTCMediaService(peerSync, peerId, isHost);
     mediaServiceRef.current = service;
 
     service.onRemoteStream = ({ peerId: pId, stream }) => {
@@ -393,10 +394,10 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       mediaStreamActions.clearStreams();
       signalingHandlerRef.current = null;
     };
-  }, [isVideoEnabled, isHost, peerId, peerSyncRef, signalingHandlerRef]);
+  }, [isHost, p2pRole, targetId, peerId, peerSyncRef, signalingHandlerRef]);
 
   // Client-only: start the camera and connect to the master once targetId is
-  // a complete peer id (PEER_ID_LENGTH chars), not on every keystroke while
+  // complete, not on every keystroke while
   // it's being typed in ConnectionManager. Kept separate from the effect
   // above so retyping targetId doesn't tear down/recreate the whole
   // WebRTCMediaService (which would stop the camera and drop all peer
@@ -404,14 +405,14 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   // target exists, so re-running this effect on unrelated state changes is
   // harmless.
   useEffect(() => {
-    if (isHost || !isVideoEnabled) return;
+    if (!shouldStartClientCamera(p2pRole, targetId)) return;
     const service = mediaServiceRef.current;
-    if (!service || targetId.length !== PEER_ID_LENGTH) return;
+    if (!service) return;
 
     void service.startLocalCamera().then(() => {
       void service.connectToPeer(targetId);
     });
-  }, [isHost, isVideoEnabled, targetId, mediaServiceRef]);
+  }, [p2pRole, targetId, mediaServiceRef]);
 
   useEffect(() => {
     const initMobile = async () => {
@@ -845,7 +846,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     p2pSyncSource, setP2pSyncSource,
     showGuide, setShowGuide,
     tallyOpen, setTallyOpen,
-    tallyMode, setTallyMode,
     tallyTorchEnabled, setTallyTorchEnabled,
     manualTally,
     tallyPayload,
@@ -875,14 +875,14 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     activeTab, isMobile, outputMode, autoUserBits, isVisualSlate, isSlateFlashing, slateTime,
     setTallyTime, setDirectorTime, userBits, markers, defaultReelName, outputLevel, outputOffset,
     peerId, targetId, p2pStatus, isHost, driftStatus, isPaused, stopHoldPct, p2pSyncSource,
-    showGuide, tallyOpen, tallyMode, tallyTorchEnabled, manualTally, tallyPayload, tallyTime,
+    showGuide, tallyOpen, tallyTorchEnabled, manualTally, tallyPayload, tallyTime,
     tallyDimmerOpacity, tallyTcSize, directorPanelOpen, directorTime, cameraLabels, tallyActionLog,
     isResyncing, lang, batteryLevel, isCharging, batteryEta, markerFlash, masterDrift, clients,
     packetLossRate, sceneName, nowTick, tallyState, isTallyConnected,
     setIsRunning, setFpsIndex, setVolume, setSyncMode, setManualTimecode, setActiveTab, setOutputMode,
     setAutoUserBits, setIsVisualSlate, setSlateTime, setUserBits, setMarkers, setDefaultReelName,
     setOutputLevel, setOutputOffset, setTargetId, setP2pSyncSource, setShowGuide, setTallyOpen,
-    setTallyMode, setTallyTorchEnabled, setTallyDimmerOpacity, setTallyTcSize, setDirectorPanelOpen,
+    setTallyTorchEnabled, setTallyDimmerOpacity, setTallyTcSize, setDirectorPanelOpen,
     setCameraLabels, setLang, setPacketLossRate, setSceneName, setIsVideoEnabled, isVideoEnabled,
   ]);
 

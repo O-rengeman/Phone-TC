@@ -50,28 +50,36 @@ afterEach(() => {
 });
 
 describe('useTallyControl.tallyState derivation', () => {
-  it('is off by default when not connected, not auto, and no manual state', () => {
+  it('is off by default when not connected and no manual state is set', () => {
     const { result } = renderHook(() => useTallyControl(makeParams({ p2pRole: null, isHost: false })));
-    // tallyMode defaults to 'auto', so this actually exercises the auto branch —
-    // use manual mode explicitly to test the "off" fallback.
-    expect(result.current.tallyMode).toBe('auto');
+    expect(result.current.tallyState).toBe('off');
   });
 
-  it('derives live/off from local running state in auto mode when standalone', () => {
-    const { result, rerender } = renderHook(
-      (props: { isRunning: boolean }) => useTallyControl(makeParams({ p2pRole: null, isHost: false, isRunning: props.isRunning })),
-      { initialProps: { isRunning: false } },
-    );
-    expect(result.current.tallyState).toBe('off');
-
-    rerender({ isRunning: true });
+  it('uses the manual state when standalone', () => {
+    const { result } = renderHook(() => useTallyControl(makeParams({ p2pRole: null, isHost: false })));
+    act(() => result.current.handleManualTallyChange('live'));
     expect(result.current.tallyState).toBe('live');
   });
 
-  it('uses the manual state when standalone and mode is manual', () => {
-    const { result } = renderHook(() => useTallyControl(makeParams({ p2pRole: null, isHost: false })));
-    act(() => result.current.setTallyMode('manual'));
-    expect(result.current.tallyState).toBe('off');
+  it('prefers the connected payload over the local manual state', () => {
+    const { result } = renderHook(() => useTallyControl(makeParams({
+      p2pRole: 'client', isHost: false, peerId: 'CAM1', nowTick: 1000, lastHeartbeatTimeRef: { current: 500 },
+    })));
+    act(() => result.current.handleManualTallyChange('live'));
+    act(() => {
+      result.current.setTallyPayload({ rev: 1, all: 'standby', assignments: { CAM1: 'preview' } });
+    });
+
+    expect(result.current.tallyState).toBe('preview');
+  });
+
+  it('uses the local manual state when connected but no payload exists yet', () => {
+    const { result } = renderHook(() => useTallyControl(makeParams({
+      p2pRole: 'client', isHost: false, nowTick: 1000, lastHeartbeatTimeRef: { current: 500 },
+    })));
+    act(() => result.current.handleManualTallyChange('preview'));
+    expect(result.current.tallyState).toBe('preview');
+    expect(result.current.manualTally).toBe('preview');
   });
 
   it('is connected and reads the assigned per-camera state when a fresh payload exists', () => {
@@ -93,37 +101,10 @@ describe('useTallyControl.tallyState derivation', () => {
   });
 });
 
-describe('useTallyControl auto-mode broadcast', () => {
-  it('broadcasts live/standby based on isRunning when host and in auto mode', () => {
-    const peerSyncRef = makePeerSyncRef();
-    const { rerender } = renderHook(
-      (props: { isRunning: boolean }) => useTallyControl(makeParams({ peerSyncRef, isRunning: props.isRunning })),
-      { initialProps: { isRunning: false } },
-    );
-    expect(peerSyncRef.current.broadcast).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'tally', tally: expect.objectContaining({ all: 'standby' }) as unknown as TallyPayload,
-    }));
-
-    rerender({ isRunning: true });
-    expect(peerSyncRef.current.broadcast).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'tally', tally: expect.objectContaining({ all: 'live' }) as unknown as TallyPayload,
-    }));
-  });
-
+describe('useTallyControl broadcasts only from explicit tally actions', () => {
   it('does not broadcast when not host', () => {
     const peerSyncRef = makePeerSyncRef();
     renderHook(() => useTallyControl(makeParams({ peerSyncRef, isHost: false })));
-    expect(peerSyncRef.current.broadcast).not.toHaveBeenCalled();
-  });
-
-  it('does not broadcast in manual mode', () => {
-    const peerSyncRef = makePeerSyncRef();
-    const { result } = renderHook(() => useTallyControl(makeParams({ peerSyncRef })));
-    act(() => result.current.setTallyMode('manual'));
-    // broadcast is a vi.fn() under the PeerSync cast in makePeerSyncRef, so
-    // its static type loses the Mock methods — cast locally to call them.
-    (peerSyncRef.current.broadcast as unknown as ReturnType<typeof vi.fn>).mockClear();
-    // No further state change should trigger an auto broadcast now that mode is manual.
     expect(peerSyncRef.current.broadcast).not.toHaveBeenCalled();
   });
 });
@@ -141,10 +122,6 @@ describe('useTallyControl tally-change handlers', () => {
   it('handleManualTallyChange broadcasts a fresh payload when host', () => {
     const peerSyncRef = makePeerSyncRef();
     const { result } = renderHook(() => useTallyControl(makeParams({ peerSyncRef, isHost: true })));
-    // Switch to manual mode first: in auto mode the auto-broadcast effect
-    // would immediately overwrite this call's payload back to live/standby.
-    act(() => result.current.setTallyMode('manual'));
-    (peerSyncRef.current.broadcast as unknown as ReturnType<typeof vi.fn>).mockClear();
 
     act(() => result.current.handleManualTallyChange('preview'));
 
@@ -193,8 +170,6 @@ describe('useTallyControl tally-change handlers', () => {
     expect(result.current.manualTally).toBe('off'); // no-op: not host
 
     const { result: hostResult } = renderHook(() => useTallyControl(makeParams({ isHost: true })));
-    // Manual mode: avoid the auto-broadcast effect overwriting this call's payload.
-    act(() => hostResult.current.setTallyMode('manual'));
     act(() => hostResult.current.handleAllTallyChange('live'));
     expect(hostResult.current.manualTally).toBe('live');
     expect(hostResult.current.tallyPayload).toMatchObject({ all: 'live' });
@@ -245,25 +220,20 @@ describe('useTallyControl UI helpers', () => {
 
 describe('useTallyControl torch effect', () => {
   it('invokes the native bridge torch call when tallyTorchEnabled and tallyState is live', async () => {
-    const { result, rerender } = renderHook(
-      (props: { isRunning: boolean }) => useTallyControl(makeParams({
-        p2pRole: null, isHost: false, isRunning: props.isRunning,
-      })),
-      { initialProps: { isRunning: true } }, // auto mode + running -> tallyState 'live'
-    );
+    const { result } = renderHook(() => useTallyControl(makeParams({ p2pRole: null, isHost: false })));
 
     await act(async () => {
+      result.current.handleManualTallyChange('live');
       result.current.setTallyTorchEnabled(true);
       await Promise.resolve();
     });
-    rerender({ isRunning: true });
 
     await act(async () => { await Promise.resolve(); });
     expect(setTorch).toHaveBeenCalledWith(true);
   });
 
   it('turns the torch off when tallyState is not live', async () => {
-    const { result } = renderHook(() => useTallyControl(makeParams({ p2pRole: null, isHost: false, isRunning: false })));
+    const { result } = renderHook(() => useTallyControl(makeParams({ p2pRole: null, isHost: false })));
 
     await act(async () => {
       result.current.setTallyTorchEnabled(true);

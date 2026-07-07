@@ -4,7 +4,7 @@
  * A tally lamp shows whether a camera is on PROGRAM (live), on PREVIEW, on
  * standby, or off. In this app the state can come from a P2P master (the
  * director's device) addressing each client camera, or — when not connected —
- * be derived locally from whether this device is emitting LTC (AUTO mode).
+ * fall back to the device's local manual tally state.
  *
  * The React layer keeps the latest payload (by rev) and calls `resolveTally`
  * each render; all the branching lives here so it can be tested in isolation.
@@ -27,19 +27,14 @@ export interface TallyPayload {
 export interface TallyContext {
   /** True when this device is a P2P client receiving from a master. */
   connected: boolean;
-  /** AUTO trigger: derive tally from local LTC output when not networked. */
-  autoMode: boolean;
-  /** Whether this device is currently emitting LTC. */
-  selfIsRunning: boolean;
-  /** Standalone MANUAL state (used when not connected and AUTO is off). */
+  /** Standalone local tally state when not receiving a master assignment. */
   manualState?: TallyState;
 }
 
 /**
  * Resolve the effective tally state for this device.
  * - Networked client with a payload -> per-camera assignment, else the `all` default.
- * - Otherwise (standalone) -> AUTO derives live/standby from local LTC; else the
- *   explicit manual state (default off).
+ * - Otherwise (standalone) -> explicit local manual state (default off).
  */
 export function resolveTally(
   payload: TallyPayload | null,
@@ -48,9 +43,6 @@ export function resolveTally(
 ): TallyState {
   if (ctx.connected && payload) {
     return payload.assignments[myId] ?? payload.all;
-  }
-  if (ctx.autoMode) {
-    return ctx.selfIsRunning ? 'live' : 'off';
   }
   return ctx.manualState ?? 'off';
 }

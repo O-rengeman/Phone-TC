@@ -5,13 +5,11 @@ import { resolveTally } from '../utils/tally';
 import type { TallyState, TallyPayload } from '../utils/tally';
 import type { PeerSync, SyncMessage } from '../utils/PeerSync';
 
-type TallyMode = 'auto' | 'manual';
 type TallyTcSize = 'sm' | 'md' | 'lg';
 type ActionLogEntry = { time: string; cam: string; state: string };
 
 interface UseTallyControlParams {
   isHost: boolean;
-  isRunning: boolean;
   p2pRole: 'master' | 'client' | null;
   peerId: string;
   peerSyncRef: React.RefObject<PeerSync | null>;
@@ -24,8 +22,6 @@ interface UseTallyControlParams {
 interface UseTallyControlResult {
   tallyOpen: boolean;
   setTallyOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  tallyMode: TallyMode;
-  setTallyMode: React.Dispatch<React.SetStateAction<TallyMode>>;
   tallyTorchEnabled: boolean;
   setTallyTorchEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   manualTally: TallyState;
@@ -69,7 +65,7 @@ function broadcastTally(peerSyncRef: React.RefObject<PeerSync | null>, isRunning
 }
 
 /**
- * Owns the tally-lamp control plane: manual/auto mode, per-camera and
+ * Owns the tally-lamp control plane: local manual state, per-camera and
  * all-camera state changes (broadcast to P2P clients), torch control,
  * dimmer, fullscreen tally open/exit, and the tally-state derivation.
  *
@@ -80,7 +76,6 @@ function broadcastTally(peerSyncRef: React.RefObject<PeerSync | null>, isRunning
  */
 export function useTallyControl({
   isHost,
-  isRunning,
   p2pRole,
   peerId,
   peerSyncRef,
@@ -90,7 +85,6 @@ export function useTallyControl({
   currentTcRef,
 }: UseTallyControlParams): UseTallyControlResult {
   const [tallyOpen, setTallyOpen] = useState(false);
-  const [tallyMode, setTallyMode] = useState<TallyMode>('auto');
   const [tallyTorchEnabled, setTallyTorchEnabled] = useState(false);
   const videoTrackRef = useRef<MediaStreamTrack | null>(null);
   const [manualTally, setManualTally] = useState<TallyState>('off');
@@ -156,26 +150,8 @@ export function useTallyControl({
   const isTallyConnected = p2pRole === 'client' && (nowTick - lastHeartbeatTimeRef.current < TALLY_HEARTBEAT_TIMEOUT_MS);
   const tallyState = resolveTally(tallyPayload, peerId, {
     connected: isTallyConnected,
-    autoMode: tallyMode === 'auto',
-    selfIsRunning: isRunning,
     manualState: manualTally,
   });
-
-  useEffect(() => {
-    if (isHost && tallyMode === 'auto') {
-      const stateToBroadcast = isRunning ? 'live' : 'standby';
-      if (tallyPayload?.all !== stateToBroadcast) {
-        tallyRevRef.current += 1;
-        const newPayload: TallyPayload = {
-          rev: tallyRevRef.current,
-          all: stateToBroadcast,
-          assignments: {}
-        };
-        setTallyPayload(newPayload);
-        broadcastTally(peerSyncRef, isRunning, newPayload);
-      }
-    }
-  }, [isHost, tallyMode, isRunning, tallyPayload?.all, peerSyncRef]);
 
   useEffect(() => {
     const turnOn = tallyTorchEnabled && tallyState === 'live';
@@ -279,7 +255,7 @@ export function useTallyControl({
   }, [isHost, peerSyncRef]);
 
   return {
-    tallyOpen, setTallyOpen, tallyMode, setTallyMode, tallyTorchEnabled, setTallyTorchEnabled,
+    tallyOpen, setTallyOpen, tallyTorchEnabled, setTallyTorchEnabled,
     manualTally, tallyPayload, setTallyPayload, tallyTime, setTallyTime,
     tallyDimmerOpacity, setTallyDimmerOpacity, tallyTcSize, setTallyTcSize, tallyActionLog,
     tallyRevRef, tallyTimeRef, tallyOpenRef,

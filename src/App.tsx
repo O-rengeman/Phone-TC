@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { LTCSyncProvider, useLTC } from './LTCSyncContext';
 import { FPS_OPTIONS } from './constants';
 import { VideoPlayer } from './VideoPlayer';
@@ -59,8 +59,6 @@ function MainApp() {
     setShowGuide,
     tallyOpen,
     setTallyOpen,
-    tallyMode,
-    setTallyMode,
     tallyTorchEnabled,
     setTallyTorchEnabled,
     manualTally,
@@ -114,6 +112,8 @@ function MainApp() {
   } = useLTC();
 
   const mediaStreams = useMediaStreams();
+  const [pgmSourceId, setPgmSourceId] = useState<string | null>(null);
+  const returnStream = targetId ? (mediaStreams.get(targetId) ?? null) : null;
 
   const handleOutputModeChange = (mode: 'stereo' | 'mono-l') => {
     setOutputMode(mode);
@@ -125,16 +125,47 @@ function MainApp() {
     }
   };
 
+  useEffect(() => {
+    if (!isHost) return;
+    const service = mediaServiceRef.current;
+    if (!service) return;
+
+    if (!isVideoEnabled || !pgmSourceId) {
+      void service.setPgmStream(null);
+      return;
+    }
+
+    void service.setPgmStream(mediaStreams.get(pgmSourceId) ?? null);
+  }, [isHost, isVideoEnabled, pgmSourceId, mediaStreams, mediaServiceRef]);
+
   // Extracted from the Director Panel's inline onClick so mediaServiceRef.current
   // is only read from within a component-level hook callback (an event-handler
   // boundary), not from inside the render-time IIFE that builds the panel's JSX.
   const handleSetOnAir = useCallback((id: string) => {
     playHapticFeedback();
     handleClientTallyChange(id, 'live');
-    if (isVideoEnabled && mediaServiceRef.current && mediaStreams.get(id)) {
-      void mediaServiceRef.current.setPgmStream(mediaStreams.get(id)!);
+    setPgmSourceId(id);
+  }, [playHapticFeedback, handleClientTallyChange]);
+
+  const handleSetPreview = useCallback((id: string) => {
+    playHapticFeedback();
+    handleClientTallyChange(id, 'preview');
+    setPgmSourceId(current => current === id ? null : current);
+  }, [playHapticFeedback, handleClientTallyChange]);
+
+  const handleSetOff = useCallback((id: string) => {
+    playHapticFeedback();
+    handleClientTallyChange(id, 'off');
+    setPgmSourceId(current => current === id ? null : current);
+  }, [playHapticFeedback, handleClientTallyChange]);
+
+  const handleSetAllTally = useCallback((state: TallyState) => {
+    playHapticFeedback();
+    handleAllTallyChange(state);
+    if (state !== 'live') {
+      setPgmSourceId(null);
     }
-  }, [playHapticFeedback, handleClientTallyChange, isVideoEnabled, mediaStreams, mediaServiceRef]);
+  }, [playHapticFeedback, handleAllTallyChange]);
 
   return (
     <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
@@ -374,20 +405,6 @@ function MainApp() {
           <div className="tab-pane tools-pane">
             <div className="control-section tally-section">
               <label className="section-label">{tr('label.tally')}</label>
-              <div className="tally-controls">
-                <button
-                  className={`btn-pill ${tallyMode === 'manual' ? 'active' : ''}`}
-                  onClick={() => setTallyMode('manual')}
-                >
-                  {tr('tally.manual')}
-                </button>
-                <button
-                  className={`btn-pill ${tallyMode === 'auto' ? 'active' : ''}`}
-                  onClick={() => setTallyMode('auto')}
-                >
-                  {tr('tally.auto')}
-                </button>
-              </div>
               <div className="tally-options" style={{ marginTop: '8px' }}>
                 <label className="toggle-label">
                   <input
@@ -406,20 +423,18 @@ function MainApp() {
                   DIRECTOR SWITCHER PANEL
                 </button>
               )}
-              {tallyMode === 'manual' && (
-                <div className="tally-state-row">
-                  {(['live', 'preview', 'off'] as TallyState[]).map(s => (
-                    <button
-                      key={s}
-                      className={`tally-state-btn ${manualTally === s ? 'active' : ''}`}
-                      style={manualTally === s ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
-                      onClick={() => handleManualTallyChange(s)}
-                    >
-                      {tr(tallyLabelKey(s))}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="tally-state-row">
+                {(['live', 'preview', 'off'] as TallyState[]).map(s => (
+                  <button
+                    key={s}
+                    className={`tally-state-btn ${manualTally === s ? 'active' : ''}`}
+                    style={manualTally === s ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
+                    onClick={() => handleManualTallyChange(s)}
+                  >
+                    {tr(tallyLabelKey(s))}
+                  </button>
+                ))}
+              </div>
               <button className="tally-open-btn" onClick={() => { setDirectorPanelOpen(false); setIsVisualSlate(false); setTallyOpen(true); }}>{tr('tally.fullscreen')}</button>
             </div>
 
@@ -438,23 +453,21 @@ function MainApp() {
                             δ: {stats.drift.toFixed(2)}s
                           </span>
                         </div>
-                        {tallyMode === 'manual' && (
-                          <div className="client-tally-controls">
-                            {(['live', 'preview', 'off'] as TallyState[]).map(s => {
-                               const isActive = tallyPayload?.assignments?.[id] === s;
-                               return (
-                                 <button
-                                   key={s}
-                                   className={`tally-state-btn mini ${isActive ? 'active' : ''}`}
-                                   style={isActive ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
-                                   onClick={() => handleClientTallyChange(id, s)}
-                                 >
-                                   {tr(tallyLabelKey(s))}
-                                 </button>
-                               );
-                            })}
-                          </div>
-                        )}
+                        <div className="client-tally-controls">
+                          {(['live', 'preview', 'off'] as TallyState[]).map(s => {
+                             const isActive = tallyPayload?.assignments?.[id] === s;
+                             return (
+                               <button
+                                 key={s}
+                                 className={`tally-state-btn mini ${isActive ? 'active' : ''}`}
+                                 style={isActive ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
+                                 onClick={() => handleClientTallyChange(id, s)}
+                               >
+                                 {tr(tallyLabelKey(s))}
+                               </button>
+                             );
+                          })}
+                        </div>
                       </div>
                     );
                   })}
@@ -653,9 +666,9 @@ function MainApp() {
                 {isConnected ? tr('tally.conn.ok') : tr('tally.conn.lost')}
               </div>
             )}
-            {isVideoEnabled && targetId && mediaStreams.get(targetId) && (
+            {p2pRole === 'client' && returnStream && (
               <div className="tally-pgm-video-container">
-                <VideoRenderer stream={mediaStreams.get(targetId)!} className="tally-pgm-video" />
+                <VideoRenderer stream={returnStream} className="tally-pgm-video" />
               </div>
             )}
             <div className="tally-header-slim">
@@ -725,15 +738,15 @@ function MainApp() {
               <div className="director-all-btns">
                 <button
                   className={`dir-all-btn on-air ${tallyPayload?.all === 'live' ? 'active' : ''}`}
-                  onClick={() => { playHapticFeedback(); handleAllTallyChange('live'); }}
+                  onClick={() => handleSetAllTally('live')}
                 >ON AIR</button>
                 <button
                   className={`dir-all-btn preview ${tallyPayload?.all === 'preview' ? 'active' : ''}`}
-                  onClick={() => { playHapticFeedback(); handleAllTallyChange('preview'); }}
+                  onClick={() => handleSetAllTally('preview')}
                 >PREVIEW</button>
                 <button
                   className={`dir-all-btn off ${tallyPayload?.all === 'off' ? 'active' : ''}`}
-                  onClick={() => { playHapticFeedback(); handleAllTallyChange('off'); }}
+                  onClick={() => handleSetAllTally('off')}
                 >OFF</button>
               </div>
             </div>
@@ -783,11 +796,11 @@ function MainApp() {
                           >ON AIR</button>
                           <button
                             className={`dir-cam-btn preview ${uiAssignedState === 'preview' ? 'active' : ''}`}
-                            onClick={() => { playHapticFeedback(); handleClientTallyChange(id, 'preview'); }}
+                            onClick={() => handleSetPreview(id)}
                           >PREVIEW</button>
                           <button
                             className={`dir-cam-btn off ${uiAssignedState === 'off' ? 'active' : ''}`}
-                            onClick={() => { playHapticFeedback(); handleClientTallyChange(id, 'off'); }}
+                            onClick={() => handleSetOff(id)}
                           >OFF</button>
                         </div>
                       </div>
