@@ -3,9 +3,18 @@ import { renderHook, act } from '@testing-library/react';
 import { useBatteryMonitor } from './useBatteryMonitor';
 import type { Lang } from '../utils/i18n';
 
-const toastFn = vi.fn() as any;
-toastFn.success = vi.fn();
-toastFn.error = vi.fn();
+// vi.mock factories are hoisted above regular const declarations — anything
+// referenced inside one must be created via vi.hoisted() or the factory
+// closes over a stale/undefined binding.
+const { toastFn } = vi.hoisted(() => {
+  const fn = vi.fn<(...args: unknown[]) => void>();
+  return {
+    toastFn: Object.assign(fn, {
+      success: vi.fn<(...args: unknown[]) => void>(),
+      error: vi.fn<(...args: unknown[]) => void>(),
+    }),
+  };
+});
 
 vi.mock('react-hot-toast', () => {
   const mockToast = (...args: unknown[]) => toastFn(...args);

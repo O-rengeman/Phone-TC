@@ -156,7 +156,10 @@ export function useLtcEngine({
     const ctx = audioCtxRef.current;
     if (ctx.state === 'suspended') await ctx.resume();
 
-    const customCtx = ctx as any;
+    // AudioContext.audioWorklet.addModule() throws if the same module is
+    // added twice on the same context (e.g. stop/start without a fresh
+    // AudioContext) — flag it on the context instance so we only add once.
+    const customCtx = ctx as AudioContext & { __ltcWorkletAdded?: boolean };
     if (!customCtx.__ltcWorkletAdded) {
       const workletCode = LTC_WORKLET_SOURCE;
       const blob = new Blob([workletCode], { type: 'application/javascript' });
@@ -219,7 +222,9 @@ export function useLtcEngine({
   };
 
   const stopEngine = (reset = false) => {
+    console.log('[DEBUG-ENGINE] stopEngine execution. reset:', reset, 'hasWorkletNode:', !!workletNodeRef.current);
     if (workletNodeRef.current) {
+      console.log('[DEBUG-ENGINE] stopEngine: disconnecting workletNode');
       workletNodeRef.current.port.onmessage = null;
       workletNodeRef.current.disconnect();
       workletNodeRef.current = null;
@@ -351,7 +356,9 @@ export function useLtcEngine({
   };
 
   const handlePause = () => {
+    console.log('[DEBUG-ENGINE] handlePause execution. isRunning:', isRunning, 'engineExists:', !!engineRef.current);
     if (isRunning && engineRef.current) {
+      console.log('[DEBUG-ENGINE] handlePause inside branch. Pausing...');
       setIsPaused(true);
       stopEngine();
     }

@@ -1,20 +1,26 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useTallyControl } from './useTallyControl';
+import type { PeerSync } from '../utils/PeerSync';
 
+// vi.mock factories are hoisted above regular const declarations — anything
+// referenced inside one must be created via vi.hoisted() or the factory
+// closes over a stale/undefined binding.
+const { setTorch, isNativePlatform } = vi.hoisted(() => ({
+  setTorch: vi.fn().mockResolvedValue(undefined),
+  isNativePlatform: vi.fn(() => true), // native by default: skips the web getUserMedia fallback
+}));
 
-const setTorch = vi.fn().mockResolvedValue(undefined);
 vi.mock('../utils/TimecodeNativeBridge', () => ({
   TimecodeNativeBridge: { setTorch: (...args: unknown[]) => setTorch(...args) },
 }));
 
-const isNativePlatform = vi.fn(() => true); // native by default: skips the web getUserMedia fallback
 vi.mock('@capacitor/core', () => ({
   Capacitor: { isNativePlatform: () => isNativePlatform() },
 }));
 
 function makePeerSyncRef() {
-  return { current: { broadcast: vi.fn() } as any };
+  return { current: { broadcast: vi.fn() } as unknown as PeerSync };
 }
 
 function makeParams(overrides: Partial<Parameters<typeof useTallyControl>[0]> = {}) {
@@ -113,7 +119,9 @@ describe('useTallyControl auto-mode broadcast', () => {
     const peerSyncRef = makePeerSyncRef();
     const { result } = renderHook(() => useTallyControl(makeParams({ peerSyncRef })));
     act(() => result.current.setTallyMode('manual'));
-    peerSyncRef.current!.broadcast.mockClear();
+    // broadcast is a vi.fn() under the PeerSync cast in makePeerSyncRef, so
+    // its static type loses the Mock methods — cast locally to call them.
+    (peerSyncRef.current!.broadcast as unknown as ReturnType<typeof vi.fn>).mockClear();
     // No further state change should trigger an auto broadcast now that mode is manual.
     expect(peerSyncRef.current!.broadcast).not.toHaveBeenCalled();
   });
@@ -132,6 +140,10 @@ describe('useTallyControl tally-change handlers', () => {
   it('handleManualTallyChange broadcasts a fresh payload when host', () => {
     const peerSyncRef = makePeerSyncRef();
     const { result } = renderHook(() => useTallyControl(makeParams({ peerSyncRef, isHost: true })));
+    // Switch to manual mode first: in auto mode the auto-broadcast effect
+    // would immediately overwrite this call's payload back to live/standby.
+    act(() => result.current.setTallyMode('manual'));
+    (peerSyncRef.current!.broadcast as unknown as ReturnType<typeof vi.fn>).mockClear();
 
     act(() => result.current.handleManualTallyChange('preview'));
 
@@ -180,6 +192,8 @@ describe('useTallyControl tally-change handlers', () => {
     expect(result.current.manualTally).toBe('off'); // no-op: not host
 
     const { result: hostResult } = renderHook(() => useTallyControl(makeParams({ isHost: true })));
+    // Manual mode: avoid the auto-broadcast effect overwriting this call's payload.
+    act(() => hostResult.current.setTallyMode('manual'));
     act(() => hostResult.current.handleAllTallyChange('live'));
     expect(hostResult.current.manualTally).toBe('live');
     expect(hostResult.current.tallyPayload).toMatchObject({ all: 'live' });

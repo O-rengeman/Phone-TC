@@ -477,16 +477,23 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
           const masterRunning = msg.isRunning;
           const masterPaused = msg.isPaused ?? false;
 
+          console.log('[DEBUG-SYNC] sync-response: masterRunning:', masterRunning, 'masterPaused:', masterPaused, 'clientRunning:', isRunning, 'clientPaused:', isPaused);
+
           if (masterRunning !== isRunning || masterPaused !== isPaused) {
+            console.log('[DEBUG-SYNC] State mismatch detected in sync-response. Resolving...');
             if (masterRunning && !isRunning) {
+              console.log('[DEBUG-SYNC] Triggering handleStartStop to START');
               void handleStartStop();
             } else if (!masterRunning) {
               if (masterPaused && isRunning) {
+                console.log('[DEBUG-SYNC] Triggering handlePause to PAUSE');
                 handlePause();
               } else if (!masterPaused && (isRunning || isPaused)) {
                 if (isRunning) {
+                  console.log('[DEBUG-SYNC] Triggering handleStartStop to STOP');
                   void handleStartStop();
                 } else {
+                  console.log('[DEBUG-SYNC] Setting client isPaused to false');
                   setIsPaused(false);
                   if (engineRef.current) {
                     engineRef.current.setManualTimecode(manualTimecode);
@@ -538,16 +545,23 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
           const masterRunning = msg.isRunning;
           const masterPaused = msg.isPaused ?? false;
 
+          console.log('[DEBUG-SYNC] heartbeat: masterRunning:', masterRunning, 'masterPaused:', masterPaused, 'clientRunning:', isRunning, 'clientPaused:', isPaused);
+
           if (masterRunning !== isRunning || masterPaused !== isPaused) {
+            console.log('[DEBUG-SYNC] State mismatch detected in heartbeat. Resolving...');
             if (masterRunning && !isRunning) {
+              console.log('[DEBUG-SYNC] Triggering handleStartStop to START');
               void handleStartStop();
             } else if (!masterRunning) {
               if (masterPaused && isRunning) {
+                console.log('[DEBUG-SYNC] Triggering handlePause to PAUSE');
                 handlePause();
               } else if (!masterPaused && (isRunning || isPaused)) {
                 if (isRunning) {
+                  console.log('[DEBUG-SYNC] Triggering handleStartStop to STOP');
                   void handleStartStop();
                 } else {
+                  console.log('[DEBUG-SYNC] Setting client isPaused to false');
                   setIsPaused(false);
                   if (engineRef.current) {
                     engineRef.current.setManualTimecode(manualTimecode);
@@ -687,7 +701,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       clearInterval(interval);
       if (hbInterval) clearInterval(hbInterval);
     };
-  }, [isHost, p2pRole, fpsIndex, masterDrift, isRunning, tallyPayload, getUnshiftedTc, lastSyncTimeRef, peerSyncRef]);
+  }, [isHost, p2pRole, fpsIndex, masterDrift, isRunning, isPaused, tallyPayload, getUnshiftedTc, lastSyncTimeRef, peerSyncRef]);
 
   // VU meter (peak level + clip detection for mono-L mic input) now lives in
   // useVuMeter() + <VuMeter>, consuming analyserRef directly, so its ~60Hz

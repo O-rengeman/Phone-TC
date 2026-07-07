@@ -3,13 +3,19 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'jsdom',
-    include: ['src/**/*.test.ts'],
+    // Was 'src/**/*.test.ts' — silently skipped every .tsx test (renderHook
+    // specs for hooks that need JSX providers/wrappers use .test.tsx).
+    include: ['src/**/*.test.{ts,tsx}'],
+    // Registers @testing-library/react's cleanup() after every test — see
+    // src/test/setup.ts for why this is required (globals: true is not set).
+    setupFiles: ['src/test/setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['src/utils/**'],
+      include: ['src/utils/**', 'src/hooks/**'],
       exclude: [
         'src/utils/**/*.test.ts',
+        'src/hooks/**/*.test.{ts,tsx}',
         // Thin Capacitor native-plugin wrapper: only meaningful inside a native
         // build, so it is exercised via manual/native QA rather than jsdom units.
         'src/utils/TimecodeNativeBridge.ts',
