@@ -1,4 +1,5 @@
 import { registerPlugin, Capacitor } from '@capacitor/core';
+import { debug } from './log';
 
 export interface TimecodeNativeBridgePlugin {
   /** バックグラウンド動作に必要なオーディオセッション・サービスの初期化と有効化 */
@@ -39,26 +40,26 @@ export const TimecodeNativeBridge = {
     if (isNative && nativePlugin) {
       try {
         await nativePlugin.startBackgroundMode();
-        console.log('[NativeBridge] Native startBackgroundMode invoked.');
+        debug('[NativeBridge] Native startBackgroundMode invoked.');
         return;
       } catch (err) {
         console.error('[NativeBridge] Failed to invoke native startBackgroundMode', err);
       }
     }
-    console.log('[NativeBridge] (Fallback) Background mode simulation started (Browser/Web).');
+    debug('[NativeBridge] (Fallback) Background mode simulation started (Browser/Web).');
   },
 
   async stopBackgroundMode(): Promise<void> {
     if (isNative && nativePlugin) {
       try {
         await nativePlugin.stopBackgroundMode();
-        console.log('[NativeBridge] Native stopBackgroundMode invoked.');
+        debug('[NativeBridge] Native stopBackgroundMode invoked.');
         return;
       } catch (err) {
         console.error('[NativeBridge] Failed to invoke native stopBackgroundMode', err);
       }
     }
-    console.log('[NativeBridge] (Fallback) Background mode simulation stopped (Browser/Web).');
+    debug('[NativeBridge] (Fallback) Background mode simulation stopped (Browser/Web).');
   },
 
   async updatePlaybackStatus(isRunning: boolean, timecode: string): Promise<void> {
@@ -72,14 +73,14 @@ export const TimecodeNativeBridge = {
     }
     // 開発中のログ過多を防ぐため、再生中はデバッグコンソールへの出力のみにします
     if (isRunning && Math.random() < 0.05) {
-      console.log(`[NativeBridge] (Fallback) Playback status updated. active: ${isRunning}, timecode: ${timecode}`);
+      debug(`[NativeBridge] (Fallback) Playback status updated. active: ${isRunning}, timecode: ${timecode}`);
     }
   },
 
   async setTorch(on: boolean): Promise<void> {
     if (isNative && nativePlugin) {
       // Capacitor v3/v4+ conventions
-      const plugin = nativePlugin as unknown as TimecodeNativeBridgePlugin;
+      const plugin = nativePlugin;
       if (typeof plugin.setTorch === 'function') {
         try {
           await plugin.setTorch({ on });
@@ -90,7 +91,7 @@ export const TimecodeNativeBridge = {
       }
     }
     // Web environment: App.tsx will handle the browser torch API if Capacitor fails
-    console.log(`[NativeBridge] (Fallback) Torch set to ${on}`);
+    debug(`[NativeBridge] (Fallback) Torch set to ${on}`);
   },
 
   /**

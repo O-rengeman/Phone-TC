@@ -71,7 +71,7 @@ export function generateLtcBits(
   framesPerSec: number,
 ): number[] {
   const { hours: h, minutes: m, seconds: s, frames: f } = tc;
-  const bits = new Array(80).fill(0);
+  const bits = new Array<number>(80).fill(0);
   const setBits = (arr: number[], start: number, count: number, val: number) => {
     for (let i = 0; i < count; i++) arr[start + i] = (val >> i) & 1;
   };

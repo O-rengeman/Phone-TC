@@ -37,7 +37,7 @@ describe('TimeSync', () => {
 
     const raw = localStorage.getItem(NTP_CACHE_KEY);
     expect(raw).not.toBeNull();
-    const cached = JSON.parse(raw!);
+    const cached = JSON.parse(raw!) as { offset: number; savedAt: number };
     expect(cached.offset).toBe(result.offset);
     expect(typeof cached.savedAt).toBe('number');
   });

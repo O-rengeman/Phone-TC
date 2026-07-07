@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { TimecodeNativeBridge } from '../utils/TimecodeNativeBridge';
 import { resolveTally } from '../utils/tally';
@@ -109,7 +109,7 @@ export function useTallyControl({
   });
   const [tallyActionLog, setTallyActionLog] = useState<ActionLogEntry[]>([]);
 
-  const playHapticFeedback = () => {
+  const playHapticFeedback = useCallback(() => {
     try {
       if (navigator.vibrate) {
         navigator.vibrate(30);
@@ -129,7 +129,7 @@ export function useTallyControl({
     } catch {
       // Ignore haptic audio errors on auto-play policy
     }
-  };
+  }, []);
 
   useEffect(() => {
     try {
@@ -206,32 +206,32 @@ export function useTallyControl({
         }
       }
     };
-    applyTorch(turnOn);
+    void applyTorch(turnOn);
     return () => {
-      if (turnOn) applyTorch(false);
+      if (turnOn) void applyTorch(false);
     };
   }, [tallyState, tallyTorchEnabled]);
 
-  const handleDimmerCycle = (e: React.MouseEvent) => {
+  const handleDimmerCycle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setTallyDimmerOpacity(prev => {
       if (prev === 0) return 0.5;
       if (prev === 0.5) return 0.85;
       return 0;
     });
-  };
+  }, []);
 
-  const handleTorchToggle = (e: React.MouseEvent) => {
+  const handleTorchToggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setTallyTorchEnabled(prev => !prev);
-  };
+  }, []);
 
-  const handleTallyExit = (e: React.MouseEvent) => {
+  const handleTallyExit = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setTallyOpen(false);
-  };
+  }, []);
 
-  const handleManualTallyChange = (s: TallyState) => {
+  const handleManualTallyChange = useCallback((s: TallyState) => {
     setManualTally(s);
     if (isHost) {
       tallyRevRef.current += 1;
@@ -243,7 +243,7 @@ export function useTallyControl({
       setTallyPayload(newPayload);
       broadcastTally(peerSyncRef, false, newPayload);
     }
-  };
+  }, [isHost, peerSyncRef]);
 
   const handleClientTallyChange = (clientId: string, s: TallyState) => {
     if (isHost) {
@@ -265,7 +265,7 @@ export function useTallyControl({
     }
   };
 
-  const handleAllTallyChange = (s: TallyState) => {
+  const handleAllTallyChange = useCallback((s: TallyState) => {
     if (!isHost) return;
     tallyRevRef.current += 1;
     const newPayload: TallyPayload = {
@@ -276,7 +276,7 @@ export function useTallyControl({
     setTallyPayload(newPayload);
     setManualTally(s);
     broadcastTally(peerSyncRef, false, newPayload);
-  };
+  }, [isHost, peerSyncRef]);
 
   return {
     tallyOpen, setTallyOpen, tallyMode, setTallyMode, tallyTorchEnabled, setTallyTorchEnabled,

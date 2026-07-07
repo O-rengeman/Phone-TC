@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import Timecode from 'smpte-timecode';
 import { LtcEngine } from '../utils/LtcEngine';
 import type { LtcSettings } from '../utils/LtcEngine';
@@ -8,6 +8,7 @@ import type { DriftMonitor, DriftStatus } from '../utils/DriftMonitor';
 import { TimecodeNativeBridge } from '../utils/TimecodeNativeBridge';
 import { t as translate } from '../utils/i18n';
 import type { Lang } from '../utils/i18n';
+import { debug } from '../utils/log';
 import { LTC_WORKLET_SOURCE } from '../audio/ltcWorkletSource';
 import { FPS_OPTIONS } from '../constants';
 import type { SyncMode } from '../LTCSyncContext';
@@ -136,7 +137,7 @@ export function useLtcEngine({
     }
   }, [volume, userBits, outputMode, outputLevel, isRunning, workletNodeRef]);
 
-  const beep = (freq: number, duration: number) => {
+  const beep = useCallback((freq: number, duration: number) => {
     if (!audioCtxRef.current) return;
     const ctx = audioCtxRef.current;
     const osc = ctx.createOscillator();
@@ -149,7 +150,7 @@ export function useLtcEngine({
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + duration);
-  };
+  }, [audioCtxRef]);
 
   const startEngine = async () => {
     if (!audioCtxRef.current) return;
@@ -191,7 +192,7 @@ export function useLtcEngine({
         h: currentTC[0], m: currentTC[1], s: currentTC[2], f: currentTC[3]
       }
     });
-    workletNode.port.onmessage = (e) => {
+    workletNode.port.onmessage = (e: MessageEvent<{ tc?: string }>) => {
       const tc = e.data?.tc;
       if (!tc) return;
       currentTcRef.current = tc;
@@ -218,13 +219,13 @@ export function useLtcEngine({
     workletNode.connect(ctx.destination);
     workletNodeRef.current = workletNode;
     setIsRunning(true);
-    TimecodeNativeBridge.startBackgroundMode();
+    void TimecodeNativeBridge.startBackgroundMode();
   };
 
   const stopEngine = (reset = false) => {
-    console.log('[DEBUG-ENGINE] stopEngine execution. reset:', reset, 'hasWorkletNode:', !!workletNodeRef.current);
+    debug('[DEBUG-ENGINE] stopEngine execution. reset:', reset, 'hasWorkletNode:', !!workletNodeRef.current);
     if (workletNodeRef.current) {
-      console.log('[DEBUG-ENGINE] stopEngine: disconnecting workletNode');
+      debug('[DEBUG-ENGINE] stopEngine: disconnecting workletNode');
       workletNodeRef.current.port.onmessage = null;
       workletNodeRef.current.disconnect();
       workletNodeRef.current = null;
@@ -255,7 +256,7 @@ export function useLtcEngine({
       }
       currentTcRef.current = engineRef.current.getTimecodeString();
     }
-    TimecodeNativeBridge.stopBackgroundMode();
+    void TimecodeNativeBridge.stopBackgroundMode();
   };
 
   const startSequence = async () => {
@@ -356,21 +357,21 @@ export function useLtcEngine({
   };
 
   const handlePause = () => {
-    console.log('[DEBUG-ENGINE] handlePause execution. isRunning:', isRunning, 'engineExists:', !!engineRef.current);
+    debug('[DEBUG-ENGINE] handlePause execution. isRunning:', isRunning, 'engineExists:', !!engineRef.current);
     if (isRunning && engineRef.current) {
-      console.log('[DEBUG-ENGINE] handlePause inside branch. Pausing...');
+      debug('[DEBUG-ENGINE] handlePause inside branch. Pausing...');
       setIsPaused(true);
       stopEngine();
     }
   };
 
-  const cancelStopHold = () => {
+  const cancelStopHold = useCallback(() => {
     if (stopHoldRafRef.current !== null) {
       cancelAnimationFrame(stopHoldRafRef.current);
       stopHoldRafRef.current = null;
     }
     setStopHoldPct(0);
-  };
+  }, [stopHoldRafRef, setStopHoldPct]);
 
   const beginStopHold = () => {
     if (stopHoldRafRef.current !== null) return;

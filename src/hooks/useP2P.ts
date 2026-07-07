@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PeerSync } from '../utils/PeerSync';
 import type { SyncMessage } from '../utils/PeerSync';
 import { t as translate } from '../utils/i18n';
@@ -85,7 +85,7 @@ export function useP2P({
     lastSyncTimeRef.current = Date.now();
   }, []);
 
-  const resetP2P = () => {
+  const resetP2P = useCallback(() => {
     if (peerSyncRef.current) {
       peerSyncRef.current.destroy();
       peerSyncRef.current = null;
@@ -95,7 +95,7 @@ export function useP2P({
     setPeerId('');
     if (syncMode === 'p2p') setSyncMode('network');
     setP2pStatus('P2P RESET');
-  };
+  }, [syncMode, setP2pRole, setSyncMode]);
 
   const setupP2PMaster = async () => {
     resetP2P();
@@ -152,7 +152,7 @@ export function useP2P({
       // One-time mount action equivalent to a user clicking "join" — not a
       // reactive state sync, so the resulting setState calls are intentional.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setupP2PClient(joinId);
+      void setupP2PClient(joinId);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
     // Mount-only by design: re-running on every setupP2PClient identity

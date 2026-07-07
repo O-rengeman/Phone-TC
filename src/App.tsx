@@ -215,7 +215,7 @@ function MainApp() {
                     <span className="msb-age">{formatSyncAge(driftStatus.msSinceSync)}</span>
                   )}
                 </div>
-                <button type="button" className="msb-resync" onClick={handleManualResync} disabled={isResyncing}>
+                <button type="button" className="msb-resync" onClick={() => void handleManualResync()} disabled={isResyncing}>
                   {isResyncing ? tr('sync.resyncing') : tr('sync.resync')}
                 </button>
               </div>

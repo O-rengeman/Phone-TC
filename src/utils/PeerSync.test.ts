@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { PeerSync } from './PeerSync';
 import type { SyncMessage } from './PeerSync';
-import type { Peer, DataConnection } from 'peerjs';
+import type { Peer } from 'peerjs';
 
 type Handler = (...args: unknown[]) => void;
 
@@ -86,7 +86,7 @@ describe('PeerSync.send', () => {
     // Math.random() >= 0 is always true, so every message goes through.
     const { ps, fake } = await setupOpenPeer();
     const conn = makeConn(true);
-    fake.emit('connection', conn as unknown as DataConnection);
+    fake.emit('connection', conn);
     ps.setLossRate(0);
 
     for (let i = 0; i < 10; i++) ps.send(mockMsg);
@@ -98,7 +98,7 @@ describe('PeerSync.send', () => {
     // Math.random() is in [0, 1), so Math.random() >= 1 is always false.
     const { ps, fake } = await setupOpenPeer();
     const conn = makeConn(true);
-    fake.emit('connection', conn as unknown as DataConnection);
+    fake.emit('connection', conn);
     ps.setLossRate(1);
 
     for (let i = 0; i < 10; i++) ps.send(mockMsg);
@@ -109,7 +109,7 @@ describe('PeerSync.send', () => {
   it('skips connections that are not open', async () => {
     const { ps, fake } = await setupOpenPeer();
     const conn = makeConn(false);
-    fake.emit('connection', conn as unknown as DataConnection);
+    fake.emit('connection', conn);
     ps.setLossRate(0);
 
     ps.send(mockMsg);
@@ -122,7 +122,7 @@ describe('PeerSync data handling', () => {
   it('tags incoming data with the sender peer id and forwards it', async () => {
     const { fake, messages } = await setupOpenPeer();
     const conn = makeConn(true);
-    fake.emit('connection', conn as unknown as DataConnection);
+    fake.emit('connection', conn);
 
     conn.emit('data', { ...mockMsg, type: 'sync-request' });
 
@@ -134,7 +134,7 @@ describe('PeerSync data handling', () => {
   it('forwards non sync-request messages directly', async () => {
     const { fake, messages } = await setupOpenPeer();
     const conn = makeConn(true);
-    fake.emit('connection', conn as unknown as DataConnection);
+    fake.emit('connection', conn);
 
     conn.emit('data', { ...mockMsg, type: 'report' });
 
@@ -155,7 +155,7 @@ describe('PeerSync connection lifecycle', () => {
   it('removes a connection once it closes', async () => {
     const { ps, fake } = await setupOpenPeer();
     const conn = makeConn(true);
-    fake.emit('connection', conn as unknown as DataConnection);
+    fake.emit('connection', conn);
     conn.emit('open');   // exercises the open handler/status path
     conn.emit('close');  // should drop it from the active list
     ps.send(mockMsg);

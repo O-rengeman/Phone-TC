@@ -1,3 +1,5 @@
+import { debug } from './log';
+
 export interface TimeSyncResult {
   offset: number;
   latency: number;
@@ -13,12 +15,25 @@ const NTP_CACHE_KEY = 'ltc-ntp-cache';
 const NTP_CACHE_TTL_MS = 3600000; // 1 hour
 const FETCH_TIMEOUT_MS = 4000; // Abort a stuck time-server request after 4s
 
+// worldtimeapi.org uses `datetime`, timeapi.io uses `dateTime` — both optional
+// since only one appears in a given response.
+interface TimeServerResponse {
+  dateTime?: string;
+  datetime?: string;
+}
+
+interface CachedTimeSync {
+  offset?: unknown;
+  latency?: unknown;
+  savedAt?: unknown;
+}
+
 export class TimeSync {
   public static async sync(samplesPerServer: number = 2): Promise<TimeSyncResult> {
     let bestSample: TimeSyncResult | null = null;
 
     for (const server of TIME_SERVERS) {
-      console.log(`Attempting sync with ${server}...`);
+      debug(`Attempting sync with ${server}...`);
       for (let i = 0; i < samplesPerServer; i++) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -33,7 +48,7 @@ export class TimeSync {
 
           if (!response.ok) continue;
 
-          const data = await response.json();
+          const data = (await response.json()) as TimeServerResponse;
           let serverTime: number;
           if (data.dateTime) {
             serverTime = new Date(data.dateTime + (data.dateTime.endsWith('Z') ? '' : 'Z')).getTime();
@@ -84,7 +99,7 @@ export class TimeSync {
     try {
       const raw = localStorage.getItem(NTP_CACHE_KEY);
       if (!raw) return null;
-      const { offset, latency, savedAt } = JSON.parse(raw);
+      const { offset, latency, savedAt } = JSON.parse(raw) as CachedTimeSync;
       if (typeof offset !== 'number' || !isFinite(offset) || Math.abs(offset) > 86400000) return null;
       if (typeof latency !== 'number' || !isFinite(latency) || latency < 0) return null;
       if (typeof savedAt !== 'number' || Date.now() - savedAt > NTP_CACHE_TTL_MS) return null;
