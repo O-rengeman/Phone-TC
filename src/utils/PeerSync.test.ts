@@ -287,6 +287,36 @@ describe('PeerSync signaling channel', () => {
     expect(fake.connectCalls).toHaveLength(2);
   });
 
+  it('clears a queued message if the connection closes before ever opening', async () => {
+    const { ps, fake } = await setupOpenPeer();
+    ps.sendTo('TARGET', offerMsg); // queued: firstConn never opens
+    const firstConn = fake.lastConn!;
+    firstConn.emit('close');
+
+    ps.sendTo('TARGET', { ...offerMsg, type: 'webrtc-candidate' });
+    const secondConn = fake.lastConn!;
+    secondConn.emit('open');
+
+    // Only the second (post-close) message should flush — the stale queued
+    // offer from the connection that never opened must not leak through.
+    expect(secondConn.send).toHaveBeenCalledTimes(1);
+    expect(secondConn.send).toHaveBeenCalledWith(expect.objectContaining({ type: 'webrtc-candidate' }));
+  });
+
+  it('clears a queued message if the connection errors before ever opening', async () => {
+    const { ps, fake } = await setupOpenPeer();
+    ps.sendTo('TARGET', offerMsg); // queued: firstConn never opens
+    const firstConn = fake.lastConn!;
+    firstConn.emit('error', new Error('connection failed'));
+
+    ps.sendTo('TARGET', { ...offerMsg, type: 'webrtc-candidate' });
+    const secondConn = fake.lastConn!;
+    secondConn.emit('open');
+
+    expect(secondConn.send).toHaveBeenCalledTimes(1);
+    expect(secondConn.send).toHaveBeenCalledWith(expect.objectContaining({ type: 'webrtc-candidate' }));
+  });
+
   it('destroy() closes all open signaling connections', async () => {
     const { ps, fake } = await setupOpenPeer();
     ps.sendTo('TARGET', offerMsg);

@@ -157,13 +157,29 @@ export class PeerSync {
     conn.on('close', () => {
       this.onStatusCallback('CONNECTION CLOSED');
       if (isSignaling) {
-        if (this.signalingConnections.get(conn.peer) === conn) {
-          this.signalingConnections.delete(conn.peer);
-        }
+        this.discardSignalingConnection(conn);
       } else {
         this.connections = this.connections.filter(c => c !== conn);
       }
     });
+
+    if (isSignaling) {
+      // A signaling connection that never opens (peer unreachable, etc.) may
+      // emit 'error' instead of 'close' — without this, its stale queue would
+      // never be cleared and would get flushed alongside a later, unrelated
+      // connection attempt to the same target.
+      conn.on('error', () => {
+        this.discardSignalingConnection(conn);
+      });
+    }
+  }
+
+  /** Drops a signaling connection and any messages still queued for it. */
+  private discardSignalingConnection(conn: DataConnection): void {
+    if (this.signalingConnections.get(conn.peer) === conn) {
+      this.signalingConnections.delete(conn.peer);
+    }
+    this.pendingSignalingSends.delete(conn.peer);
   }
 
   /** Lazily creates (or reuses) the reliable signaling DataConnection to targetId. */
