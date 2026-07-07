@@ -324,7 +324,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     peerId, targetId, setTargetId, p2pStatus, setP2pStatus, isHost,
     masterDrift, setMasterDrift, clients, setClients,
     packetLossRate, setPacketLossRate,
-    peerSyncRef, messageHandlerRef, signalingHandlerRef, rttHistoryRef, lastSyncTimeRef, lastHeartbeatTimeRef,
+    peerSyncRef, messageHandlerRef, signalingHandlerRef, rttHistoryRef, lastSyncTimeRef, lastHeartbeatTimeRef, lastMasterContactTimeRef,
     resetP2P, setupP2PMaster, setupP2PClient, joinSession,
   } = useP2P({
     syncMode,
@@ -559,6 +559,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
             }));
           }
         } else if (msg.type === 'sync-response' && !isHost) {
+          lastMasterContactTimeRef.current = Date.now();
           const now = performance.now();
           const rtt = now - (msg.clientTimestamp || now);
           
@@ -632,6 +633,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
             drift: diff
           });
         } else if (msg.type === 'heartbeat' && !isHost) {
+          lastMasterContactTimeRef.current = Date.now();
           const diff = engineRef.current.getDiffSeconds(msg.masterTimecode);
           setMasterDrift(diff);
 

@@ -139,12 +139,31 @@ describe('useP2P — thin state-transition coverage', () => {
     })));
 
     act(() => {
-      result.current.lastHeartbeatTimeRef.current = Date.now() - 5000;
+      result.current.lastMasterContactTimeRef.current = Date.now() - 5000;
     });
     act(() => { vi.advanceTimersByTime(1000); });
 
     expect(result.current.p2pStatus).toBe('MASTER TIMEOUT');
     expect(onMasterHeartbeatTimeout).toHaveBeenCalledTimes(1);
     expect(addToast).toHaveBeenCalledWith('MASTER LOST — CLIENT STOPPED', 'error');
+  });
+
+  it('times out on stale master contact even when no heartbeat was recorded yet', () => {
+    vi.useFakeTimers();
+    const onMasterHeartbeatTimeout = vi.fn();
+    const { result } = renderHook(() => useP2P(makeParams({
+      p2pRole: 'client',
+      isRunning: true,
+      onMasterHeartbeatTimeout,
+    })));
+
+    act(() => {
+      result.current.lastHeartbeatTimeRef.current = 0;
+      result.current.lastMasterContactTimeRef.current = Date.now() - 5000;
+    });
+    act(() => { vi.advanceTimersByTime(1000); });
+
+    expect(result.current.p2pStatus).toBe('MASTER TIMEOUT');
+    expect(onMasterHeartbeatTimeout).toHaveBeenCalledTimes(1);
   });
 });
