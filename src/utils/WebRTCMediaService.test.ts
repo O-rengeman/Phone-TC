@@ -376,6 +376,38 @@ describe('WebRTCMediaService signaling flow', () => {
     expect(peerSync.sendTo).toHaveBeenCalledWith('MASTER', expect.objectContaining({ type: 'webrtc-candidate' }));
   });
 
+  it('onicecandidate serializes RTCIceCandidate instances to plain objects before sending', async () => {
+    const peerSync = makeFakePeerSync();
+    const service = new WebRTCMediaService(peerSync, 'ME', false);
+    await service.connectToPeer('MASTER');
+    const pc = createdPeerConnections[0];
+    const candidate: RTCIceCandidateInit & { toJSON: () => RTCIceCandidateInit } = {
+      candidate: 'abc',
+      sdpMid: '0',
+      sdpMLineIndex: 0,
+      usernameFragment: 'ufrag',
+      toJSON: () => ({
+        candidate: 'abc',
+        sdpMid: '0',
+        sdpMLineIndex: 0,
+        usernameFragment: 'ufrag',
+      }),
+    };
+
+    pc.onicecandidate?.({ candidate });
+
+    const sentMessage = vi.mocked(peerSync.sendTo).mock.calls.at(-1)?.[1];
+    expect(sentMessage).toMatchObject({
+      type: 'webrtc-candidate',
+      candidate: {
+        candidate: 'abc',
+        sdpMid: '0',
+        sdpMLineIndex: 0,
+        usernameFragment: 'ufrag',
+      },
+    });
+  });
+
   it('onicecandidate does nothing on the end-of-candidates null signal', async () => {
     const peerSync = makeFakePeerSync();
     const service = new WebRTCMediaService(peerSync, 'ME', false);

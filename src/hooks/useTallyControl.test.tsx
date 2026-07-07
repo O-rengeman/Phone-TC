@@ -43,6 +43,7 @@ beforeEach(() => {
   localStorage.clear();
   isNativePlatform.mockReturnValue(true);
   setTorch.mockClear();
+  delete (navigator as unknown as { mediaDevices?: unknown }).mediaDevices;
 });
 
 afterEach(() => {
@@ -241,5 +242,40 @@ describe('useTallyControl torch effect', () => {
     });
 
     expect(setTorch).toHaveBeenCalledWith(false);
+  });
+
+  it('falls back to a generic camera when rear camera selection is unavailable on web', async () => {
+    isNativePlatform.mockReturnValue(false);
+    const applyConstraints = vi.fn(() => Promise.resolve());
+    const stop = vi.fn();
+    const fallbackTrack = { applyConstraints, stop } as unknown as MediaStreamTrack;
+    const getUserMedia = vi.fn()
+      .mockRejectedValueOnce(new DOMException('Requested device not found', 'NotFoundError'))
+      .mockResolvedValueOnce({
+        getVideoTracks: () => [fallbackTrack],
+      });
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: { getUserMedia },
+      configurable: true,
+    });
+
+    const { result } = renderHook(() => useTallyControl(makeParams({ p2pRole: null, isHost: false })));
+
+    await act(async () => {
+      result.current.handleManualTallyChange('live');
+      result.current.setTallyTorchEnabled(true);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(getUserMedia).toHaveBeenNthCalledWith(1, {
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false,
+    });
+    expect(getUserMedia).toHaveBeenNthCalledWith(2, {
+      video: true,
+      audio: false,
+    });
+    expect(applyConstraints).toHaveBeenCalled();
   });
 });

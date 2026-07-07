@@ -12,6 +12,18 @@ export interface WebRTCStreamEvent {
 // a few seconds without needing to tear down and re-negotiate the connection.
 export const DISCONNECT_GRACE_MS = 5000;
 
+function serializeIceCandidate(candidate: RTCIceCandidate): RTCIceCandidateInit {
+  if (typeof candidate.toJSON === 'function') {
+    return candidate.toJSON();
+  }
+  return {
+    candidate: candidate.candidate,
+    sdpMid: candidate.sdpMid,
+    sdpMLineIndex: candidate.sdpMLineIndex,
+    usernameFragment: candidate.usernameFragment ?? undefined,
+  };
+}
+
 export class WebRTCMediaService {
   private peerConnections = new Map<string, RTCPeerConnection>();
   // The video RTCRtpSender for each peer, tracked by reference from creation
@@ -203,7 +215,7 @@ export class WebRTCMediaService {
       if (event.candidate) {
         this.peerSync.sendTo(peerId, {
           type: 'webrtc-candidate',
-          candidate: event.candidate,
+          candidate: serializeIceCandidate(event.candidate),
           // Fill required fields with dummies
           masterTimecode: '00:00:00:00',
           masterTimestamp: 0,

@@ -51,6 +51,25 @@ interface UseTallyControlResult {
 const TALLY_HEARTBEAT_TIMEOUT_MS = 3000;
 const ACTION_LOG_MAX_ENTRIES = 10;
 
+async function requestTorchVideoTrack(): Promise<MediaStreamTrack | null> {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false,
+    });
+    return stream.getVideoTracks()[0] ?? null;
+  } catch (err) {
+    const fallbackNeeded = err instanceof DOMException && (err.name === 'NotFoundError' || err.name === 'OverconstrainedError');
+    if (!fallbackNeeded) throw err;
+
+    const fallbackStream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: false,
+    });
+    return fallbackStream.getVideoTracks()[0] ?? null;
+  }
+}
+
 function broadcastTally(peerSyncRef: React.RefObject<PeerSync | null>, isRunning: boolean, payload: TallyPayload) {
   const msg: SyncMessage = {
     type: 'tally',
@@ -162,10 +181,7 @@ export function useTallyControl({
         try {
           if (on) {
             if (!videoTrackRef.current) {
-              const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' }
-              });
-              videoTrackRef.current = stream.getVideoTracks()[0];
+              videoTrackRef.current = await requestTorchVideoTrack();
             }
             if (videoTrackRef.current) {
               await videoTrackRef.current.applyConstraints({ advanced: [{ torch: true }] } as unknown as MediaTrackConstraints);
