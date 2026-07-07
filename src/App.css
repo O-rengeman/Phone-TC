@@ -211,7 +211,7 @@ header {
 .desktop-dashboard {
   flex: 1;
   display: grid;
-  grid-template-columns: 320px 1fr 340px;
+  grid-template-columns: 280px minmax(0, 1fr) 312px;
   grid-template-areas: "side-l center side-r";
   gap: 0;
   padding: 0;
@@ -228,7 +228,7 @@ header {
 
 .desktop-dashboard .main-pane { 
   grid-area: center; 
-  padding: 0;
+  padding: 28px 32px 20px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -241,7 +241,7 @@ header {
 
 .desktop-dashboard .sync-pane { 
   grid-area: side-l; 
-  padding: 20px 16px;
+  padding: 22px 18px 24px;
   border-right: 1px solid var(--border);
   background: rgba(10, 10, 10, 0.7);
   backdrop-filter: blur(20px);
@@ -252,7 +252,7 @@ header {
 
 .desktop-dashboard .tools-pane { 
   grid-area: side-r; 
-  padding: 20px 16px;
+  padding: 22px 18px 24px;
   background: rgba(10, 10, 10, 0.7);
   backdrop-filter: blur(20px);
   overflow-y: auto;
@@ -271,7 +271,8 @@ header {
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 180px;
+  max-width: 900px;
+  height: min(46vh, 400px);
   aspect-ratio: auto;
 }
 
@@ -291,7 +292,7 @@ header {
 
 .desktop-view .fixed-footer {
   border-top: 1px solid var(--border);
-  padding: 16px 32px 24px;
+  padding: 12px 24px 16px;
   background: rgba(5, 5, 5, 0.8);
   backdrop-filter: blur(10px);
 }
@@ -307,13 +308,27 @@ header {
   padding: 12px 16px;
 }
 
+.desktop-dashboard .sync-pane > .control-section,
+.desktop-view .tool-section-shell,
+.desktop-view .marker-section-pro {
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01)),
+    rgba(10, 10, 10, 0.92);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 18px 40px rgba(0, 0, 0, 0.22);
+}
+
 .desktop-view .tool-card input {
-  font-size: 1.5rem;
+  font-size: 1.32rem;
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
   font-weight: 700;
 }
 
@@ -328,18 +343,34 @@ header {
 }
 
 .desktop-view .footer-buttons {
-  max-width: 800px;
-  gap: 20px;
+  max-width: 820px;
+  gap: 18px;
+  align-items: center;
 }
 
 .desktop-view .btn-main-action {
-  padding: 16px 32px;
+  padding: 14px 28px;
   font-size: 1rem;
+  min-height: 50px;
 }
 
 .desktop-view .btn-export-pro {
   font-size: 0.75rem;
   padding: 10px 18px;
+}
+.desktop-view .footer-right {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+.desktop-view .mark-label {
+  font-size: 0.55rem;
+  letter-spacing: 2px;
+}
+.desktop-view .mark-colors-container {
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: 1fr;
+  gap: 8px;
 }
 
 .tab-pane {
@@ -1851,20 +1882,39 @@ input[type="range"] {
 .desktop-view .footer-buttons { max-width: 720px; gap: 14px; }
 .desktop-view .btn-main-action { padding: 14px 32px; font-size: 1rem; min-height: 52px; }
 .desktop-view .btn-export-pro { font-size: 0.72rem; padding: 8px 14px; }
-.desktop-view .tool-section-shell {
-  gap: 0;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-}
+.desktop-view .tool-section-shell { gap: 12px; }
 .desktop-view .tool-section-head {
-  gap: 0;
+  align-items: center;
+  gap: 10px;
 }
 .desktop-view .tally-options {
-  margin-top: 8px;
-  justify-content: flex-start;
+  justify-content: flex-end;
+}
+.desktop-view .tools-grid-meta {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.desktop-view .tool-card-userbits,
+.desktop-view .tool-card.span-2 {
+  grid-column: 1 / -1;
+}
+.desktop-view .tool-card-userbits .userbits-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  align-items: center;
+}
+.desktop-view .tool-card-userbits .btn-pill {
+  width: 100%;
+  padding: 10px 10px;
+  font-size: 0.72rem;
+}
+.desktop-view .main-sync-bar {
+  width: min(100%, 520px);
+  margin-top: 18px;
+}
+.desktop-view .sync-pane > .control-section {
+  gap: 10px;
 }
 
 /* ============================================================
@@ -1873,11 +1923,11 @@ input[type="range"] {
    ============================================================ */
 @media (min-width: 769px) and (max-width: 1024px) {
   .desktop-dashboard {
-    grid-template-columns: minmax(180px, 220px) 1fr minmax(180px, 240px);
+    grid-template-columns: minmax(220px, 250px) 1fr minmax(240px, 280px);
   }
   .desktop-dashboard .sync-pane,
   .desktop-dashboard .tools-pane {
-    padding: 12px 10px;
+    padding: 14px 12px 18px;
   }
   .desktop-view .section-label,
   .desktop-view .tool-card label {
@@ -1898,7 +1948,7 @@ input[type="range"] {
     min-height: 46px;
   }
   .desktop-view .footer-buttons {
-    max-width: 500px;
+    max-width: 620px;
     gap: 10px;
   }
   .desktop-view .btn-mark-color {
@@ -1906,12 +1956,15 @@ input[type="range"] {
     height: 36px;
   }
   .desktop-view .fixed-footer {
-    padding: 10px 16px;
+    padding: 10px 18px 12px;
   }
   .desktop-view .marker-scroll {
     height: auto;
     max-height: calc(100dvh - 380px);
     min-height: 100px;
+  }
+  .desktop-view .mark-colors-container {
+    gap: 6px;
   }
 }
 

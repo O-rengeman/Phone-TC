@@ -490,7 +490,7 @@ function MainApp() {
                     <button className={`btn-pill ${autoUserBits ? 'active' : ''}`} onClick={() => setAutoUserBits(!autoUserBits)}>{tr('btn.auto')}</button>
                   </div>
                 </div>
-                <div className={`tool-card tool-card-meta ${isMobile ? '' : 'span-2'}`}>
+                <div className="tool-card tool-card-meta">
                   <label>{tr('label.defaultReel')}</label>
                   <input
                     value={defaultReelName}
@@ -499,7 +499,7 @@ function MainApp() {
                     placeholder="A001"
                   />
                 </div>
-                <div className={`tool-card tool-card-meta ${isMobile ? '' : 'span-2'}`}>
+                <div className="tool-card tool-card-meta">
                   <label>{tr('label.defaultScene')}</label>
                   <input
                     value={sceneName}
