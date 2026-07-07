@@ -317,6 +317,25 @@ describe('PeerSync signaling channel', () => {
     expect(secondConn.send).toHaveBeenCalledWith(expect.objectContaining({ type: 'webrtc-candidate' }));
   });
 
+  it('a stale connection\'s delayed/duplicate close does not wipe a newer connection\'s queue', async () => {
+    const { ps, fake } = await setupOpenPeer();
+    ps.sendTo('TARGET', offerMsg);
+    const firstConn = fake.lastConn!;
+    firstConn.emit('close'); // discards firstConn and its queue, as normal
+
+    ps.sendTo('TARGET', { ...offerMsg, type: 'webrtc-candidate' });
+    const secondConn = fake.lastConn!;
+
+    // A duplicate/delayed 'close' for the already-discarded firstConn must
+    // not touch secondConn's still-pending queue, since secondConn — not
+    // firstConn — is now the registered connection for this peer.
+    firstConn.emit('close');
+    secondConn.emit('open');
+
+    expect(secondConn.send).toHaveBeenCalledTimes(1);
+    expect(secondConn.send).toHaveBeenCalledWith(expect.objectContaining({ type: 'webrtc-candidate' }));
+  });
+
   it('destroy() closes all open signaling connections', async () => {
     const { ps, fake } = await setupOpenPeer();
     ps.sendTo('TARGET', offerMsg);

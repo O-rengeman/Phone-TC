@@ -174,12 +174,19 @@ export class PeerSync {
     }
   }
 
-  /** Drops a signaling connection and any messages still queued for it. */
+  /**
+   * Drops a signaling connection and any messages still queued for it —
+   * but only if `conn` is still the connection currently registered for its
+   * peer. If a newer connection has already replaced it (e.g. a delayed or
+   * duplicate 'close'/'error' event arriving for a connection that was
+   * already superseded), that newer connection's own queued messages must
+   * not be wiped out by this stale event.
+   */
   private discardSignalingConnection(conn: DataConnection): void {
     if (this.signalingConnections.get(conn.peer) === conn) {
       this.signalingConnections.delete(conn.peer);
+      this.pendingSignalingSends.delete(conn.peer);
     }
-    this.pendingSignalingSends.delete(conn.peer);
   }
 
   /** Lazily creates (or reuses) the reliable signaling DataConnection to targetId. */
