@@ -31,6 +31,8 @@ export type SyncMode = 'system' | 'network' | 'p2p' | 'freerun';
 export type ToastLevel = 'info' | 'warn' | 'error';
 export type Toast = { id: number; msg: string; level: ToastLevel };
 
+const getIsMobileLayout = () => Math.min(window.innerWidth, window.innerHeight) <= 768;
+
 // Split into two contexts so that a consumer reading only stable actions/refs
 // doesn't re-render on every volatile state tick (masterDrift, clients,
 // tallyPayload, nowTick, ...). useLTC() below merges both back into one
@@ -200,7 +202,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [manualTimecode, setManualTimecode] = useState('00:00:00:00');
   const [p2pRole, setP2pRole] = useState<'master' | 'client' | null>(null);
   const [activeTab, setActiveTab] = useState<'main' | 'sync' | 'tools'>('main');
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isMobile, setIsMobile] = useState(getIsMobileLayout);
   
   const [outputMode, setOutputMode] = useState<'stereo' | 'mono-l'>(() => {
     try { const saved = localStorage.getItem('ltc-outmode'); return (saved === 'stereo' || saved === 'mono-l') ? saved : 'stereo'; } catch { return 'stereo'; }
@@ -212,7 +214,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [slateTime, setSlateTime] = useState('00:00:00:00');
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    const handleResize = () => setIsMobile(getIsMobileLayout());
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);

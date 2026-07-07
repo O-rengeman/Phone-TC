@@ -2264,6 +2264,149 @@ input[type="range"] {
   font-size: 0.6rem;
 }
 
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-view header {
+    padding: 6px 10px;
+  }
+  .mobile-view .logo {
+    font-size: 0.74rem;
+    letter-spacing: 1.5px;
+  }
+  .mobile-view .header-right {
+    gap: 4px;
+  }
+  .mobile-view .hdr-status {
+    gap: 6px;
+  }
+  .mobile-view .status-pill {
+    min-width: 82px;
+    padding: 4px 8px;
+    font-size: 0.56rem;
+  }
+  .mobile-view .hdr-tally-btn,
+  .mobile-view .hdr-director-btn {
+    padding: 4px 6px;
+    font-size: 0.52rem;
+  }
+  .mobile-view .hdr-actions .lang-btn {
+    width: 36px;
+    font-size: 0.52rem;
+  }
+  .mobile-view .hdr-actions .help-btn {
+    width: 18px;
+    height: 18px;
+    font-size: 0.56rem;
+  }
+  .mobile-view .tab-bar {
+    padding: 2px 10px;
+  }
+  .mobile-view .tab-bar button {
+    padding: 6px 6px;
+    font-size: 0.64rem;
+    letter-spacing: 1.4px;
+  }
+  .mobile-view .tab-content {
+    padding: 8px 8px calc(12px + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(78px + env(safe-area-inset-bottom));
+  }
+  .mobile-view .tab-pane {
+    gap: 6px;
+  }
+  .mobile-view .timecode-card-pro {
+    aspect-ratio: auto;
+    min-height: 104px;
+    max-height: 124px;
+  }
+  .mobile-view .info-strip-pro {
+    bottom: 4px;
+    gap: 6px;
+  }
+  .mobile-view .info-label {
+    font-size: 0.66rem;
+  }
+  .mobile-view .control-section {
+    gap: 4px;
+  }
+  .mobile-view .fps-grid-compact {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .mobile-view .btn-pill {
+    padding: 8px 4px;
+    font-size: 0.64rem;
+  }
+  .mobile-view .volume-row {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .mobile-view .sync-toggle-pro button {
+    padding: 7px 4px;
+    font-size: 0.58rem;
+  }
+  .mobile-view .tool-section-shell {
+    padding: 10px;
+    gap: 8px;
+  }
+  .mobile-view .tool-section-head {
+    gap: 8px;
+  }
+  .mobile-view .tools-grid-meta .tool-card {
+    min-height: 72px;
+  }
+  .mobile-view .tool-card-userbits .userbits-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+  .mobile-view .tool-card-userbits .btn-pill {
+    width: auto;
+    min-width: 112px;
+    padding: 8px 10px;
+  }
+  .mobile-view .tool-card-meta input,
+  .mobile-view .tool-card-userbits input,
+  .mobile-view .tool-card input {
+    font-size: 0.96rem;
+  }
+  .mobile-view .toggle-label {
+    padding: 4px 8px;
+    font-size: 0.58rem;
+  }
+  .mobile-view .btn-mark-large {
+    padding: 10px 8px;
+    font-size: 0.72rem;
+  }
+  .mobile-view .marker-scroll {
+    height: 132px;
+  }
+  .mobile-view .fixed-footer {
+    padding: 4px 8px;
+    padding-bottom: calc(4px + env(safe-area-inset-bottom));
+  }
+  .mobile-view .footer-buttons {
+    gap: 8px;
+  }
+  .mobile-view .footer-left {
+    gap: 4px;
+  }
+  .mobile-view .btn-main-action {
+    min-height: 40px;
+    padding: 8px;
+    font-size: 0.72rem;
+  }
+  .mobile-view .mark-label {
+    font-size: 0.42rem;
+    letter-spacing: 1.6px;
+  }
+  .mobile-view .btn-mark-color {
+    width: 26px;
+    height: 26px;
+  }
+  .mobile-view .mark-colors-container {
+    gap: 4px;
+  }
+}
+
 @media (max-width: 360px) {
   .mobile-view header {
     padding: 8px 10px;
