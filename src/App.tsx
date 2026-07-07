@@ -403,44 +403,50 @@ function MainApp() {
 
         {(isMobile ? activeTab === 'tools' : true) && (
           <div className="tab-pane tools-pane">
-            <div className="control-section tally-section">
-              <label className="section-label">{tr('label.tally')}</label>
-              <div className="tally-options" style={{ marginTop: '8px' }}>
-                <label className="toggle-label">
-                  <input
-                    type="checkbox"
-                    checked={tallyTorchEnabled}
-                    onChange={(e) => setTallyTorchEnabled(e.target.checked)}
-                  />
-                  <span>Torch LED</span>
-                </label>
+            <section className="tool-section-shell tool-section-shell-tally">
+              <div className="tool-section-head">
+                <label className="section-label">{tr('label.tally')}</label>
+                <div className="tally-options">
+                  <label className="toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={tallyTorchEnabled}
+                      onChange={(e) => setTallyTorchEnabled(e.target.checked)}
+                    />
+                    <span>Torch LED</span>
+                  </label>
+                </div>
               </div>
-              {isHost && (
-                <button
-                  className="tally-open-btn btn-director-switcher"
-                  onClick={() => { setTallyOpen(false); setIsVisualSlate(false); setDirectorPanelOpen(true); }}
-                >
-                  DIRECTOR SWITCHER PANEL
-                </button>
-              )}
-              <div className="tally-state-row">
-                {(['live', 'preview', 'off'] as TallyState[]).map(s => (
+              <div className="control-section tally-section">
+                {isHost && (
                   <button
-                    key={s}
-                    className={`tally-state-btn ${manualTally === s ? 'active' : ''}`}
-                    style={manualTally === s ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
-                    onClick={() => handleManualTallyChange(s)}
+                    className="tally-open-btn btn-director-switcher"
+                    onClick={() => { setTallyOpen(false); setIsVisualSlate(false); setDirectorPanelOpen(true); }}
                   >
-                    {tr(tallyLabelKey(s))}
+                    DIRECTOR SWITCHER PANEL
                   </button>
-                ))}
+                )}
+                <div className="tally-state-row">
+                  {(['live', 'preview', 'off'] as TallyState[]).map(s => (
+                    <button
+                      key={s}
+                      className={`tally-state-btn ${manualTally === s ? 'active' : ''}`}
+                      style={manualTally === s ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
+                      onClick={() => handleManualTallyChange(s)}
+                    >
+                      {tr(tallyLabelKey(s))}
+                    </button>
+                  ))}
+                </div>
+                <button className="tally-open-btn" onClick={() => { setDirectorPanelOpen(false); setIsVisualSlate(false); setTallyOpen(true); }}>{tr('tally.fullscreen')}</button>
               </div>
-              <button className="tally-open-btn" onClick={() => { setDirectorPanelOpen(false); setIsVisualSlate(false); setTallyOpen(true); }}>{tr('tally.fullscreen')}</button>
-            </div>
+            </section>
 
             {isHost && Object.keys(clients).length > 0 && (
-              <div className="control-section clients-list-section">
-                <label className="section-label">CONNECTED CLIENTS ({Object.keys(clients).length})</label>
+              <section className="tool-section-shell clients-list-section">
+                <div className="tool-section-head">
+                  <label className="section-label">CONNECTED CLIENTS ({Object.keys(clients).length})</label>
+                </div>
                 <div className="clients-grid">
                   {Object.entries(clients).map(([id, stats]) => {
                     const isOffline = nowTick - stats.lastSeen > 30000;
@@ -472,86 +478,90 @@ function MainApp() {
                     );
                   })}
                 </div>
-              </div>
+              </section>
             )}
 
-            <div className="tools-grid-pro">
-              <div className="tool-card span-2">
-                <label>{tr('label.userBits')}</label>
-                <div className="userbits-row">
-                  <input value={userBits} onChange={e => setUserBits(e.target.value.toUpperCase().replace(/[^0-9A-F]/g, ''))} maxLength={8} disabled={autoUserBits} />
-                  <button className={`btn-pill ${autoUserBits ? 'active' : ''}`} onClick={() => setAutoUserBits(!autoUserBits)}>{tr('btn.auto')}</button>
+            <section className="tool-section-shell tool-section-shell-meta">
+              <div className="tools-grid-pro tools-grid-meta">
+                <div className="tool-card tool-card-userbits span-2">
+                  <label>{tr('label.userBits')}</label>
+                  <div className="userbits-row">
+                    <input value={userBits} onChange={e => setUserBits(e.target.value.toUpperCase().replace(/[^0-9A-F]/g, ''))} maxLength={8} disabled={autoUserBits} />
+                    <button className={`btn-pill ${autoUserBits ? 'active' : ''}`} onClick={() => setAutoUserBits(!autoUserBits)}>{tr('btn.auto')}</button>
+                  </div>
                 </div>
-              </div>
-              <div className="tool-card span-2">
-                <label>{tr('label.defaultReel')}</label>
-                <input
-                  value={defaultReelName}
-                  onChange={e => setDefaultReelName(e.target.value.toUpperCase())}
-                  maxLength={8}
-                  placeholder="A001"
-                />
-              </div>
-              <div className="tool-card span-2">
-                <label>{tr('label.defaultScene')}</label>
-                <input
-                  value={sceneName}
-                  onChange={e => setSceneName(e.target.value.toUpperCase())}
-                  maxLength={8}
-                  placeholder="001"
-                />
-              </div>
-              {!isMobile && (
-                <>
-                  <div className="tool-card span-2">
-                    <label className="section-label">{tr('label.outputVolume')}</label>
-                    <div className="volume-row">
-                      <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} />
-                      <div className="level-toggle">
-                        <button className={outputLevel === 'mic' ? 'active' : ''} onClick={() => setOutputLevel('mic')}>MIC</button>
-                        <button className={outputLevel === 'line' ? 'active' : ''} onClick={() => setOutputLevel('line')}>LINE</button>
+                <div className={`tool-card tool-card-meta ${isMobile ? '' : 'span-2'}`}>
+                  <label>{tr('label.defaultReel')}</label>
+                  <input
+                    value={defaultReelName}
+                    onChange={e => setDefaultReelName(e.target.value.toUpperCase())}
+                    maxLength={8}
+                    placeholder="A001"
+                  />
+                </div>
+                <div className={`tool-card tool-card-meta ${isMobile ? '' : 'span-2'}`}>
+                  <label>{tr('label.defaultScene')}</label>
+                  <input
+                    value={sceneName}
+                    onChange={e => setSceneName(e.target.value.toUpperCase())}
+                    maxLength={8}
+                    placeholder="001"
+                  />
+                </div>
+                {!isMobile && (
+                  <>
+                    <div className="tool-card span-2">
+                      <label className="section-label">{tr('label.outputVolume')}</label>
+                      <div className="volume-row">
+                        <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} />
+                        <div className="level-toggle">
+                          <button className={outputLevel === 'mic' ? 'active' : ''} onClick={() => setOutputLevel('mic')}>MIC</button>
+                          <button className={outputLevel === 'line' ? 'active' : ''} onClick={() => setOutputLevel('line')}>LINE</button>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="tool-card span-2">
-                    <label className="section-label">{tr('label.outputMode')}</label>
-                    <div className="sync-toggle-pro">
-                      <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')}>STEREO TC</button>
-                      <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')}>L-TC / R-AUDIO</button>
+                    <div className="tool-card span-2">
+                      <label className="section-label">{tr('label.outputMode')}</label>
+                      <div className="sync-toggle-pro">
+                        <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')}>STEREO TC</button>
+                        <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')}>L-TC / R-AUDIO</button>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="tool-card span-2">
-                    <label className="section-label">TC OFFSET (FRAMES)</label>
-                    <div className="offset-control">
-                      <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} />
-                      <span className="offset-value">{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
+                    <div className="tool-card span-2">
+                      <label className="section-label">TC OFFSET (FRAMES)</label>
+                      <div className="offset-control">
+                        <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} />
+                        <span className="offset-value">{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
+                      </div>
                     </div>
-                  </div>
-                  {outputMode === 'mono-l' && (
-                    <div className="tool-card span-2 vu-meter-container">
-                      <label className="vu-label">MIC INPUT LEVEL {!isRunning && '(START TO MONITOR)'}</label>
-                      <VuMeter />
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+                    {outputMode === 'mono-l' && (
+                      <div className="tool-card span-2 vu-meter-container">
+                        <label className="vu-label">MIC INPUT LEVEL {!isRunning && '(START TO MONITOR)'}</label>
+                        <VuMeter />
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </section>
             
             {isMobile && (
-              <div className="control-section mobile-marker-section">
-                <label className="section-label">{tr('label.quickMark')}</label>
-                <div className="marker-buttons-grid">
-                  <button className="btn-mark-large red" onClick={() => addMarker('Red')}>{tr('color.red')}</button>
-                  <button className="btn-mark-large blue" onClick={() => addMarker('Blue')}>{tr('color.blue')}</button>
-                  <button className="btn-mark-large green" onClick={() => addMarker('Green')}>{tr('color.green')}</button>
-                  <button className="btn-mark-large yellow" onClick={() => addMarker('Yellow')}>{tr('color.yellow')}</button>
+              <section className="tool-section-shell tool-section-shell-marks">
+                <div className="control-section mobile-marker-section">
+                  <label className="section-label">{tr('label.quickMark')}</label>
+                  <div className="marker-buttons-grid">
+                    <button className="btn-mark-large red" onClick={() => addMarker('Red')}>{tr('color.red')}</button>
+                    <button className="btn-mark-large blue" onClick={() => addMarker('Blue')}>{tr('color.blue')}</button>
+                    <button className="btn-mark-large green" onClick={() => addMarker('Green')}>{tr('color.green')}</button>
+                    <button className="btn-mark-large yellow" onClick={() => addMarker('Yellow')}>{tr('color.yellow')}</button>
+                  </div>
                 </div>
-              </div>
+              </section>
             )}
 
-            <div className="marker-section-pro">
+            <section className="tool-section-shell marker-section-pro">
               <div className="marker-header">
                 <label>{tr('label.loggedTakes')}</label>
                 <div className="export-group">
@@ -592,7 +602,7 @@ function MainApp() {
                   ))
                 )}
               </div>
-            </div>
+            </section>
           </div>
         )}
       </main>
