@@ -2200,9 +2200,25 @@ input[type="range"] {
   color: rgba(255, 255, 255, 0.7);
 }
 .tally-conn-banner.disconnected {
-  background: rgba(255, 200, 0, 0.9);
-  color: #000;
-  animation: pulse-warn 1s infinite;
+  background: rgba(255, 59, 48, 0.9);
+  color: #fff;
+}
+
+.tally-pgm-video-container {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.tally-pgm-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* スリムヘッダー */
@@ -2406,6 +2422,23 @@ input[type="range"] {
   gap: 16px;
 }
 
+.dir-video-toggle {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.dir-video-toggle.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #000;
+}
+
 .director-tc-large {
   font-size: 1.6rem;
   font-weight: 900;
@@ -2438,9 +2471,9 @@ input[type="range"] {
   letter-spacing: 1px;
 }
 .director-all-sub {
-  font-size: 0.6rem;
+  font-weight: 700;
   color: var(--text-muted);
-  font-weight: 400;
+  white-space: nowrap;
 }
 .director-all-btns {
   display: flex;
@@ -2636,6 +2669,24 @@ input[type="range"] {
   font-size: 0.55rem;
   color: var(--text-muted);
   font-family: var(--font-mono);
+}
+
+.director-cam-video {
+  background: #000;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  height: 110px;
+}
+
+.dir-cam-video-el {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* P3-2: 縦1列大型ボタン */

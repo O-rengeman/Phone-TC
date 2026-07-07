@@ -10,6 +10,8 @@ import { formatSyncAge } from './utils/DriftMonitor';
 import { formatDuration } from './utils/battery';
 import { Toaster, toast } from 'react-hot-toast';
 import { VuMeter } from './components/VuMeter';
+import { VideoRenderer } from './components/VideoRenderer';
+import { useMediaStreams } from './hooks/useMediaStreams';
 import './App.css';
 
 function MainApp() {
@@ -47,6 +49,7 @@ function MainApp() {
     outputOffset,
     setOutputOffset,
     peerId,
+    targetId,
     isHost,
     driftStatus,
     isPaused,
@@ -103,8 +106,13 @@ function MainApp() {
     handleDimmerCycle,
     handleTorchToggle,
     handleTallyExit,
-    holdStoppedRef
+    holdStoppedRef,
+    isVideoEnabled,
+    toggleVideoMonitoring,
+    mediaServiceRef
   } = useLTC();
+
+  const mediaStreams = useMediaStreams();
 
   const handleOutputModeChange = (mode: 'stereo' | 'mono-l') => {
     setOutputMode(mode);
@@ -633,6 +641,11 @@ function MainApp() {
                 {isConnected ? tr('tally.conn.ok') : tr('tally.conn.lost')}
               </div>
             )}
+            {isVideoEnabled && targetId && mediaStreams.get(targetId) && (
+              <div className="tally-pgm-video-container">
+                <VideoRenderer stream={mediaStreams.get(targetId)!} className="tally-pgm-video" />
+              </div>
+            )}
             <div className="tally-header-slim">
               <span className="tally-header-id">
                 {cameraLabels[peerId] || (peerId ? peerId.slice(0, 8) : 'LOCAL')}
@@ -683,6 +696,12 @@ function MainApp() {
                 <span className="director-cam-count">{camCount} CAM{camCount !== 1 ? 'S' : ''}</span>
               </div>
               <div className="director-header-right">
+                <button
+                  className={`dir-video-toggle ${isVideoEnabled ? 'active' : ''}`}
+                  onClick={() => { playHapticFeedback(); toggleVideoMonitoring(); }}
+                >
+                  {isVideoEnabled ? 'VIDEO ON' : 'VIDEO OFF'}
+                </button>
                 <div className="director-tc-large">{directorTime}</div>
                 <button className="director-close-btn" onClick={() => { playHapticFeedback(); setDirectorPanelOpen(false); }}>✕ EXIT</button>
               </div>
@@ -740,10 +759,21 @@ function MainApp() {
                             <span className="director-cam-rtt">{stats.rtt.toFixed(0)}ms</span>
                           </div>
                         </div>
+                        {isVideoEnabled && mediaStreams.get(id) && (
+                          <div className="director-cam-video">
+                            <VideoRenderer stream={mediaStreams.get(id)!} muted={true} className="dir-cam-video-el" />
+                          </div>
+                        )}
                         <div className="director-cam-actions-v">
                           <button
                             className={`dir-cam-btn on-air ${uiAssignedState === 'live' ? 'active' : ''}`}
-                            onClick={() => { playHapticFeedback(); handleClientTallyChange(id, 'live'); }}
+                            onClick={() => {
+                              playHapticFeedback();
+                              handleClientTallyChange(id, 'live');
+                              if (isVideoEnabled && mediaServiceRef.current && mediaStreams.get(id)) {
+                                mediaServiceRef.current.setPgmStream(mediaStreams.get(id)!);
+                              }
+                            }}
                           >ON AIR</button>
                           <button
                             className={`dir-cam-btn preview ${uiAssignedState === 'preview' ? 'active' : ''}`}

@@ -23,6 +23,8 @@ import { useNetworkSync } from './hooks/useNetworkSync';
 import { useP2P } from './hooks/useP2P';
 import { useTallyControl } from './hooks/useTallyControl';
 import { useLtcEngine } from './hooks/useLtcEngine';
+import { WebRTCMediaService } from './utils/WebRTCMediaService';
+import { mediaStreamActions } from './hooks/useMediaStreams';
 
 export type SyncMode = 'system' | 'network' | 'p2p' | 'freerun';
 export type ToastLevel = 'info' | 'warn' | 'error';
@@ -129,6 +131,8 @@ interface LTCStateType {
   setSceneName: React.Dispatch<React.SetStateAction<string>>;
   tallyState: TallyState;
   isTallyConnected: boolean;
+  isVideoEnabled: boolean;
+  setIsVideoEnabled: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 interface LTCActionsType {
@@ -149,6 +153,7 @@ interface LTCActionsType {
   holdStoppedRef: React.MutableRefObject<boolean>;
   stopHoldStartRef: React.MutableRefObject<number>;
   stopHoldRafRef: React.MutableRefObject<number | null>;
+  mediaServiceRef: React.MutableRefObject<import('./utils/WebRTCMediaService').WebRTCMediaService | null>;
 
   tr: (key: string, vars?: Record<string, string | number>) => string;
   playHapticFeedback: () => void;
@@ -174,6 +179,7 @@ interface LTCActionsType {
   handleDimmerCycle: (e: React.MouseEvent) => void;
   handleTorchToggle: (e: React.MouseEvent) => void;
   handleTallyExit: (e: React.MouseEvent) => void;
+  toggleVideoMonitoring: () => void;
 }
 
 type LTCSyncContextType = LTCStateType & LTCActionsType;
@@ -284,6 +290,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
   const [p2pSyncSource, setP2pSyncSource] = useState<'manual' | 'network'>('manual');
   const [nowTick, setNowTick] = useState(0);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(false);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   useWakeLock(isRunning);
@@ -293,6 +300,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const currentTcRef = useRef<string>('00:00:00:00');
   const analyserRef = useRef<AnalyserNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
+  const mediaServiceRef = useRef<import('./utils/WebRTCMediaService').WebRTCMediaService | null>(null);
 
   const addToast = useCallback((msg: string, level: ToastLevel = 'info') => {
     if (level === 'error') {
@@ -314,7 +322,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     peerId, targetId, setTargetId, p2pStatus, setP2pStatus, isHost,
     masterDrift, setMasterDrift, clients, setClients,
     packetLossRate, setPacketLossRate,
-    peerSyncRef, messageHandlerRef, rttHistoryRef, lastSyncTimeRef, lastHeartbeatTimeRef,
+    peerSyncRef, messageHandlerRef, signalingHandlerRef, rttHistoryRef, lastSyncTimeRef, lastHeartbeatTimeRef,
     resetP2P, setupP2PMaster, setupP2PClient, joinSession,
   } = useP2P({ syncMode, setSyncMode, p2pRole, setP2pRole, isRunning, langRef, addToast });
 
@@ -336,6 +344,48 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     const id = setInterval(() => setNowTick(Date.now()), 5000);
     return () => clearInterval(id);
   }, [isHost]);
+
+  // Manage WebRTCMediaService lifecycle
+  useEffect(() => {
+    if (!isVideoEnabled || !peerSyncRef.current || !peerId) {
+      if (mediaServiceRef.current) {
+        mediaServiceRef.current.closeAll();
+        mediaServiceRef.current = null;
+        mediaStreamActions.clearStreams();
+      }
+      return;
+    }
+
+    const service = new WebRTCMediaService(peerSyncRef.current, peerId, isHost);
+    mediaServiceRef.current = service;
+
+    service.onRemoteStream = ({ peerId: pId, stream }) => {
+      mediaStreamActions.addStream(pId, stream);
+    };
+
+    service.onStreamClosed = (pId) => {
+      mediaStreamActions.removeStream(pId);
+    };
+
+    signalingHandlerRef.current = (msg: any) => {
+      void mediaServiceRef.current?.handleSignalingMessage(msg);
+    };
+
+    if (!isHost && targetId) {
+      void service.startLocalCamera().then(() => {
+        void service.connectToPeer(targetId);
+      });
+    } else if (isHost) {
+      void service.startLocalCamera();
+    }
+
+    return () => {
+      service.closeAll();
+      mediaServiceRef.current = null;
+      mediaStreamActions.clearStreams();
+      signalingHandlerRef.current = null;
+    };
+  }, [isVideoEnabled, isHost, peerId, targetId, peerSyncRef, signalingHandlerRef]);
 
   useEffect(() => {
     const initMobile = async () => {
@@ -730,6 +780,10 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     try { localStorage.setItem('ltc-camera-labels', JSON.stringify(cameraLabels)); } catch { /* ignore */ }
   }, [cameraLabels]);
 
+  const toggleVideoMonitoring = useCallback(() => {
+    setIsVideoEnabled(prev => !prev);
+  }, []);
+
   const stateValue = useMemo<LTCStateType>(() => ({
     isRunning, setIsRunning,
     fpsIndex, setFpsIndex,
@@ -787,6 +841,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     nowTick,
     tallyState,
     isTallyConnected,
+    isVideoEnabled, setIsVideoEnabled,
   }), [
     isRunning, fpsIndex, volume, syncStatus, syncMode, isPreparing, manualTimecode, p2pRole,
     activeTab, isMobile, outputMode, autoUserBits, isVisualSlate, isSlateFlashing, slateTime,
@@ -800,7 +855,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     setAutoUserBits, setIsVisualSlate, setSlateTime, setUserBits, setMarkers, setDefaultReelName,
     setOutputLevel, setOutputOffset, setTargetId, setP2pSyncSource, setShowGuide, setTallyOpen,
     setTallyMode, setTallyTorchEnabled, setTallyDimmerOpacity, setTallyTcSize, setDirectorPanelOpen,
-    setCameraLabels, setLang, setPacketLossRate, setSceneName,
+    setCameraLabels, setLang, setPacketLossRate, setSceneName, setIsVideoEnabled, isVideoEnabled,
   ]);
 
   const actionsValue = useMemo<LTCActionsType>(() => ({
@@ -817,6 +872,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     holdStoppedRef,
     stopHoldStartRef,
     stopHoldRafRef,
+    mediaServiceRef,
     tr,
     playHapticFeedback,
     addToast,
@@ -841,6 +897,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     handleDimmerCycle,
     handleTorchToggle,
     handleTallyExit,
+    toggleVideoMonitoring,
   }), [
     analyserRef, canvasRef, engineRef, currentTcRef, isVisualSlateRef, slateTimeRef, tallyTimeRef,
     tallyOpenRef, directorTimeRef, directorPanelOpenRef, holdStoppedRef, stopHoldStartRef, stopHoldRafRef,
@@ -848,7 +905,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     exportToALE, handleSlateClick, resetP2P, setupP2PMaster, setupP2PClient, joinSession,
     handleStartStop, handlePause, beginStopHold, cancelStopHold, handleManualResync,
     handleManualTallyChange, handleClientTallyChange, handleAllTallyChange, handleDimmerCycle,
-    handleTorchToggle, handleTallyExit,
+    handleTorchToggle, handleTallyExit, toggleVideoMonitoring, mediaServiceRef
   ]);
 
   return (
