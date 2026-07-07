@@ -508,7 +508,9 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [isRunning, isPaused, handleStartStop, setIsPaused, engineRef, manualTimecode, currentTcRef]);
-  onMasterHeartbeatTimeoutRef.current = syncClientToStoppedMaster;
+  useEffect(() => {
+    onMasterHeartbeatTimeoutRef.current = syncClientToStoppedMaster;
+  }, [syncClientToStoppedMaster]);
 
   const getUnshiftedTc = useCallback((tcStr: string) => {
     if (outputOffset === 0) return tcStr;
