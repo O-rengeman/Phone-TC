@@ -1,3 +1,5 @@
+import { debug } from './log';
+
 export interface TimeSyncResult {
   offset: number;
   latency: number;
@@ -18,7 +20,7 @@ export class TimeSync {
     let bestSample: TimeSyncResult | null = null;
 
     for (const server of TIME_SERVERS) {
-      console.log(`Attempting sync with ${server}...`);
+      debug(`Attempting sync with ${server}...`);
       for (let i = 0; i < samplesPerServer; i++) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);

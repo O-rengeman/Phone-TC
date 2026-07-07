@@ -18,5 +18,15 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      'no-console': ['error', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    // Only file allowed to call console.debug/log directly (see log.ts).
+    files: ['src/utils/log.ts'],
+    rules: {
+      'no-console': 'off',
+    },
   },
 ])

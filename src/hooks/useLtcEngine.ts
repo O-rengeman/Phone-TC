@@ -8,6 +8,7 @@ import type { DriftMonitor, DriftStatus } from '../utils/DriftMonitor';
 import { TimecodeNativeBridge } from '../utils/TimecodeNativeBridge';
 import { t as translate } from '../utils/i18n';
 import type { Lang } from '../utils/i18n';
+import { debug } from '../utils/log';
 import { LTC_WORKLET_SOURCE } from '../audio/ltcWorkletSource';
 import { FPS_OPTIONS } from '../constants';
 import type { SyncMode } from '../LTCSyncContext';
@@ -222,9 +223,9 @@ export function useLtcEngine({
   };
 
   const stopEngine = (reset = false) => {
-    console.log('[DEBUG-ENGINE] stopEngine execution. reset:', reset, 'hasWorkletNode:', !!workletNodeRef.current);
+    debug('[DEBUG-ENGINE] stopEngine execution. reset:', reset, 'hasWorkletNode:', !!workletNodeRef.current);
     if (workletNodeRef.current) {
-      console.log('[DEBUG-ENGINE] stopEngine: disconnecting workletNode');
+      debug('[DEBUG-ENGINE] stopEngine: disconnecting workletNode');
       workletNodeRef.current.port.onmessage = null;
       workletNodeRef.current.disconnect();
       workletNodeRef.current = null;
@@ -356,9 +357,9 @@ export function useLtcEngine({
   };
 
   const handlePause = () => {
-    console.log('[DEBUG-ENGINE] handlePause execution. isRunning:', isRunning, 'engineExists:', !!engineRef.current);
+    debug('[DEBUG-ENGINE] handlePause execution. isRunning:', isRunning, 'engineExists:', !!engineRef.current);
     if (isRunning && engineRef.current) {
-      console.log('[DEBUG-ENGINE] handlePause inside branch. Pausing...');
+      debug('[DEBUG-ENGINE] handlePause inside branch. Pausing...');
       setIsPaused(true);
       stopEngine();
     }
