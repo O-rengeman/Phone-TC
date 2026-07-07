@@ -19,6 +19,13 @@ export default defineConfig({
         // Thin Capacitor native-plugin wrapper: only meaningful inside a native
         // build, so it is exercised via manual/native QA rather than jsdom units.
         'src/utils/TimecodeNativeBridge.ts',
+        // Deliberately covered by thin state-transition tests only (per the
+        // Phase 4 plan): their real value (PeerJS connection lifecycle,
+        // AudioWorklet/AudioContext behavior) can't be meaningfully exercised
+        // under jsdom fakes and is verified via the Phase 7 device/browser
+        // checklist instead.
+        'src/hooks/useP2P.ts',
+        'src/hooks/useLtcEngine.ts',
       ],
       thresholds: {
         lines: 80,
