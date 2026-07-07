@@ -5,7 +5,7 @@ import type { TallyPayload } from './tally';
 import { debug } from './log';
 
 export interface SyncMessage {
-  type: 'sync-request' | 'sync-response' | 'heartbeat' | 'report' | 'tally';
+  type: 'sync-request' | 'sync-response' | 'heartbeat' | 'report' | 'tally' | 'webrtc-offer' | 'webrtc-answer' | 'webrtc-candidate';
   masterTimecode: string;
   masterTimestamp: number;
   fps: number;
@@ -14,9 +14,12 @@ export interface SyncMessage {
   isPaused?: boolean;
   clientTimestamp?: number;
   clientId?: string; // Identifier for the sender
+  targetId?: string; // Identifier for the intended recipient (used for signaling)
   rtt?: number;      // Reported RTT from client
   drift?: number;    // Reported drift from client
   tally?: TallyPayload;
+  sdp?: RTCSessionDescriptionInit; // For WebRTC signaling
+  candidate?: RTCIceCandidateInit; // For WebRTC signaling
 }
 
 /** Factory used to create the underlying Peer — overridable for tests. */
@@ -26,6 +29,7 @@ export class PeerSync {
   private peer: Peer | null = null;
   private connections: DataConnection[] = [];
   private onMessageCallback: (msg: SyncMessage) => void;
+  private onSignalingCallback?: (msg: SyncMessage) => void;
   private onStatusCallback: (status: string) => void;
   private lossRate: number = 0;
   private peerFactory: PeerFactory;
@@ -34,10 +38,12 @@ export class PeerSync {
     onMessage: (msg: SyncMessage) => void,
     onStatus: (status: string) => void,
     peerFactory: PeerFactory = (id, options) => new Peer(id, options),
+    onSignaling?: (msg: SyncMessage) => void
   ) {
     this.onMessageCallback = onMessage;
     this.onStatusCallback = onStatus;
     this.peerFactory = peerFactory;
+    this.onSignalingCallback = onSignaling;
   }
 
   private generateShortId(): string {
@@ -111,6 +117,13 @@ export class PeerSync {
       const msg = data as SyncMessage;
       msg.clientId = conn.peer; // Identify the sender
 
+      if (msg.type.startsWith('webrtc-')) {
+        if (this.onSignalingCallback) {
+          this.onSignalingCallback(msg);
+        }
+        return;
+      }
+
       // Master logic: Answer to sync-request automatically
       if (msg.type === 'sync-request' && this.onMessageCallback) {
         this.onMessageCallback({ ...msg, clientTimestamp: msg.clientTimestamp });
@@ -140,6 +153,14 @@ export class PeerSync {
         void conn.send(msg);
       }
     });
+  }
+
+  public sendTo(targetId: string, msg: SyncMessage) {
+    msg.targetId = targetId;
+    const conn = this.connections.find(c => c.peer === targetId);
+    if (conn && conn.open && Math.random() >= this.lossRate) {
+      void conn.send(msg);
+    }
   }
 
   public broadcast(msg: SyncMessage) {
