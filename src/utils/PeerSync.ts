@@ -3,6 +3,7 @@ import type { DataConnection } from 'peerjs';
 
 import type { TallyPayload } from './tally';
 import { debug } from './log';
+import { ICE_SERVERS } from './iceServers';
 
 export interface SyncMessage {
   type: 'sync-request' | 'sync-response' | 'heartbeat' | 'report' | 'tally' | 'webrtc-offer' | 'webrtc-answer' | 'webrtc-candidate';
@@ -76,13 +77,7 @@ export class PeerSync {
         this.peer = this.peerFactory(shortId, {
           debug: 2,
           config: {
-            'iceServers': [
-              { 'urls': 'stun:stun.l.google.com:19302' },
-              { 'urls': 'stun:stun1.l.google.com:19302' },
-              { 'urls': 'stun:stun2.l.google.com:19302' },
-              { 'urls': 'stun:stun3.l.google.com:19302' },
-              { 'urls': 'stun:stun4.l.google.com:19302' },
-            ]
+            'iceServers': ICE_SERVERS,
           }
         });
 
