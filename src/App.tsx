@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { LTCSyncProvider, useLTC } from './LTCSyncContext';
 import { FPS_OPTIONS } from './constants';
 import { VideoPlayer } from './VideoPlayer';
@@ -123,6 +124,17 @@ function MainApp() {
       });
     }
   };
+
+  // Extracted from the Director Panel's inline onClick so mediaServiceRef.current
+  // is only read from within a component-level hook callback (an event-handler
+  // boundary), not from inside the render-time IIFE that builds the panel's JSX.
+  const handleSetOnAir = useCallback((id: string) => {
+    playHapticFeedback();
+    handleClientTallyChange(id, 'live');
+    if (isVideoEnabled && mediaServiceRef.current && mediaStreams.get(id)) {
+      void mediaServiceRef.current.setPgmStream(mediaStreams.get(id)!);
+    }
+  }, [playHapticFeedback, handleClientTallyChange, isVideoEnabled, mediaStreams, mediaServiceRef]);
 
   return (
     <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
@@ -767,13 +779,7 @@ function MainApp() {
                         <div className="director-cam-actions-v">
                           <button
                             className={`dir-cam-btn on-air ${uiAssignedState === 'live' ? 'active' : ''}`}
-                            onClick={() => {
-                              playHapticFeedback();
-                              handleClientTallyChange(id, 'live');
-                              if (isVideoEnabled && mediaServiceRef.current && mediaStreams.get(id)) {
-                                mediaServiceRef.current.setPgmStream(mediaStreams.get(id)!);
-                              }
-                            }}
+                            onClick={() => handleSetOnAir(id)}
                           >ON AIR</button>
                           <button
                             className={`dir-cam-btn preview ${uiAssignedState === 'preview' ? 'active' : ''}`}
