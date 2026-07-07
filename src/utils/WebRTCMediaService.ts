@@ -12,11 +12,25 @@ export interface WebRTCStreamEvent {
   stream: MediaStream;
 }
 
+// Grace period before a transient ICE 'disconnected' state is treated as a
+// real drop — mobile networks (Wi-Fi/cellular handoff) often recover within
+// a few seconds without needing to tear down and re-negotiate the connection.
+export const DISCONNECT_GRACE_MS = 5000;
+
 export class WebRTCMediaService {
   private peerConnections = new Map<string, RTCPeerConnection>();
+  // The video RTCRtpSender for each peer, tracked by reference from creation
+  // time (whether or not it already has a track) so setPgmStream() can call
+  // replaceTrack() directly instead of re-discovering it via
+  // pc.getSenders().find(...), which fails to match a still-trackless sender.
+  private senders = new Map<string, RTCRtpSender>();
+  // ICE candidates that arrive before the corresponding pc's remoteDescription
+  // is set — queued instead of dropped, then flushed once it's set.
+  private iceCandidateQueues = new Map<string, RTCIceCandidateInit[]>();
+  private disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private localStream: MediaStream | null = null;
   private pgmStream: MediaStream | null = null;
-  
+
   // Callbacks
   public onRemoteStream?: (event: WebRTCStreamEvent) => void;
   public onStreamClosed?: (peerId: string) => void;
@@ -84,16 +98,17 @@ export class WebRTCMediaService {
 
     const newVideoTrack = stream?.getVideoTracks()[0] || null;
 
-    // Replace track on all existing connections
-    for (const [peerId, pc] of this.peerConnections.entries()) {
-      const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-      if (sender && newVideoTrack) {
-        try {
-          await sender.replaceTrack(newVideoTrack);
-          debug(`[WebRTC] Replaced PGM track for peer ${peerId}`);
-        } catch (err) {
-          console.error(`[WebRTC] Failed to replace track for ${peerId}`, err);
-        }
+    // Replace track on all existing connections. Senders are tracked by
+    // reference from creation time (see `senders`), so this works even for a
+    // sender that started trackless (no pgm feed chosen yet) — replaceTrack
+    // can start transmitting without renegotiation since the transceiver was
+    // always created with direction 'sendrecv'.
+    for (const [peerId, sender] of this.senders.entries()) {
+      try {
+        await sender.replaceTrack(newVideoTrack);
+        debug(`[WebRTC] Replaced PGM track for peer ${peerId}`);
+      } catch (err) {
+        console.error(`[WebRTC] Failed to replace track for ${peerId}`, err);
       }
     }
   }
@@ -112,9 +127,10 @@ export class WebRTCMediaService {
         pc = this.createPeerConnection(peerId);
       }
       await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+      await this.flushIceCandidateQueue(peerId, pc);
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      
+
       this.peerSync.sendTo(peerId, {
         type: 'webrtc-answer',
         sdp: answer,
@@ -128,14 +144,35 @@ export class WebRTCMediaService {
     } else if (msg.type === 'webrtc-answer' && msg.sdp) {
       if (pc) {
         await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+        await this.flushIceCandidateQueue(peerId, pc);
       }
     } else if (msg.type === 'webrtc-candidate' && msg.candidate) {
-      if (pc) {
+      if (pc && pc.remoteDescription) {
         try {
           await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
         } catch (err) {
           console.error('[WebRTC] Error adding ICE candidate', err);
         }
+      } else {
+        // No pc yet, or its remoteDescription isn't set: queue this candidate
+        // instead of dropping it — arrival order across the signaling channel
+        // isn't guaranteed relative to the offer/answer round-trip.
+        const queue = this.iceCandidateQueues.get(peerId) ?? [];
+        queue.push(msg.candidate);
+        this.iceCandidateQueues.set(peerId, queue);
+      }
+    }
+  }
+
+  private async flushIceCandidateQueue(peerId: string, pc: RTCPeerConnection): Promise<void> {
+    const queue = this.iceCandidateQueues.get(peerId);
+    if (!queue || queue.length === 0) return;
+    this.iceCandidateQueues.delete(peerId);
+    for (const candidate of queue) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        console.error(`[WebRTC] Error adding queued ICE candidate for ${peerId}`, err);
       }
     }
   }
@@ -192,26 +229,57 @@ export class WebRTCMediaService {
     };
 
     pc.oniceconnectionstatechange = () => {
-      debug(`[WebRTC] ICE state for ${peerId}: ${pc.iceConnectionState}`);
-      if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') {
+      const state = pc.iceConnectionState;
+      debug(`[WebRTC] ICE state for ${peerId}: ${state}`);
+
+      if (state === 'failed' || state === 'closed') {
+        this.clearDisconnectTimer(peerId);
         this.closePeer(peerId);
+      } else if (state === 'disconnected') {
+        // Transient disconnects (mobile network handoff, brief Wi-Fi drop)
+        // often recover on their own — give it a grace period instead of
+        // tearing the connection down immediately.
+        this.clearDisconnectTimer(peerId);
+        const timer = setTimeout(() => {
+          this.disconnectTimers.delete(peerId);
+          const currentPc = this.peerConnections.get(peerId);
+          if (currentPc === pc && currentPc.iceConnectionState === 'disconnected') {
+            this.closePeer(peerId);
+          }
+        }, DISCONNECT_GRACE_MS);
+        this.disconnectTimers.set(peerId, timer);
+      } else if (state === 'connected' || state === 'completed') {
+        this.clearDisconnectTimer(peerId);
       }
     };
 
-    // Add local tracks (Client -> camera, Master -> PGM)
+    // Add the video transceiver as sendrecv unconditionally — even before a
+    // local track exists (master with no PGM feed chosen yet, or a client
+    // that hasn't started its camera). A trackless recvonly transceiver would
+    // permanently lock this m-line to receive-only in the negotiated SDP, so
+    // a later replaceTrack() (see setPgmStream) would silently never
+    // transmit. sendrecv lets replaceTrack start sending later with no
+    // renegotiation needed.
     const streamToSend = this.isMaster ? this.pgmStream : this.localStream;
-    if (streamToSend) {
-      streamToSend.getTracks().forEach(track => {
-        const sender = pc.addTrack(track, streamToSend);
-        // Apply bandwidth constraints
-        void this.applyBandwidthLimit(sender, this.isMaster ? 500000 : 250000); // 500kbps master->client, 250kbps client->master
-      });
-    } else {
-      // Add a recvonly transceiver if we don't have a stream yet but want to receive
-      pc.addTransceiver('video', { direction: 'recvonly' });
+    const localTrack = streamToSend?.getVideoTracks()[0] ?? null;
+    const transceiver = localTrack
+      ? pc.addTransceiver(localTrack, { direction: 'sendrecv', streams: streamToSend ? [streamToSend] : [] })
+      : pc.addTransceiver('video', { direction: 'sendrecv' });
+    this.senders.set(peerId, transceiver.sender);
+    if (localTrack) {
+      // Apply bandwidth constraints
+      void this.applyBandwidthLimit(transceiver.sender, this.isMaster ? 500000 : 250000); // 500kbps master->client, 250kbps client->master
     }
 
     return pc;
+  }
+
+  private clearDisconnectTimer(peerId: string): void {
+    const timer = this.disconnectTimers.get(peerId);
+    if (timer) {
+      clearTimeout(timer);
+      this.disconnectTimers.delete(peerId);
+    }
   }
 
   private async applyBandwidthLimit(sender: RTCRtpSender, maxBitrateBps: number) {
@@ -235,6 +303,9 @@ export class WebRTCMediaService {
     if (pc) {
       pc.close();
       this.peerConnections.delete(peerId);
+      this.senders.delete(peerId);
+      this.iceCandidateQueues.delete(peerId);
+      this.clearDisconnectTimer(peerId);
       if (this.onStreamClosed) {
         this.onStreamClosed(peerId);
       }
@@ -249,6 +320,10 @@ export class WebRTCMediaService {
       }
     }
     this.peerConnections.clear();
+    this.senders.clear();
+    this.iceCandidateQueues.clear();
+    this.disconnectTimers.forEach(timer => clearTimeout(timer));
+    this.disconnectTimers.clear();
     this.stopLocalCamera();
     this.pgmStream = null;
   }
