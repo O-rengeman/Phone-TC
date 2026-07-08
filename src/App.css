@@ -2265,6 +2265,12 @@ input[type="range"] {
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
+  .mobile-view.app-container {
+    height: 100svh;
+    min-height: 100svh;
+    padding: 0;
+  }
+
   .mobile-view header {
     padding: 6px 10px;
   }
@@ -2306,23 +2312,24 @@ input[type="range"] {
     letter-spacing: 1.4px;
   }
   .mobile-view .tab-content {
-    padding: 8px 8px calc(12px + env(safe-area-inset-bottom));
-    scroll-padding-bottom: calc(78px + env(safe-area-inset-bottom));
+    min-height: 0;
+    padding: 6px 8px calc(8px + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(58px + env(safe-area-inset-bottom));
   }
   .mobile-view .tab-pane {
-    gap: 6px;
+    gap: 4px;
   }
   .mobile-view .timecode-card-pro {
     aspect-ratio: auto;
-    min-height: 104px;
-    max-height: 124px;
+    min-height: 92px;
+    max-height: 108px;
   }
   .mobile-view .info-strip-pro {
-    bottom: 4px;
-    gap: 6px;
+    bottom: 2px;
+    gap: 4px;
   }
   .mobile-view .info-label {
-    font-size: 0.66rem;
+    font-size: 0.6rem;
   }
   .mobile-view .control-section {
     gap: 4px;
@@ -2377,33 +2384,51 @@ input[type="range"] {
     font-size: 0.72rem;
   }
   .mobile-view .marker-scroll {
-    height: 132px;
+    height: 110px;
   }
   .mobile-view .fixed-footer {
-    padding: 4px 8px;
-    padding-bottom: calc(4px + env(safe-area-inset-bottom));
+    padding: 2px 6px;
+    padding-bottom: calc(2px + env(safe-area-inset-bottom));
   }
   .mobile-view .footer-buttons {
-    gap: 8px;
+    gap: 6px;
+    align-items: center;
   }
   .mobile-view .footer-left {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .mobile-view .footer-right {
+    flex-direction: row;
+    align-items: center;
     gap: 4px;
   }
   .mobile-view .btn-main-action {
-    min-height: 40px;
-    padding: 8px;
-    font-size: 0.72rem;
+    min-height: 34px;
+    padding: 6px 8px;
+    border-radius: 12px;
+    gap: 6px;
+  }
+  .mobile-view .btn-text {
+    font-size: 0.68rem;
+    letter-spacing: 1.2px;
+  }
+  .mobile-view .btn-icon {
+    width: 10px;
+    height: 10px;
   }
   .mobile-view .mark-label {
-    font-size: 0.42rem;
-    letter-spacing: 1.6px;
+    display: none;
   }
   .mobile-view .btn-mark-color {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
   }
   .mobile-view .mark-colors-container {
-    gap: 4px;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: 1fr;
+    gap: 3px;
   }
 }
 
