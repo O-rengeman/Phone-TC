@@ -19,6 +19,7 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
+  --app-height: 100dvh;
 
   /* z-index階層（App.tsxのToaster: 10500 と同期） */
   --z-footer: 10;
@@ -35,20 +36,22 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-body, html {
+html, body, #root {
   margin: 0;
   padding: 0;
   background-color: var(--bg);
   color: var(--text);
   font-family: var(--font-main);
   overflow: hidden;
-  height: 100dvh;
+  height: var(--app-height);
+  min-height: var(--app-height);
 }
 
 .app-container {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  height: var(--app-height);
+  min-height: var(--app-height);
   width: 100%;
   max-width: 100vw;
   margin: 0;
@@ -2266,8 +2269,8 @@ input[type="range"] {
 
 @media (orientation: landscape) and (max-height: 500px) {
   .mobile-view.app-container {
-    height: 100svh;
-    min-height: 100svh;
+    height: var(--app-height);
+    min-height: var(--app-height);
     padding: 0;
   }
 
@@ -2313,7 +2316,7 @@ input[type="range"] {
   }
   .mobile-view .tab-content {
     min-height: 0;
-    padding: 6px 8px calc(8px + env(safe-area-inset-bottom));
+    padding: 6px 8px calc(50px + env(safe-area-inset-bottom));
     scroll-padding-bottom: calc(58px + env(safe-area-inset-bottom));
   }
   .mobile-view .tab-pane {
@@ -2387,8 +2390,15 @@ input[type="range"] {
     height: 110px;
   }
   .mobile-view .fixed-footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
     padding: 2px 6px;
     padding-bottom: calc(2px + env(safe-area-inset-bottom));
+    border-top-color: rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.92);
+    backdrop-filter: blur(10px);
   }
   .mobile-view .footer-buttons {
     gap: 6px;
