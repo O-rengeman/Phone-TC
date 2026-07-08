@@ -722,13 +722,29 @@ function MainApp() {
 
       {directorPanelOpen && (() => {
         const camCount = Object.keys(clients).length;
+        const liveCount = Object.entries(clients).filter(([id]) => {
+          const assignedState = tallyPayload?.assignments?.[id] ?? tallyPayload?.all ?? 'off';
+          return (assignedState === 'standby' ? 'preview' : assignedState) === 'live';
+        }).length;
+        const previewCount = Object.entries(clients).filter(([id]) => {
+          const assignedState = tallyPayload?.assignments?.[id] ?? tallyPayload?.all ?? 'off';
+          return (assignedState === 'standby' ? 'preview' : assignedState) === 'preview';
+        }).length;
+        const offlineCount = Object.values(clients).filter((stats) => Date.now() - stats.lastSeen > 30000).length;
+        const globalState = tallyPayload?.all === 'standby' ? 'preview' : (tallyPayload?.all ?? 'off');
+        const monitorLabel = pgmSourceId
+          ? (cameraLabels[pgmSourceId] || `CAM${Object.keys(clients).findIndex((id) => id === pgmSourceId) + 1}`)
+          : null;
         return (
           <div className="director-tally-overlay">
             <div className="director-tally-header">
-              <div className="director-title">
-                <span className="director-rec-dot" />
-                DIRECTOR PANEL
-                <span className="director-cam-count">{camCount} CAM{camCount !== 1 ? 'S' : ''}</span>
+              <div className="director-title-group">
+                <div className="director-title">
+                  <span className="director-rec-dot" />
+                  DIRECTOR SWITCHER
+                  <span className="director-cam-count">{camCount} CAM{camCount !== 1 ? 'S' : ''}</span>
+                </div>
+                <div className="director-subtitle">VIDEO MONITORING + TALLY BUS CONTROL</div>
               </div>
               <div className="director-header-right">
                 <button
@@ -738,24 +754,43 @@ function MainApp() {
                   {isVideoEnabled ? 'VIDEO ON' : 'VIDEO OFF'}
                 </button>
                 <div className="director-tc-large">{directorTime}</div>
-                <button className="director-close-btn" onClick={() => { playHapticFeedback(); setDirectorPanelOpen(false); }}>✕ EXIT</button>
+                <button className="director-close-btn" onClick={() => { playHapticFeedback(); setDirectorPanelOpen(false); }}>EXIT</button>
+              </div>
+            </div>
+            <div className="director-panel-summary">
+              <div className="director-summary-chip neutral">
+                <span className="director-summary-label">MONITOR</span>
+                <span className="director-summary-value">{monitorLabel ?? 'NONE'}</span>
+              </div>
+              <div className={`director-summary-chip ${liveCount > 0 ? 'live' : 'neutral'}`}>
+                <span className="director-summary-label">PGM</span>
+                <span className="director-summary-value">{liveCount}</span>
+              </div>
+              <div className={`director-summary-chip ${previewCount > 0 ? 'preview' : 'neutral'}`}>
+                <span className="director-summary-label">PVW</span>
+                <span className="director-summary-value">{previewCount}</span>
+              </div>
+              <div className={`director-summary-chip ${offlineCount > 0 ? 'offline' : 'neutral'}`}>
+                <span className="director-summary-label">OFFLINE</span>
+                <span className="director-summary-value">{offlineCount}</span>
               </div>
             </div>
             <div className="director-all-control">
               <div className="director-all-label">
                 <span>{tr('director.allControl')}</span>
+                <span className={`director-all-bus state-${globalState}`}>{globalState.toUpperCase()}</span>
               </div>
               <div className="director-all-btns">
                 <button
-                  className={`dir-all-btn on-air ${tallyPayload?.all === 'live' ? 'active' : ''}`}
+                  className={`dir-all-btn on-air ${globalState === 'live' ? 'active' : ''}`}
                   onClick={() => handleSetAllTally('live')}
-                >ON AIR</button>
+                >PGM</button>
                 <button
-                  className={`dir-all-btn preview ${tallyPayload?.all === 'preview' ? 'active' : ''}`}
+                  className={`dir-all-btn preview ${globalState === 'preview' ? 'active' : ''}`}
                   onClick={() => handleSetAllTally('preview')}
-                >PREVIEW</button>
+                >PVW</button>
                 <button
-                  className={`dir-all-btn off ${tallyPayload?.all === 'off' ? 'active' : ''}`}
+                  className={`dir-all-btn off ${globalState === 'off' ? 'active' : ''}`}
                   onClick={() => handleSetAllTally('off')}
                 >OFF</button>
               </div>
@@ -764,9 +799,9 @@ function MainApp() {
               <div className="director-grid">
                 {camCount === 0 ? (
                   <div className="director-no-clients">
-                    <div className="director-no-clients-icon">📷</div>
+                    <div className="director-no-clients-icon">CAM</div>
                     <div>NO CAMERAS CONNECTED</div>
-                    <div className="director-no-clients-sub">P2P でクライアント端末を接続してください</div>
+                    <div className="director-no-clients-sub">Connected P2P client cameras will appear here.</div>
                   </div>
                 ) : (
                   Object.entries(clients).map(([id, stats], idx) => {
@@ -775,8 +810,9 @@ function MainApp() {
                     const uiAssignedState = assignedState === 'standby' ? 'preview' : assignedState;
                     const defaultLabel = `CAM${idx + 1}`;
                     const label = cameraLabels[id] || defaultLabel;
+                    const isMonitorSource = pgmSourceId === id;
                     return (
-                      <div key={id} className={`director-cam-card status-${uiAssignedState} ${isOffline ? 'offline' : ''}`}>
+                      <div key={id} className={`director-cam-card status-${uiAssignedState} ${isMonitorSource ? 'monitor-selected' : ''} ${isOffline ? 'offline' : ''}`}>
                         {isOffline && <div className="director-offline-overlay">OFFLINE</div>}
                         <div className="director-cam-header">
                           <input
@@ -787,27 +823,30 @@ function MainApp() {
                             maxLength={8}
                           />
                           <div className="director-cam-meta">
-                            <span className={`director-state-chip state-${uiAssignedState}`}>
-                              {uiAssignedState === 'live' ? '● ' : uiAssignedState === 'preview' ? '◐ ' : '— '}
-                              {tr(tallyLabelKey(uiAssignedState))}
-                            </span>
-                            <span className="director-cam-rtt">{stats.rtt.toFixed(0)}ms</span>
+                            <span className={`director-state-chip state-${uiAssignedState}`}>{tr(tallyLabelKey(uiAssignedState))}</span>
+                            {isMonitorSource && <span className="director-monitor-chip">MONITOR OUT</span>}
+                            <span className="director-cam-rtt">RTT {stats.rtt.toFixed(0)}ms</span>
                           </div>
                         </div>
-                        {isVideoEnabled && mediaStreams.get(id) && (
+                        {isVideoEnabled && mediaStreams.get(id) ? (
                           <div className="director-cam-video">
                             <VideoRenderer stream={mediaStreams.get(id)!} muted={true} className="dir-cam-video-el" />
+                          </div>
+                        ) : (
+                          <div className={`director-cam-video director-cam-video-placeholder ${isVideoEnabled ? '' : 'disabled'}`.trim()}>
+                            <span>{isVideoEnabled ? 'NO SIGNAL' : 'VIDEO OFF'}</span>
+                            <small>{isVideoEnabled ? 'VIDEO STREAM WAITING' : 'ENABLE MONITORING TO PREVIEW'}</small>
                           </div>
                         )}
                         <div className="director-cam-actions-v">
                           <button
                             className={`dir-cam-btn on-air ${uiAssignedState === 'live' ? 'active' : ''}`}
                             onClick={() => handleSetOnAir(id)}
-                          >ON AIR</button>
+                          >PGM</button>
                           <button
                             className={`dir-cam-btn preview ${uiAssignedState === 'preview' ? 'active' : ''}`}
                             onClick={() => handleSetPreview(id)}
-                          >PREVIEW</button>
+                          >PVW</button>
                           <button
                             className={`dir-cam-btn off ${uiAssignedState === 'off' ? 'active' : ''}`}
                             onClick={() => handleSetOff(id)}

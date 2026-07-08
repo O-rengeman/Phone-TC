@@ -3242,6 +3242,501 @@ input[type="range"] {
 /* ログで使うstate-textクラスがdirector-log外でも使えるよう重複定義 */
 .director-log-row { border-left: 3px solid var(--border); }
 
+/* Director switcher refresh */
+.director-tally-overlay {
+  padding: clamp(12px, 2vw, 22px);
+  gap: 12px;
+  background:
+    radial-gradient(circle at top left, rgba(255, 59, 48, 0.12), transparent 26%),
+    radial-gradient(circle at top right, rgba(255, 214, 10, 0.12), transparent 18%),
+    linear-gradient(180deg, #0d1117 0%, #090c12 100%);
+}
+
+.director-tally-header {
+  margin-bottom: 0;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  background: rgba(14, 18, 26, 0.92);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.24);
+}
+
+.director-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.director-title {
+  font-size: clamp(1rem, 1.4vw, 1.35rem);
+  letter-spacing: 0.16em;
+  flex-wrap: wrap;
+}
+
+.director-subtitle {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.director-cam-count {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.director-header-right {
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.dir-video-toggle,
+.director-close-btn {
+  min-height: 40px;
+}
+
+.director-tc-large {
+  font-size: clamp(1.2rem, 2vw, 1.85rem);
+}
+
+.director-panel-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.director-summary-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(14, 18, 26, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.director-summary-chip.live {
+  border-color: rgba(255, 59, 48, 0.34);
+  background: rgba(255, 59, 48, 0.12);
+}
+
+.director-summary-chip.preview {
+  border-color: rgba(52, 199, 89, 0.34);
+  background: rgba(52, 199, 89, 0.12);
+}
+
+.director-summary-chip.offline {
+  border-color: rgba(255, 159, 10, 0.3);
+  background: rgba(255, 159, 10, 0.12);
+}
+
+.director-summary-chip.neutral {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.director-summary-label {
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.director-summary-value {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: var(--text-bright);
+  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
+}
+
+.director-all-control {
+  margin-bottom: 0;
+  padding: 16px 18px;
+  border-radius: 24px;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(14, 18, 26, 0.92);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.2);
+}
+
+.director-all-label {
+  gap: 8px;
+  color: var(--text-bright);
+}
+
+.director-all-bus {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-bright);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  font-family: var(--font-mono);
+}
+
+.director-all-bus.state-live {
+  color: #ff8d87;
+  border-color: rgba(255, 59, 48, 0.34);
+  background: rgba(255, 59, 48, 0.16);
+}
+
+.director-all-bus.state-preview {
+  color: #74e08d;
+  border-color: rgba(52, 199, 89, 0.34);
+  background: rgba(52, 199, 89, 0.16);
+}
+
+.director-all-bus.state-off {
+  color: var(--text-muted);
+}
+
+.director-all-btns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(84px, 1fr));
+  gap: 8px;
+}
+
+.dir-all-btn {
+  min-height: 44px;
+  border-radius: 14px;
+}
+
+.director-main-area {
+  min-height: 0;
+  gap: 18px;
+}
+
+.director-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  padding: 2px 6px 20px 2px;
+}
+
+.director-cam-card {
+  min-height: 320px;
+  padding: 16px;
+  gap: 12px;
+  border-radius: 22px;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(14, 18, 26, 0.92);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.22);
+}
+
+.director-cam-card::before {
+  left: 12px;
+  top: 14px;
+  bottom: 14px;
+  width: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.director-cam-card.status-live {
+  border-color: rgba(255, 59, 48, 0.34);
+  background: linear-gradient(180deg, rgba(255, 59, 48, 0.12), rgba(14, 18, 26, 0.92));
+}
+
+.director-cam-card.status-preview {
+  border-color: rgba(52, 199, 89, 0.3);
+  background: linear-gradient(180deg, rgba(52, 199, 89, 0.1), rgba(14, 18, 26, 0.92));
+}
+
+.director-cam-card.monitor-selected {
+  box-shadow:
+    0 0 0 1px rgba(255, 214, 10, 0.42),
+    0 24px 44px rgba(0, 0, 0, 0.3);
+}
+
+.director-cam-card.monitor-selected::after {
+  content: 'MONITOR';
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 214, 10, 0.14);
+  border: 1px solid rgba(255, 214, 10, 0.3);
+  color: #ffd54a;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  font-family: var(--font-mono);
+}
+
+.director-cam-card.offline {
+  opacity: 0.62;
+}
+
+.director-cam-header {
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.director-cam-label-input {
+  max-width: none;
+  padding-right: 16px;
+  font-size: 1.05rem;
+  letter-spacing: 0.12em;
+}
+
+.director-cam-meta {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.director-state-chip,
+.director-monitor-chip,
+.director-cam-rtt {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  font-family: var(--font-mono);
+}
+
+.director-state-chip {
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+}
+
+.director-monitor-chip {
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  color: #ffd54a;
+  border-color: rgba(255, 214, 10, 0.28);
+  background: rgba(255, 214, 10, 0.12);
+}
+
+.director-cam-rtt {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+}
+
+.director-cam-video {
+  flex: 1;
+  min-height: 168px;
+  margin: 0;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(8, 10, 14, 0.92));
+  aspect-ratio: 16 / 9;
+}
+
+.director-cam-video-placeholder {
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.director-cam-video-placeholder span {
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: var(--text-bright);
+}
+
+.director-cam-video-placeholder small {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.director-cam-video-placeholder.disabled {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(8, 10, 14, 0.98));
+}
+
+.dir-cam-video-el {
+  display: block;
+}
+
+.director-cam-actions-v {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dir-cam-btn {
+  min-height: 44px;
+  border-radius: 14px;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+}
+
+.director-log {
+  width: min(280px, 28vw);
+  min-width: 220px;
+  padding: 14px;
+  border-radius: 22px;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(14, 18, 26, 0.92);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.22);
+}
+
+.director-log-title {
+  font-size: 0.68rem;
+}
+
+.director-log-row {
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.director-no-clients {
+  min-height: 260px;
+  justify-content: center;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(14, 18, 26, 0.78);
+}
+
+.mobile-view .director-tally-overlay {
+  padding: 12px 12px max(12px, env(safe-area-inset-bottom));
+}
+
+.mobile-view .director-tally-header {
+  padding: 12px;
+  gap: 10px;
+  border-radius: 18px;
+}
+
+.mobile-view .director-title {
+  font-size: 0.9rem;
+  letter-spacing: 0.12em;
+}
+
+.mobile-view .director-subtitle {
+  font-size: 0.56rem;
+}
+
+.mobile-view .director-header-right {
+  width: 100%;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.mobile-view .director-panel-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mobile-view .director-summary-chip {
+  padding: 10px 12px;
+  border-radius: 16px;
+}
+
+.mobile-view .director-summary-value {
+  font-size: 0.95rem;
+}
+
+.mobile-view .director-all-control {
+  padding: 12px;
+  gap: 10px;
+  border-radius: 18px;
+}
+
+.mobile-view .director-all-label {
+  font-size: 0.68rem;
+}
+
+.mobile-view .director-all-btns {
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mobile-view .director-main-area {
+  flex-direction: column;
+  overflow: auto;
+}
+
+.mobile-view .director-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  padding: 0 0 14px;
+  overflow: visible;
+}
+
+.mobile-view .director-cam-card {
+  min-height: 0;
+  padding: 12px;
+  border-radius: 18px;
+}
+
+.mobile-view .director-cam-header {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.mobile-view .director-cam-meta {
+  justify-content: flex-start;
+}
+
+.mobile-view .director-cam-video {
+  min-height: 104px;
+}
+
+.mobile-view .director-cam-actions-v {
+  gap: 6px;
+}
+
+.mobile-view .dir-cam-btn {
+  min-height: 36px;
+  font-size: 0.64rem;
+}
+
+.mobile-view .director-log {
+  width: 100%;
+  min-width: 0;
+  max-height: 180px;
+  border-radius: 18px;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-view .director-tally-overlay {
+    padding-top: 8px;
+  }
+
+  .mobile-view .director-main-area {
+    flex-direction: row;
+  }
+
+  .mobile-view .director-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .mobile-view .director-cam-video {
+    min-height: 92px;
+  }
+
+  .mobile-view .director-log {
+    width: 220px;
+    max-height: none;
+  }
+}
+
 .vu-label {
   display: block;
   font-size: 0.65rem;
