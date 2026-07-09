@@ -310,8 +310,8 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
   const [p2pSyncSource, setP2pSyncSource] = useState<'manual' | 'network'>('manual');
   const [nowTick, setNowTick] = useState(() => Date.now());
-  // Multiview is the director's primary control surface, so show incoming
-  // camera feeds immediately. The operator can still disable rendering.
+  // The multiview is the switcher's primary surface; camera previews should
+  // appear as soon as a source connects without requiring a separate toggle.
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const onMasterHeartbeatTimeoutRef = useRef<(() => void) | null>(null);
 

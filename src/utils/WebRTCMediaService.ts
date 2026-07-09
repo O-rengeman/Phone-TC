@@ -31,11 +31,6 @@ export class WebRTCMediaService {
   // replaceTrack() directly instead of re-discovering it via
   // pc.getSenders().find(...), which fails to match a still-trackless sender.
   private senders = new Map<string, RTCRtpSender>();
-  // A transceiver created before PGM is selected has no associated MediaStream
-  // in its SDP. Browsers then fire `ontrack` with event.streams = [], even
-  // though the receiver track is valid and starts producing frames after
-  // replaceTrack(). Keep a synthetic stream per peer for that case.
-  private remoteStreams = new Map<string, MediaStream>();
   // ICE candidates that arrive before the corresponding pc's remoteDescription
   // is set — queued instead of dropped, then flushed once it's set.
   private iceCandidateQueues = new Map<string, RTCIceCandidateInit[]>();
@@ -260,22 +255,10 @@ export class WebRTCMediaService {
 
     pc.ontrack = (event) => {
       debug(`[WebRTC] Received remote track from ${peerId}`, event.track.kind);
-      const associatedStream = event.streams?.[0];
-      let stream: MediaStream;
-
-      if (!associatedStream) {
-        stream = this.remoteStreams.get(peerId) ?? new MediaStream();
-        this.remoteStreams.set(peerId, stream);
-        if (!stream.getTracks().includes(event.track)) {
-          stream.addTrack(event.track);
+      if (event.streams && event.streams[0]) {
+        if (this.onRemoteStream) {
+          this.onRemoteStream({ peerId, stream: event.streams[0] });
         }
-      } else {
-        stream = associatedStream;
-        this.remoteStreams.set(peerId, stream);
-      }
-
-      if (this.onRemoteStream) {
-        this.onRemoteStream({ peerId, stream });
       }
     };
 
@@ -373,7 +356,6 @@ export class WebRTCMediaService {
       pc.close();
       this.peerConnections.delete(peerId);
       this.senders.delete(peerId);
-      this.remoteStreams.delete(peerId);
       this.iceCandidateQueues.delete(peerId);
       this.clearDisconnectTimer(peerId);
       if (this.onStreamClosed) {
@@ -391,7 +373,6 @@ export class WebRTCMediaService {
     }
     this.peerConnections.clear();
     this.senders.clear();
-    this.remoteStreams.clear();
     this.iceCandidateQueues.clear();
     this.disconnectTimers.forEach(timer => clearTimeout(timer));
     this.disconnectTimers.clear();

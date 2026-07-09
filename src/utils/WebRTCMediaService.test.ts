@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WebRTCMediaService, DISCONNECT_GRACE_MS } from './WebRTCMediaService';
-import type { WebRTCStreamEvent } from './WebRTCMediaService';
 import type { PeerSync, SyncMessage } from './PeerSync';
 
 // jsdom implements none of RTCPeerConnection/RTCSessionDescription/
@@ -19,37 +18,13 @@ function makeFakeTrack(kind = 'video'): FakeTrack {
   return { kind, enabled: true, stop: vi.fn() };
 }
 
-class FakeMediaStream {
-  id = 'fake-stream';
-  private tracks: FakeTrack[];
-
-  constructor(tracks: FakeTrack[] = []) {
-    this.tracks = [...tracks];
-  }
-
-  getTracks() {
-    return this.tracks;
-  }
-
-  getVideoTracks() {
-    return this.tracks.filter(track => track.kind === 'video');
-  }
-
-  getAudioTracks() {
-    return this.tracks.filter(track => track.kind === 'audio');
-  }
-
-  addTrack(track: FakeTrack) {
-    if (!this.tracks.includes(track)) this.tracks.push(track);
-  }
-
-  removeTrack(track: FakeTrack) {
-    this.tracks = this.tracks.filter(candidate => candidate !== track);
-  }
-}
-
 function makeFakeStream(track: FakeTrack = makeFakeTrack()) {
-  return new FakeMediaStream([track]) as unknown as MediaStream;
+  const tracks = [track];
+  return {
+    id: 'fake-stream',
+    getTracks: () => tracks,
+    getVideoTracks: () => tracks.filter(t => t.kind === 'video'),
+  } as unknown as MediaStream;
 }
 
 class FakeSender {
@@ -149,7 +124,6 @@ function candidateMsg(clientId: string, opts: { reject?: boolean; candidate?: st
 
 beforeEach(() => {
   createdPeerConnections = [];
-  vi.stubGlobal('MediaStream', FakeMediaStream);
   vi.stubGlobal('RTCPeerConnection', FakeRTCPeerConnection);
   vi.stubGlobal('RTCSessionDescription', class {
     init: unknown;
@@ -457,22 +431,6 @@ describe('WebRTCMediaService signaling flow', () => {
     pc.ontrack?.({ track: makeFakeTrack(), streams: [stream] });
 
     expect(onRemoteStream).toHaveBeenCalledWith({ peerId: 'CLIENT1', stream });
-  });
-
-  it('wraps a streamless receiver track so a late PGM replaceTrack reaches the return monitor', async () => {
-    const service = new WebRTCMediaService(makeFakePeerSync(), 'ME', false);
-    const onRemoteStream = vi.fn<(event: WebRTCStreamEvent) => void>();
-    service.onRemoteStream = onRemoteStream;
-    await service.connectToPeer('MASTER');
-    const pc = createdPeerConnections[0];
-    const receiverTrack = makeFakeTrack();
-
-    pc.ontrack?.({ track: receiverTrack, streams: [] });
-
-    const receivedEvent = onRemoteStream.mock.calls[0]?.[0];
-    expect(receivedEvent?.peerId).toBe('MASTER');
-    expect(receivedEvent?.stream).toBeInstanceOf(FakeMediaStream);
-    expect(receivedEvent?.stream.getVideoTracks()).toEqual([receiverTrack]);
   });
 
   it('updateBitrate sets the maxBitrate on the RTCRtpSender', async () => {

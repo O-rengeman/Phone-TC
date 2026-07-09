@@ -367,7 +367,7 @@ function MainApp() {
   useEffect(() => {
     if (!directorPanelOpen) return;
 
-    const handleSwitcherShortcut = (event: KeyboardEvent) => {
+    const handleCreatorShortcut = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (
         target?.isContentEditable
@@ -378,16 +378,12 @@ function MainApp() {
         return;
       }
 
-      const inputIndex = Number(event.key) - 1;
-      if (inputIndex >= 0 && inputIndex <= 8) {
-        const sourceId = Object.keys(clients)[inputIndex];
+      const sourceIndex = Number(event.key) - 1;
+      if (sourceIndex >= 0 && sourceIndex <= 8) {
+        const sourceId = Object.keys(clients)[sourceIndex];
         if (!sourceId) return;
         event.preventDefault();
-        if (event.shiftKey) {
-          handleSelectProgram(sourceId);
-        } else {
-          handleSelectPreview(sourceId);
-        }
+        handleSelectPreview(sourceId);
         return;
       }
 
@@ -400,16 +396,9 @@ function MainApp() {
       }
     };
 
-    window.addEventListener('keydown', handleSwitcherShortcut);
-    return () => window.removeEventListener('keydown', handleSwitcherShortcut);
-  }, [
-    clients,
-    directorPanelOpen,
-    handleAuto,
-    handleCut,
-    handleSelectPreview,
-    handleSelectProgram,
-  ]);
+    window.addEventListener('keydown', handleCreatorShortcut);
+    return () => window.removeEventListener('keydown', handleCreatorShortcut);
+  }, [clients, directorPanelOpen, handleAuto, handleCut, handleSelectPreview]);
 
   return (
     <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
@@ -1034,29 +1023,32 @@ function MainApp() {
         const programStream = effectivePgmSourceId ? (mediaStreams.get(effectivePgmSourceId) ?? null) : null;
         const previewStream = effectivePreviewSourceId ? (mediaStreams.get(effectivePreviewSourceId) ?? null) : null;
         return (
-          <div className="director-tally-overlay atem-chassis">
-            <div className="director-tally-header">
+          <div className="director-tally-overlay atem-chassis creator-switcher apple-director-switcher">
+            <div className="director-tally-header apple-director-header">
               <div className="director-title-group">
                 <div className="director-title">
-                  <span className="director-rec-dot" />
+                  <span className="creator-live-mark" />
                   DIRECTOR SWITCHER
-                  <span className="director-cam-count">{camCount} INPUT{camCount !== 1 ? 'S' : ''}</span>
+                  <span className="creator-mode-badge">Creator View</span>
                 </div>
-                <div className="director-subtitle">1 M/E · PROGRAM / PREVIEW</div>
+                <div className="director-subtitle">カメラを選ぶ <b>→</b> TAKEで切り替え</div>
               </div>
               <div className="director-header-right">
-                <div className={`director-signal-state ${signalCount > 0 ? 'online' : 'waiting'}`}>
-                  <span />
-                  {signalCount}/{camCount} SIGNAL
+                <div className={`creator-signal-summary ${signalCount > 0 ? 'ready' : ''}`}>
+                  <span className="creator-signal-dot" />
+                  <div>
+                    <small>CAMERAS</small>
+                    <strong>{signalCount} / {camCount} READY</strong>
+                  </div>
                 </div>
                 <button
                   className={`dir-video-toggle ${isVideoEnabled ? 'active' : ''}`}
                   onClick={() => { playHapticFeedback(); toggleVideoMonitoring(); }}
                 >
-                  MV {isVideoEnabled ? 'ON' : 'OFF'}
+                  {isVideoEnabled ? '映像 ON' : '映像 OFF'}
                 </button>
                 <div className="director-tc-large">{directorTime}</div>
-                <button className="director-close-btn" onClick={() => { playHapticFeedback(); setDirectorPanelOpen(false); }}>EXIT</button>
+                <button className="director-close-btn" onClick={() => { playHapticFeedback(); setDirectorPanelOpen(false); }} aria-label="Close switcher">×</button>
               </div>
             </div>
 
@@ -1067,7 +1059,7 @@ function MainApp() {
                   {/* PROGRAMモニター */}
                   <div className={`atem-monitor program-monitor ${effectivePgmSourceId ? 'has-source' : ''}`}>
                     <div className="atem-monitor-head">
-                      <span><i className="monitor-tally-dot" />PROGRAM</span>
+                      <span><i className="creator-monitor-dot" />ON AIR <small>現在の映像</small></span>
                       <strong className="source-label">{programLabel}</strong>
                     </div>
                     <div className="atem-monitor-screen">
@@ -1082,8 +1074,8 @@ function MainApp() {
                         </div>
                       ) : (
                         <div className="atem-monitor-placeholder">
-                          <span>{isVideoEnabled ? 'NO PROGRAM SOURCE' : 'MONITORING OFF'}</span>
-                          <small>{effectivePgmSourceId ? 'WAITING FOR CAMERA' : 'SELECT A PROGRAM INPUT'}</small>
+                          <span>{isVideoEnabled ? 'ON AIR未選択' : '映像モニターOFF'}</span>
+                          <small>{effectivePgmSourceId ? 'カメラ映像を待っています' : '下のカメラからNEXTを選択してください'}</small>
                         </div>
                       )}
                     </div>
@@ -1092,7 +1084,7 @@ function MainApp() {
                   {/* PREVIEWモニター */}
                   <div className={`atem-monitor preview-monitor ${effectivePreviewSourceId ? 'has-source' : ''}`}>
                     <div className="atem-monitor-head">
-                      <span><i className="monitor-tally-dot" />PREVIEW</span>
+                      <span><i className="creator-monitor-dot" />NEXT <small>次に出す映像</small></span>
                       <strong className="source-label">{previewLabel}</strong>
                     </div>
                     <div className="atem-monitor-screen">
@@ -1100,8 +1092,8 @@ function MainApp() {
                         <VideoRenderer stream={previewStream} muted={true} className="atem-monitor-video" />
                       ) : (
                         <div className="atem-monitor-placeholder">
-                          <span>{isVideoEnabled ? 'NO PREVIEW SOURCE' : 'MONITORING OFF'}</span>
-                          <small>{effectivePreviewSourceId ? 'WAITING FOR CAMERA' : 'SELECT A PREVIEW INPUT'}</small>
+                          <span>{isVideoEnabled ? 'NEXT未選択' : '映像モニターOFF'}</span>
+                          <small>{effectivePreviewSourceId ? 'カメラ映像を待っています' : '下のカメラをクリックして選択'}</small>
                         </div>
                       )}
                     </div>
@@ -1109,12 +1101,20 @@ function MainApp() {
                 </div>
 
                 {/* 入力カメラプレビューグリッド */}
-                <div className="atem-mv-inputs-grid">
+                <div className="creator-camera-section">
+                  <div className="creator-section-heading">
+                    <div>
+                      <small>CAMERA SOURCES</small>
+                      <strong>カメラを選ぶ</strong>
+                    </div>
+                    <span>クリックするとNEXTにセットされます</span>
+                  </div>
+                  <div className="atem-mv-inputs-grid">
                   {camCount === 0 ? (
                     <div className="director-no-clients">
-                      <div className="director-no-clients-icon">CAM</div>
-                      <div>NO CAMERAS CONNECTED</div>
-                      <div className="director-no-clients-sub">Connected P2P client cameras will appear here.</div>
+                      <div className="director-no-clients-icon">＋</div>
+                      <div>カメラを接続してください</div>
+                      <div className="director-no-clients-sub">クライアントが接続されると、ここに映像が並びます</div>
                     </div>
                   ) : (
                     clientEntries.map(([id, stats], idx) => {
@@ -1146,21 +1146,12 @@ function MainApp() {
                           key={id}
                           className={`atem-mv-card status-${cardTallyState} ${isOffline ? 'offline' : ''}`}
                           onClick={() => !isOffline && handleSelectPreview(id)}
-                          onKeyDown={(event) => {
-                            if (!isOffline && (event.key === 'Enter' || event.key === ' ')) {
-                              event.preventDefault();
-                              handleSelectPreview(id);
-                            }
-                          }}
-                          role="button"
-                          tabIndex={isOffline ? -1 : 0}
-                          aria-label={`Set ${label} to preview`}
-                          title="Click to set Preview"
+                          title="NEXTに設定"
                         >
                           {isOffline && <div className="director-offline-overlay">OFFLINE</div>}
                           <div className="input-card-state-rail">
-                            {isPgmActive && <span className="input-state-badge program">PGM</span>}
-                            {isPvwActive && <span className="input-state-badge preview">PVW</span>}
+                            {isPgmActive && <span className="input-state-badge program">ON AIR</span>}
+                            {isPvwActive && <span className="input-state-badge preview">NEXT</span>}
                           </div>
                           <div className="input-card-header">
                             <span className="input-num">{idx + 1}</span>
@@ -1197,8 +1188,8 @@ function MainApp() {
 
                           <div className="input-card-footer">
                             <div className="input-card-footer-meta">
-                              <span className="input-card-footer-label">RETURN OUT</span>
-                              <strong>{isPgmActive ? 'LIVE' : isPvwActive ? 'READY' : 'IDLE'}</strong>
+                              <span className="input-card-footer-label">STATUS</span>
+                              <strong>{isPgmActive ? '配信中' : isPvwActive ? '次に出す' : '待機'}</strong>
                             </div>
                             <div className="input-card-actions" onClick={e => e.stopPropagation()}>
                               <button
@@ -1207,15 +1198,7 @@ function MainApp() {
                                 onClick={() => handleSelectPreview(id)}
                                 disabled={isOffline}
                               >
-                                PVW
-                              </button>
-                              <button
-                                type="button"
-                                className={`input-card-action pgm ${isPgmActive ? 'active' : ''}`}
-                                onClick={() => handleSelectProgram(id)}
-                                disabled={isOffline}
-                              >
-                                PGM
+                                {isPvwActive ? 'NEXT選択中' : 'NEXTにする'}
                               </button>
                             </div>
                           </div>
@@ -1223,22 +1206,100 @@ function MainApp() {
                       );
                     })
                   )}
+                  </div>
                 </div>
               </div>
 
               {/* 右側：ATEM 筐体型 M/E コントロールパネル */}
               <div className="atem-control-chassis">
-                <div className="atem-control-heading">
-                  <div>
-                    <span>ME 1</span>
-                    <strong>SWITCHING BUS</strong>
-                  </div>
-                  <div className="atem-next-take">
-                    <small>NEXT TAKE</small>
-                    <strong>{previewLabel}</strong>
-                  </div>
-                </div>
                 <div className="atem-chassis-panel">
+                  <div className="creator-control-header">
+                    <div>
+                      <small>TAKE CONTROL</small>
+                      <strong>映像を切り替える</strong>
+                    </div>
+                    <span className={effectivePreviewSourceId ? 'ready' : ''}>
+                      {effectivePreviewSourceId ? 'READY' : 'NEXTを選択'}
+                    </span>
+                  </div>
+
+                  <div className="creator-take-flow">
+                    <div className="creator-flow-source on-air">
+                      <small>ON AIR</small>
+                      <strong>{programLabel}</strong>
+                    </div>
+                    <div className="creator-flow-arrow" aria-hidden="true">→</div>
+                    <div className="creator-flow-source next">
+                      <small>NEXT</small>
+                      <strong>{previewLabel}</strong>
+                    </div>
+                  </div>
+
+                  <div className="creator-take-actions">
+                    <button
+                      className="creator-take-button cut"
+                      onClick={handleCut}
+                      disabled={!effectivePreviewSourceId || isAutoTransitioning}
+                    >
+                      <span className="creator-action-icon">↯</span>
+                      <span>
+                        <small>瞬時に切り替え</small>
+                        <strong>TAKE</strong>
+                      </span>
+                      <kbd>SPACE</kbd>
+                    </button>
+                    <button
+                      className={`creator-take-button mix ${isAutoTransitioning ? 'transitioning' : ''}`}
+                      onClick={handleAuto}
+                      disabled={!effectivePreviewSourceId || isAutoTransitioning}
+                    >
+                      <span className="creator-action-icon">◐</span>
+                      <span>
+                        <small>0.5秒でなめらかに</small>
+                        <strong>MIX</strong>
+                      </span>
+                      <kbd>ENTER</kbd>
+                    </button>
+                  </div>
+
+                  <div className="creator-transition-progress" aria-label={`Transition ${transitionProgress}%`}>
+                    <div className="creator-progress-meta">
+                      <span>{isAutoTransitioning ? '切り替え中' : 'TRANSITION'}</span>
+                      <strong>{transitionProgress}%</strong>
+                    </div>
+                    <div className="creator-progress-track">
+                      <span style={{ width: `${transitionProgress}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="creator-quick-select">
+                    <div className="creator-quick-select-head">
+                      <span>QUICK SELECT</span>
+                      <small>数字キーでも選択できます</small>
+                    </div>
+                    <div className="creator-quick-buttons">
+                      {clientEntries.length === 0 ? (
+                        <span className="creator-no-inputs">カメラ待機中</span>
+                      ) : (
+                        clientEntries.slice(0, 9).map(([id, stats], idx) => {
+                          const isOffline = Date.now() - stats.lastSeen > 30000;
+                          const isActive = effectivePreviewSourceId === id;
+                          return (
+                            <button
+                              key={id}
+                              className={isActive ? 'active' : ''}
+                              onClick={() => handleSelectPreview(id)}
+                              disabled={isOffline}
+                              aria-label={`${cameraLabels[id] || `CAM${idx + 1}`}をNEXTに設定`}
+                            >
+                              <kbd>{idx + 1}</kbd>
+                              <span>{cameraLabels[id] || `CAM${idx + 1}`}</span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
                   {/* スイッチャーバスボタン列 */}
                   <div className="atem-buses">
                     {/* PROGRAM バス */}
@@ -1323,7 +1384,6 @@ function MainApp() {
                         onClick={handleCut}
                         disabled={!effectivePreviewSourceId || isAutoTransitioning}
                       >
-                        <small>SPACE</small>
                         CUT
                       </button>
                       <button
@@ -1331,7 +1391,6 @@ function MainApp() {
                         onClick={handleAuto}
                         disabled={!effectivePreviewSourceId || isAutoTransitioning}
                       >
-                        <small>ENTER</small>
                         AUTO
                       </button>
                     </div>
@@ -1340,18 +1399,12 @@ function MainApp() {
 
                 {/* ステータスストリップとログをパネル下部に綺麗に配置 */}
                 <div className="atem-panel-footer">
-                  <div className="atem-shortcuts" aria-label="Keyboard shortcuts">
-                    <span><kbd>1–9</kbd> PREVIEW</span>
-                    <span><kbd>SHIFT</kbd> + <kbd>1–9</kbd> PROGRAM</span>
-                    <span><kbd>SPACE</kbd> CUT</span>
-                    <span><kbd>ENTER</kbd> AUTO</span>
-                  </div>
                   <div className="atem-status-strip">
-                    <span><small>PROGRAM</small>{programLabel}</span>
-                    <span><small>PREVIEW</small>{previewLabel}</span>
-                    <span><small>TALLY</small>{liveCount} PGM / {previewCount} PVW</span>
+                    <span><small>ON AIR</small>{programLabel}</span>
+                    <span><small>NEXT</small>{previewLabel}</span>
+                    <span><small>CAMERAS</small>{liveCount} LIVE / {previewCount} NEXT</span>
                     <span className={offlineCount > 0 ? 'warn' : ''}><small>OFFLINE</small>{offlineCount}</span>
-                    <span className={effectivePgmSourceId ? 'online' : 'warn'}><small>RETURN OUT</small>{effectivePgmSourceId ? 'LIVE' : 'IDLE'}</span>
+                    <span className={effectivePgmSourceId ? 'online' : 'warn'}><small>RETURN</small>{effectivePgmSourceId ? '送出中' : '待機'}</span>
                   </div>
 
                   {tallyActionLog.length > 0 && (
