@@ -1089,7 +1089,7 @@ function MainApp() {
                     const label = cameraLabels[id] || defaultLabel;
                     const isMonitorSource = pgmSourceId === id;
 
-                    let clientTc = '00:00:00:00';
+                    let clientTc: string;
                     const driftSec = stats.drift ?? 0;
                     const driftAbs = Math.abs(driftSec);
                     const isDriftWarning = driftAbs >= 0.03;
@@ -1100,7 +1100,7 @@ function MainApp() {
                       const driftFrames = Math.round(driftSec * fps);
                       tc.add(driftFrames);
                       clientTc = tc.toString();
-                    } catch (e) {
+                    } catch {
                       clientTc = directorTime;
                     }
 
