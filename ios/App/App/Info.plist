@@ -53,5 +53,7 @@
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app requires microphone access to record reference audio on the right channel while outputting timecode on the left channel.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app uses the camera to send a low-latency preview to the director and receive the selected program return feed.</string>
 </dict>
 </plist>

@@ -290,7 +290,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const { batteryLevel, isCharging, batteryEta } = useBatteryMonitor(langRef);
 
   const [p2pSyncSource, setP2pSyncSource] = useState<'manual' | 'network'>('manual');
-  const [nowTick, setNowTick] = useState(0);
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const [isVideoEnabled, setIsVideoEnabled] = useState(false);
   const onMasterHeartbeatTimeoutRef = useRef<(() => void) | null>(null);
 
@@ -352,10 +352,10 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    if (!isHost) return;
-    const id = setInterval(() => setNowTick(Date.now()), 5000);
+    if (!p2pRole) return;
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [isHost]);
+  }, [p2pRole]);
 
   // Manage WebRTCMediaService lifecycle
   useEffect(() => {
@@ -410,11 +410,24 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     if (!shouldStartClientCamera(p2pRole, targetId)) return;
     const service = mediaServiceRef.current;
     if (!service) return;
+    let cancelled = false;
 
     void service.startLocalCamera().then(() => {
-      void service.connectToPeer(targetId);
+      if (!cancelled && mediaServiceRef.current === service) {
+        void service.connectToPeer(targetId).catch((err: unknown) => {
+          console.error('[WebRTC] Failed to connect return monitor', err);
+          addToast('RETURN MONITOR CONNECTION FAILED', 'error');
+        });
+      }
+    }).catch((err: unknown) => {
+      console.error('[WebRTC] Camera permission or startup failed', err);
+      addToast('CAMERA ACCESS REQUIRED FOR VIDEO MONITORING', 'error');
     });
-  }, [p2pRole, targetId, mediaServiceRef]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [p2pRole, targetId, mediaServiceRef, addToast]);
 
   useEffect(() => {
     const initMobile = async () => {

@@ -12,6 +12,7 @@ import { formatDuration } from './utils/battery';
 import { Toaster, toast } from 'react-hot-toast';
 import { VuMeter } from './components/VuMeter';
 import { VideoRenderer } from './components/VideoRenderer';
+import { ReturnMonitor } from './components/ReturnMonitor';
 import { useMediaStreams } from './hooks/useMediaStreams';
 import './App.css';
 
@@ -278,6 +279,18 @@ function MainApp() {
         {(isMobile ? activeTab === 'main' : true) && (
           <div className="tab-pane main-pane">
             <VideoPlayer />
+
+            {p2pRole === 'client' && (
+              <ReturnMonitor
+                stream={returnStream}
+                connected={isTallyConnected}
+                onOpenFullscreen={() => {
+                  setDirectorPanelOpen(false);
+                  setIsVisualSlate(false);
+                  setTallyOpen(true);
+                }}
+              />
+            )}
 
             {syncMode === 'network' && (
               <div className="main-sync-bar">
@@ -698,10 +711,22 @@ function MainApp() {
                 {isConnected ? tr('tally.conn.ok') : tr('tally.conn.lost')}
               </div>
             )}
-            {p2pRole === 'client' && returnStream && (
-              <div className="tally-pgm-video-container">
-                <VideoRenderer stream={returnStream} className="tally-pgm-video" />
-              </div>
+            {p2pRole === 'client' && (
+              <>
+                {returnStream && (
+                  <div className="tally-pgm-video-container">
+                    <VideoRenderer
+                      stream={returnStream}
+                      className="tally-pgm-video"
+                      style={{ objectFit: 'contain' }}
+                    />
+                  </div>
+                )}
+                <div className={`tally-return-status ${returnStream ? 'live' : 'waiting'}`}>
+                  <span />
+                  RETURN {returnStream ? 'LIVE' : 'NO SIGNAL'}
+                </div>
+              </>
             )}
             <div className="tally-header-slim">
               <span className="tally-header-id">
