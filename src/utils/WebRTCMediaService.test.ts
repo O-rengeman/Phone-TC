@@ -432,6 +432,27 @@ describe('WebRTCMediaService signaling flow', () => {
 
     expect(onRemoteStream).toHaveBeenCalledWith({ peerId: 'CLIENT1', stream });
   });
+
+  it('updateBitrate sets the maxBitrate on the RTCRtpSender', async () => {
+    const service = new WebRTCMediaService(makeFakePeerSync(), 'ME', true);
+    await service.handleSignalingMessage(offerMsg('CLIENT1'));
+    await service.setPgmStream(makeFakeStream());
+
+    await service.updateBitrate('CLIENT1', 125000);
+
+    const pc = createdPeerConnections[0];
+    const sender = pc.transceivers[0].sender;
+    expect(sender.getParameters).toHaveBeenCalled();
+    expect(sender.setParameters).toHaveBeenCalledWith(
+      expect.objectContaining({
+        encodings: [
+          expect.objectContaining({
+            maxBitrate: 125000
+          })
+        ]
+      })
+    );
+  });
 });
 
 describe('WebRTCMediaService camera lifecycle', () => {

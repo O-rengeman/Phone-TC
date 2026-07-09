@@ -121,6 +121,13 @@ interface LTCStateType {
   setTallyDimmerOpacity: React.Dispatch<React.SetStateAction<number>>;
   tallyTcSize: 'sm' | 'md' | 'lg';
   setTallyTcSize: React.Dispatch<React.SetStateAction<'sm' | 'md' | 'lg'>>;
+  tallyStyle: 'full' | 'border';
+  setTallyStyle: React.Dispatch<React.SetStateAction<'full' | 'border'>>;
+  tallyBorderSize: 'thin' | 'medium' | 'thick';
+  setTallyBorderSize: React.Dispatch<React.SetStateAction<'thin' | 'medium' | 'thick'>>;
+  pipEnabled: boolean;
+  setPipEnabled: React.Dispatch<React.SetStateAction<boolean>>;
+  clientBitrates: Record<string, number>;
   directorPanelOpen: boolean;
   setDirectorPanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
   directorTime: string;
@@ -192,6 +199,7 @@ interface LTCActionsType {
   handleTorchToggle: (e: React.MouseEvent) => void;
   handleTallyExit: (e: React.MouseEvent) => void;
   toggleVideoMonitoring: () => void;
+  changeClientBitrate: (clientId: string, bitrateBps: number) => void;
 }
 
 type LTCSyncContextType = LTCStateType & LTCActionsType;
@@ -357,10 +365,29 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     isTallyConnected, tallyState,
     playHapticFeedback, handleManualTallyChange, handleClientTallyChange, handleAllTallyChange, handleSwitcherBusChange,
     handleDimmerCycle, handleTorchToggle, handleTallyExit,
+    tallyStyle, setTallyStyle, tallyBorderSize, setTallyBorderSize,
   } = useTallyControl({
     isHost, p2pRole, peerId, peerSyncRef, lastHeartbeatTimeRef,
     nowTick, cameraLabels, currentTcRef,
   });
+
+  const [pipEnabled, setPipEnabled] = useState(false);
+  const [clientBitrates, setClientBitrates] = useState<Record<string, number>>({});
+
+  const changeClientBitrate = useCallback((clientId: string, bitrateBps: number) => {
+    if (!isHost) return;
+    setClientBitrates(prev => ({ ...prev, [clientId]: bitrateBps }));
+    peerSyncRef.current?.broadcast({
+      type: 'set-bitrate',
+      masterTimecode: '',
+      masterTimestamp: 0,
+      fps: 0,
+      isDropFrame: false,
+      isRunning: false,
+      bitrateBps,
+      targetId: clientId
+    });
+  }, [isHost, peerSyncRef]);
 
   useEffect(() => {
     if (!p2pRole) return;
@@ -724,6 +751,11 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
           if (msg.tally) {
             setTallyPayload(prev => adoptTally(prev, msg.tally!));
           }
+        } else if (msg.type === 'set-bitrate' && !isHost) {
+          if (msg.targetId === peerId && msg.bitrateBps !== undefined) {
+            void mediaServiceRef.current?.updateBitrate(msg.targetId, msg.bitrateBps);
+            setClientBitrates(prev => ({ ...prev, [msg.targetId!]: msg.bitrateBps! }));
+          }
         }
       }
     };
@@ -878,6 +910,10 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     tallyTime,
     tallyDimmerOpacity, setTallyDimmerOpacity,
     tallyTcSize, setTallyTcSize,
+    tallyStyle, setTallyStyle,
+    tallyBorderSize, setTallyBorderSize,
+    pipEnabled, setPipEnabled,
+    clientBitrates,
     directorPanelOpen, setDirectorPanelOpen,
     directorTime,
     cameraLabels, setCameraLabels,
@@ -905,6 +941,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     tallyDimmerOpacity, tallyTcSize, directorPanelOpen, directorTime, cameraLabels, tallyActionLog,
     isResyncing, lang, batteryLevel, isCharging, batteryEta, markerFlash, masterDrift, clients,
     packetLossRate, sceneName, nowTick, tallyState, isTallyConnected,
+    tallyStyle, setTallyStyle, tallyBorderSize, setTallyBorderSize, pipEnabled, setPipEnabled, clientBitrates,
     setIsRunning, setFpsIndex, setVolume, setSyncMode, setManualTimecode, setActiveTab, setOutputMode,
     setAutoUserBits, setIsVisualSlate, setSlateTime, setUserBits, setMarkers, setDefaultReelName,
     setOutputLevel, setOutputOffset, setTargetId, setP2pSyncSource, setShowGuide, setTallyOpen,
@@ -953,6 +990,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     handleTorchToggle,
     handleTallyExit,
     toggleVideoMonitoring,
+    changeClientBitrate,
   }), [
     analyserRef, canvasRef, engineRef, currentTcRef, isVisualSlateRef, slateTimeRef, tallyTimeRef,
     tallyOpenRef, directorTimeRef, directorPanelOpenRef, holdStoppedRef, stopHoldStartRef, stopHoldRafRef,
@@ -960,7 +998,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     exportToALE, handleSlateClick, resetP2P, setupP2PMaster, setupP2PClient, joinSession,
     handleStartStop, handlePause, beginStopHold, cancelStopHold, handleManualResync,
     handleManualTallyChange, handleClientTallyChange, handleAllTallyChange, handleSwitcherBusChange, handleDimmerCycle,
-    handleTorchToggle, handleTallyExit, toggleVideoMonitoring, mediaServiceRef
+    handleTorchToggle, handleTallyExit, toggleVideoMonitoring, mediaServiceRef, changeClientBitrate
   ]);
 
   return (

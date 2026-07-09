@@ -306,4 +306,23 @@ describe('useTallyControl torch effect', () => {
     });
     expect(applyConstraints).toHaveBeenCalled();
   });
+
+  it('persists tallyStyle and tallyBorderSize to localStorage and restores them on next mount', () => {
+    localStorage.setItem('ltc-tally-style', 'border');
+    localStorage.setItem('ltc-tally-border-size', 'thick');
+
+    const { result, unmount } = renderHook(() => useTallyControl(makeParams()));
+    expect(result.current.tallyStyle).toBe('border');
+    expect(result.current.tallyBorderSize).toBe('thick');
+
+    act(() => {
+      result.current.setTallyStyle('full');
+      result.current.setTallyBorderSize('thin');
+    });
+
+    expect(localStorage.getItem('ltc-tally-style')).toBe('full');
+    expect(localStorage.getItem('ltc-tally-border-size')).toBe('thin');
+
+    unmount();
+  });
 });

@@ -14,7 +14,93 @@ import { VuMeter } from './components/VuMeter';
 import { VideoRenderer } from './components/VideoRenderer';
 import { ReturnMonitor } from './components/ReturnMonitor';
 import { useMediaStreams } from './hooks/useMediaStreams';
+import Timecode from 'smpte-timecode';
 import './App.css';
+
+function FloatingPip({ stream, onClose }: { stream: MediaStream; onClose: () => void }) {
+  const [position, setPosition] = useState({ x: window.innerWidth - 180 - 16, y: window.innerHeight - 120 - 70 });
+  const [size, setSize] = useState({ width: 180, height: 120 });
+  const pipRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const isResizingRef = useRef(false);
+  const dragStartRef = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
+  const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).classList.contains('pip-resize-handle')) {
+      isResizingRef.current = true;
+      resizeStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        width: size.width,
+        height: size.height
+      };
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      e.stopPropagation();
+      return;
+    }
+
+    isDraggingRef.current = true;
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      posX: position.x,
+      posY: position.y
+    };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (isDraggingRef.current) {
+      const dx = e.clientX - dragStartRef.current.x;
+      const dy = e.clientY - dragStartRef.current.y;
+      setPosition({
+        x: Math.max(0, Math.min(window.innerWidth - size.width, dragStartRef.current.posX + dx)),
+        y: Math.max(0, Math.min(window.innerHeight - size.height, dragStartRef.current.posY + dy))
+      });
+    } else if (isResizingRef.current) {
+      const dx = e.clientX - resizeStartRef.current.x;
+      const dy = e.clientY - resizeStartRef.current.y;
+      setSize({
+        width: Math.max(100, Math.min(600, resizeStartRef.current.width + dx)),
+        height: Math.max(75, Math.min(450, resizeStartRef.current.height + dy))
+      });
+    }
+  };
+
+  const handlePointerUp = () => {
+    isDraggingRef.current = false;
+    isResizingRef.current = false;
+  };
+
+  return (
+    <div
+      ref={pipRef}
+      className="floating-pip"
+      style={{
+        position: 'fixed',
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        width: `${size.width}px`,
+        height: `${size.height}px`,
+        zIndex: 9999,
+        touchAction: 'none'
+      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+    >
+      <div className="pip-header">
+        <span>RETURN OUT</span>
+        <button className="pip-close-btn" onClick={onClose}>✕</button>
+      </div>
+      <div className="pip-content">
+        <VideoRenderer stream={stream} className="pip-video-el" />
+      </div>
+      <div className="pip-resize-handle" />
+    </div>
+  );
+}
 
 function MainApp() {
   const {
@@ -68,6 +154,13 @@ function MainApp() {
     tallyDimmerOpacity,
     tallyTcSize,
     setTallyTcSize,
+    tallyStyle,
+    setTallyStyle,
+    tallyBorderSize,
+    setTallyBorderSize,
+    pipEnabled,
+    setPipEnabled,
+    clientBitrates,
     directorPanelOpen,
     setDirectorPanelOpen,
     directorTime,
@@ -110,7 +203,8 @@ function MainApp() {
     isVideoEnabled,
     setIsVideoEnabled,
     toggleVideoMonitoring,
-    mediaServiceRef
+    mediaServiceRef,
+    changeClientBitrate
   } = useLTC();
 
   const mediaStreams = useMediaStreams();
@@ -317,7 +411,13 @@ function MainApp() {
                   setIsVisualSlate(false);
                   setTallyOpen(true);
                 }}
+                pipEnabled={pipEnabled}
+                setPipEnabled={setPipEnabled}
               />
+            )}
+
+            {p2pRole === 'client' && pipEnabled && returnStream && (
+              <FloatingPip stream={returnStream} onClose={() => setPipEnabled(false)} />
             )}
 
             {syncMode === 'network' && (
@@ -730,8 +830,8 @@ function MainApp() {
         const stateSubLabel = tr(`tally.sub.${uiState}`);
         return (
           <div
-            className={`tally-overlay tally-${uiState}`}
-            style={{ background: TALLY_COLORS[uiState] }}
+            className={`tally-overlay tally-${uiState} style-${tallyStyle} border-${tallyBorderSize}`}
+            style={tallyStyle === 'full' ? { background: TALLY_COLORS[uiState] } : {}}
           >
             <div className="tally-dimmer" style={{ opacity: tallyDimmerOpacity }} />
             {p2pRole === 'client' && (
@@ -777,6 +877,22 @@ function MainApp() {
               <button className={`tally-ctrl-bar-btn ${tallyTorchEnabled ? 'active' : ''}`} onClick={(e) => { playHapticFeedback(); handleTorchToggle(e); }}>
                 <span className="tally-ctrl-icon">🔦</span>
                 <span>TORCH {tallyTorchEnabled ? 'ON' : 'OFF'}</span>
+              </button>
+              <button className="tally-ctrl-bar-btn" onClick={(e) => {
+                e.stopPropagation();
+                playHapticFeedback();
+                setTallyStyle(prev => prev === 'full' ? 'border' : 'full');
+              }}>
+                <span className="tally-ctrl-icon">🖼</span>
+                <span>STYLE: {tallyStyle.toUpperCase()}</span>
+              </button>
+              <button className="tally-ctrl-bar-btn" onClick={(e) => {
+                e.stopPropagation();
+                playHapticFeedback();
+                setTallyBorderSize(prev => prev === 'thin' ? 'medium' : prev === 'medium' ? 'thick' : 'thin');
+              }}>
+                <span className="tally-ctrl-icon">📏</span>
+                <span>BORDER: {tallyBorderSize.toUpperCase()}</span>
               </button>
               <button className="tally-ctrl-bar-btn" onClick={(e) => {
                 e.stopPropagation();
@@ -972,6 +1088,22 @@ function MainApp() {
                     const defaultLabel = `CAM${idx + 1}`;
                     const label = cameraLabels[id] || defaultLabel;
                     const isMonitorSource = pgmSourceId === id;
+
+                    let clientTc = '00:00:00:00';
+                    const driftSec = stats.drift;
+                    const driftAbs = Math.abs(driftSec);
+                    const isDriftWarning = driftAbs >= 0.03;
+                    try {
+                      const fps = FPS_OPTIONS[fpsIndex].value;
+                      const drop = FPS_OPTIONS[fpsIndex].drop;
+                      const tc = Timecode(directorTime, fps, drop);
+                      const driftFrames = Math.round(driftSec * fps);
+                      tc.add(driftFrames);
+                      clientTc = tc.toString();
+                    } catch (e) {
+                      clientTc = directorTime;
+                    }
+
                     return (
                       <div key={id} className={`director-cam-card status-${uiAssignedState} ${isMonitorSource ? 'monitor-selected' : ''} ${isOffline ? 'offline' : ''}`}>
                         {isOffline && <div className="director-offline-overlay">OFFLINE</div>}
@@ -999,9 +1131,30 @@ function MainApp() {
                             <small>{isVideoEnabled ? 'VIDEO STREAM WAITING' : 'ENABLE MONITORING TO PREVIEW'}</small>
                           </div>
                         )}
+                        <div className="director-cam-bitrate-panel">
+                          <label>遠隔ビットレート: </label>
+                          <select
+                            className="director-cam-bitrate-select"
+                            value={clientBitrates[id] ?? 500000}
+                            onChange={(e) => changeClientBitrate(id, Number(e.target.value))}
+                          >
+                            <option value={125000}>125 kbps (Eco)</option>
+                            <option value={250000}>250 kbps (Low)</option>
+                            <option value={500000}>500 kbps (Mid)</option>
+                            <option value={1000000}>1 Mbps (High)</option>
+                            <option value={2000000}>2 Mbps (Super)</option>
+                            <option value={4000000}>4 Mbps (Broadcast)</option>
+                          </select>
+                        </div>
                         <div className="director-input-footer">
-                          <span>INPUT {idx + 1}</span>
-                          <strong>{uiAssignedState === 'live' ? 'PROGRAM' : uiAssignedState === 'preview' ? 'PREVIEW' : 'IDLE'}</strong>
+                          <div>
+                            <span>INPUT {idx + 1}</span>
+                            <strong style={{ marginLeft: '8px' }}>{uiAssignedState === 'live' ? 'PROGRAM' : uiAssignedState === 'preview' ? 'PREVIEW' : 'IDLE'}</strong>
+                          </div>
+                          <div className={`director-cam-tc-sync ${isDriftWarning ? 'warning' : 'ok'}`}>
+                            <span className="director-cam-tc-val">{clientTc}</span>
+                            <span className="director-cam-drift-val">({driftSec >= 0 ? '+' : ''}{driftSec.toFixed(3)}s)</span>
+                          </div>
                         </div>
                       </div>
                     );

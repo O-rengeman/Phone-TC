@@ -4,12 +4,16 @@ interface ReturnMonitorProps {
   stream: MediaStream | null;
   connected: boolean;
   onOpenFullscreen: () => void;
+  pipEnabled: boolean;
+  setPipEnabled: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export function ReturnMonitor({
   stream,
   connected,
   onOpenFullscreen,
+  pipEnabled,
+  setPipEnabled,
 }: ReturnMonitorProps) {
   const hasSignal = stream !== null;
 
@@ -20,13 +24,34 @@ export function ReturnMonitor({
           <div className="return-monitor-title">RETURN MONITOR</div>
           <div className="return-monitor-subtitle">PROGRAM FEED FROM DIRECTOR</div>
         </div>
-        <span
-          className={`return-monitor-status ${hasSignal ? 'live' : connected ? 'waiting' : 'offline'}`}
-          aria-live="polite"
-        >
-          <span className="return-monitor-status-dot" />
-          {hasSignal ? 'LIVE' : connected ? 'WAITING' : 'OFFLINE'}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {stream && (
+            <button
+              type="button"
+              className={`pip-toggle-btn ${pipEnabled ? 'active' : ''}`}
+              onClick={(e) => { e.stopPropagation(); setPipEnabled(v => !v); }}
+              style={{
+                background: pipEnabled ? '#2563eb' : '#27272a',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              PIP {pipEnabled ? 'ON' : 'OFF'}
+            </button>
+          )}
+          <span
+            className={`return-monitor-status ${hasSignal ? 'live' : connected ? 'waiting' : 'offline'}`}
+            aria-live="polite"
+          >
+            <span className="return-monitor-status-dot" />
+            {hasSignal ? 'LIVE' : connected ? 'WAITING' : 'OFFLINE'}
+          </span>
+        </div>
       </div>
 
       <button

@@ -12,6 +12,8 @@ describe('ReturnMonitor', () => {
         stream={null}
         connected={false}
         onOpenFullscreen={onOpenFullscreen}
+        pipEnabled={false}
+        setPipEnabled={() => undefined}
       />,
     );
 
@@ -28,6 +30,8 @@ describe('ReturnMonitor', () => {
         stream={null}
         connected={true}
         onOpenFullscreen={() => undefined}
+        pipEnabled={false}
+        setPipEnabled={() => undefined}
       />,
     );
 

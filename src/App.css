@@ -4544,3 +4544,132 @@ input[type="range"] {
     display: none;
   }
 }
+
+/* ──────────────── LMS FEATURES ──────────────── */
+
+/* 1. ボーダータリー */
+.tally-overlay.style-border {
+  background: transparent !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+.tally-overlay.style-border.border-thin {
+  border: 6px solid transparent;
+}
+.tally-overlay.style-border.border-medium {
+  border: 12px solid transparent;
+}
+.tally-overlay.style-border.border-thick {
+  border: 24px solid transparent;
+}
+.tally-overlay.style-border.tally-live {
+  border-color: #ff1a1a !important;
+  box-shadow: inset 0 0 20px rgba(255, 26, 26, 0.4) !important;
+}
+.tally-overlay.style-border.tally-preview {
+  border-color: #16a34a !important;
+  box-shadow: inset 0 0 20px rgba(22, 163, 74, 0.3) !important;
+}
+.tally-overlay.style-border.tally-standby {
+  border-color: #b45309 !important;
+  box-shadow: inset 0 0 20px rgba(180, 83, 9, 0.3) !important;
+}
+.tally-overlay.style-border.tally-off {
+  border-color: #0a0a0a !important;
+}
+
+/* 2. ディレクター検証ビュー & ビットレート */
+.director-cam-tc-sync {
+  font-family: var(--font-mono), monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+.director-cam-tc-sync.ok {
+  color: var(--color-text-dim);
+}
+.director-cam-tc-sync.warning {
+  color: #ff3b30;
+  font-weight: bold;
+}
+.director-cam-tc-val {
+  font-size: 14px;
+}
+.director-cam-drift-val {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.director-cam-bitrate-panel {
+  padding: 8px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+}
+.director-cam-bitrate-select {
+  background: #1c1c1e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  outline: none;
+}
+
+/* 3. フローティングPiP */
+.floating-pip {
+  background: #000;
+  border: 2px solid #27272a;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+}
+.floating-pip .pip-header {
+  background: #1c1c1e;
+  padding: 4px 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  font-weight: bold;
+  color: #a1a1aa;
+  border-bottom: 1px solid #27272a;
+  cursor: move;
+}
+.floating-pip .pip-close-btn {
+  background: transparent;
+  border: none;
+  color: #a1a1aa;
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 10px;
+}
+.floating-pip .pip-close-btn:hover {
+  color: #fff;
+}
+.floating-pip .pip-content {
+  flex: 1;
+  position: relative;
+  background: #000;
+}
+.floating-pip .pip-video-el {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.floating-pip .pip-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: se-resize;
+  background: linear-gradient(135deg, transparent 50%, #52525b 50%);
+  border-bottom-right-radius: 6px;
+}
