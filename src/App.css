@@ -4578,7 +4578,7 @@ input[type="range"] {
   border-color: #0a0a0a !important;
 }
 
-/* 2. ディレクター検証ビュー & ビットレート */
+/* 2. Director TC sync & Bitrate panel */
 .director-cam-tc-sync {
   font-family: var(--font-mono), monospace;
   display: flex;
@@ -4620,7 +4620,7 @@ input[type="range"] {
   outline: none;
 }
 
-/* 3. フローティングPiP */
+/* 3. Floating PiP */
 .floating-pip {
   background: #000;
   border: 2px solid #27272a;

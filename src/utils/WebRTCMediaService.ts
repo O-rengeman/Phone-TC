@@ -291,6 +291,14 @@ export class WebRTCMediaService {
     }
   }
 
+  /** Apply bitrate limit to ALL connected senders (used by clients receiving remote bitrate commands). */
+  public async updateBitrateAll(maxBitrateBps: number) {
+    for (const [peerId, sender] of this.senders) {
+      await this.applyBandwidthLimit(sender, maxBitrateBps);
+      debug(`[WebRTC] Updated bitrate limit for peer ${peerId} to ${maxBitrateBps} Bps (all)`);
+    }
+  }
+
   private clearDisconnectTimer(peerId: string): void {
     const timer = this.disconnectTimers.get(peerId);
     if (timer) {

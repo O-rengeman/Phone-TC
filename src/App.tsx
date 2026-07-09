@@ -18,7 +18,7 @@ import Timecode from 'smpte-timecode';
 import './App.css';
 
 function FloatingPip({ stream, onClose }: { stream: MediaStream; onClose: () => void }) {
-  const [position, setPosition] = useState({ x: window.innerWidth - 180 - 16, y: window.innerHeight - 120 - 70 });
+  const [position, setPosition] = useState({ x: Math.max(0, window.innerWidth - 180 - 16), y: Math.max(0, window.innerHeight - 120 - 70) });
   const [size, setSize] = useState({ width: 180, height: 120 });
   const pipRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
@@ -1090,7 +1090,7 @@ function MainApp() {
                     const isMonitorSource = pgmSourceId === id;
 
                     let clientTc = '00:00:00:00';
-                    const driftSec = stats.drift;
+                    const driftSec = stats.drift ?? 0;
                     const driftAbs = Math.abs(driftSec);
                     const isDriftWarning = driftAbs >= 0.03;
                     try {

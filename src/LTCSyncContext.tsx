@@ -753,7 +753,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
           }
         } else if (msg.type === 'set-bitrate' && !isHost) {
           if (msg.targetId === peerId && msg.bitrateBps !== undefined) {
-            void mediaServiceRef.current?.updateBitrate(msg.targetId, msg.bitrateBps);
+            void mediaServiceRef.current?.updateBitrateAll(msg.bitrateBps);
             setClientBitrates(prev => ({ ...prev, [msg.targetId!]: msg.bitrateBps! }));
           }
         }
