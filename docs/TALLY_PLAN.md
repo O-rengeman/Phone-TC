@@ -28,24 +28,24 @@
 - ✅ 本プラン `TALLY_PLAN.md`（このファイル）
 
 ### フェーズ1: 状態ロジック＋単体タリー（P2Pなしで動く）
-- ⬜ `src/utils/tally.ts`: 型 `TallyState`、`resolveTally(payload|null, myId, {connected, autoMode, selfIsRunning})`、`tallyColor(state)`/`tallyLabel(state)` ヘルパ
-- ⬜ `src/utils/tally.test.ts`: resolve の各分岐（接続/未接続・auto・個別/all・rev）
-- ⬜ `App.tsx`: state `tallyOn`(表示ON/OFF), `tallyMode`('manual'|'auto'), 自機タリーの算出
-- ⬜ client全画面オーバーレイ（色/ラベル、高輝度、タップで操作表示・長押しで閉じる）
-- ⬜ TOOLSかSYNCに「TALLY」入口（表示トグル＋MANUAL/AUTO）
-- ⬜ i18n キー（tally.live/preview/standby/off, label等）
-- ⬜ tsc / eslint / test / build 緑 → コミット `feat(tally): phase1 local tally + state logic`
+- ✅ `src/utils/tally.ts`: 型 `TallyState`、`resolveTally(payload|null, myId, {connected, autoMode, selfIsRunning})`、`tallyColor(state)`/`tallyLabel(state)` ヘルパ
+- ✅ `src/utils/tally.test.ts`: resolve の各分岐（接続/未接続・auto・個別/all・rev）
+- ✅ `App.tsx`: state `tallyOn`(表示ON/OFF), `tallyMode`('manual'|'auto'), 自機タリーの算出
+- ✅ client全画面オーバーレイ（色/ラベル、高輝度、タップで操作表示・長押しで閉じる）
+- ✅ TOOLSかSYNCに「TALLY」入口（表示トグル＋MANUAL/AUTO）
+- ✅ i18n キー（tally.live/preview/standby/off, label等）
+- ✅ tsc / eslint / test / build 緑 → コミット `feat(tally): phase1 local tally + state logic`
 
 ### フェーズ2: P2P連動（全台一斉）
-- ⬜ `PeerSync.ts`: `TallyState`/`TallyPayload` 型、`SyncMessage.type` に `'tally'`、`tally?` フィールド
-- ⬜ master: タリー変更時 `broadcast({type:'tally', tally})`＋heartbeatに現在tally同梱、`rev` 単調増加
-- ⬜ client: 受信tallyを `rev` 比較で採用、`resolveTally` に供給。master途絶でフェイルセーフ
-- ⬜ tsc / eslint / test / build 緑 → コミット `feat(tally): phase2 P2P broadcast + heartbeat`
+- ✅ `PeerSync.ts`: `TallyState`/`TallyPayload` 型、`SyncMessage.type` に `'tally'`、`tally?` フィールド
+- ✅ master: タリー変更時 `broadcast({type:'tally', tally})`＋heartbeatに現在tally同梱、`rev` 単調増加
+- ✅ client: 受信tallyを `rev` 比較で採用、`resolveTally` に供給。master途絶でフェイルセーフ
+- ✅ tsc / eslint / test / build 緑 → コミット `feat(tally): phase2 P2P broadcast + heartbeat`
 
 ### フェーズ3: カメラ個別指定
-- ⬜ master UI: 接続中client一覧（既存 `clients`）に PGM/PVW/STBY/OFF 割当＋「ALL」一括
-- ⬜ AUTO時のLIVE対象選択（全台 or 個別）
-- ⬜ tsc / eslint / test / build 緑 → コミット `feat(tally): phase3 per-camera assignment`
+- ✅ master UI: 接続中client一覧（既存 `clients`）に PGM/PVW/STBY/OFF 割当＋「ALL」一括
+- ✅ AUTO時のLIVE対象選択（全台 or 個別）
+- ✅ tsc / eslint / test / build 緑 → コミット `feat(tally): phase3 per-camera assignment`
 
 ### フェーズ4: トーチLED
 - ⬜ Webフォールバック: getUserMedia(video) + `applyConstraints({advanced:[{torch:true}]})`、`live`時ON
