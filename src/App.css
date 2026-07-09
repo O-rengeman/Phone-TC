@@ -4667,9 +4667,12 @@ input[type="range"] {
   position: absolute;
   right: 0;
   bottom: 0;
-  width: 16px;
-  height: 16px;
+  width: 44px;
+  height: 44px;
   cursor: se-resize;
-  background: linear-gradient(135deg, transparent 50%, #52525b 50%);
+  background-image: linear-gradient(135deg, transparent 50%, #52525b 50%);
+  background-size: 16px 16px;
+  background-position: bottom right;
+  background-repeat: no-repeat;
   border-bottom-right-radius: 6px;
 }

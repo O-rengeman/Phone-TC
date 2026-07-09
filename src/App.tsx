@@ -841,7 +841,7 @@ function MainApp() {
             )}
             {p2pRole === 'client' && (
               <>
-                {returnStream && (
+                {returnStream && tallyStyle === 'full' && (
                   <div className="tally-pgm-video-container">
                     <VideoRenderer
                       stream={returnStream}
