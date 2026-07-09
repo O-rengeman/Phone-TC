@@ -281,6 +281,16 @@ export class WebRTCMediaService {
     return pc;
   }
 
+  public async updateBitrate(peerId: string, maxBitrateBps: number) {
+    const sender = this.senders.get(peerId);
+    if (sender) {
+      await this.applyBandwidthLimit(sender, maxBitrateBps);
+      debug(`[WebRTC] Updated bitrate limit for peer ${peerId} to ${maxBitrateBps} Bps`);
+    } else {
+      debug(`[WebRTC] No sender found for peer ${peerId} to update bitrate`);
+    }
+  }
+
   private clearDisconnectTimer(peerId: string): void {
     const timer = this.disconnectTimers.get(peerId);
     if (timer) {

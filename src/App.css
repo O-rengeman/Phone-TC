@@ -4114,3 +4114,433 @@ input[type="range"] {
   min-width: 30px;
   font-family: var(--font-mono);
 }
+
+/* ---------- ATEM-style director switcher ---------- */
+.atem-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.atem-multiview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.atem-monitor {
+  min-width: 0;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: #050607;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.32);
+}
+
+.atem-monitor.program {
+  border-color: #d82c27;
+  box-shadow: 0 0 0 1px rgba(255, 59, 48, 0.22), 0 12px 26px rgba(0, 0, 0, 0.32);
+}
+
+.atem-monitor.preview {
+  border-color: #199a42;
+  box-shadow: 0 0 0 1px rgba(52, 199, 89, 0.18), 0 12px 26px rgba(0, 0, 0, 0.32);
+}
+
+.atem-monitor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 34px;
+  padding: 0 11px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, #272a2f, #17191d);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+}
+
+.atem-monitor.program .atem-monitor-head > span {
+  color: #ff6962;
+}
+
+.atem-monitor.preview .atem-monitor-head > span {
+  color: #62db7d;
+}
+
+.atem-monitor-head strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #fff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atem-monitor-screen {
+  display: flex;
+  height: clamp(112px, 20vh, 180px);
+  align-items: center;
+  justify-content: center;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    #020304;
+  background-size: 24px 24px;
+}
+
+.atem-monitor-video {
+  display: block;
+  object-fit: contain !important;
+}
+
+.atem-monitor-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 20px;
+  color: #80858e;
+  text-align: center;
+  font-family: var(--font-mono);
+}
+
+.atem-monitor-placeholder span {
+  color: #b5bac2;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.atem-monitor-placeholder small {
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+}
+
+.atem-me-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #3a3d43;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #26292e, #181a1e);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 12px 26px rgba(0, 0, 0, 0.25);
+}
+
+.atem-bus-stack {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.atem-bus-row {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+
+.atem-bus-label {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 5px;
+  background: #111316;
+  color: #a7abb2;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.atem-bus-row.program .atem-bus-label {
+  border-left: 3px solid #ff3b30;
+  color: #ff7771;
+}
+
+.atem-bus-row.preview .atem-bus-label {
+  border-left: 3px solid #34c759;
+  color: #70df88;
+}
+
+.atem-source-buttons {
+  display: flex;
+  min-width: 0;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.atem-source-buttons button {
+  display: grid;
+  grid-template-columns: 24px minmax(52px, 1fr);
+  align-items: center;
+  min-width: 94px;
+  min-height: 43px;
+  overflow: hidden;
+  padding: 3px 7px 3px 4px;
+  border: 1px solid #4b4f56;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #4a4e55, #292c31);
+  color: #d5d8dd;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 4px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  font-family: var(--font-mono);
+}
+
+.atem-source-buttons button > span {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 3px;
+  background: #15171a;
+  color: #aeb2b8;
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+.atem-source-buttons button > strong {
+  overflow: hidden;
+  font-size: 0.62rem;
+  letter-spacing: 0.07em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atem-bus-row.program .atem-source-buttons button.active {
+  border-color: #ff5a52;
+  background: linear-gradient(180deg, #e5443c, #a61d19);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(255, 59, 48, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.atem-bus-row.preview .atem-source-buttons button.active {
+  border-color: #56d774;
+  background: linear-gradient(180deg, #3bbb5e, #187b35);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(52, 199, 89, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.atem-source-buttons button:disabled {
+  opacity: 0.34;
+  cursor: not-allowed;
+}
+
+.atem-bus-empty {
+  display: flex;
+  min-height: 43px;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px dashed #494c52;
+  border-radius: 5px;
+  color: #70747b;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+}
+
+.atem-transition-block {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  padding-left: 10px;
+  border-left: 1px solid #44474e;
+}
+
+.atem-transition-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #969aa1;
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+  letter-spacing: 0.08em;
+}
+
+.atem-transition-title strong {
+  color: #d0d3d8;
+  font-size: 0.58rem;
+}
+
+.atem-transition-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.atem-transition-actions button {
+  min-height: 53px;
+  border: 1px solid #565a61;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #555a62, #2d3035);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 3px 7px rgba(0, 0, 0, 0.36);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+.atem-transition-actions .atem-auto-btn {
+  border-color: #b87018;
+  color: #ffc262;
+}
+
+.atem-transition-actions .atem-auto-btn.active {
+  background: linear-gradient(180deg, #ffae38, #b96508);
+  color: #18120a;
+  animation: atem-auto-pulse 0.5s ease-in-out;
+}
+
+@keyframes atem-auto-pulse {
+  50% { box-shadow: 0 0 20px rgba(255, 159, 10, 0.82); }
+}
+
+.atem-transition-actions button:disabled {
+  opacity: 0.34;
+  cursor: not-allowed;
+}
+
+.atem-status-strip {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 1px;
+}
+
+.atem-status-strip > span {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 7px;
+  min-height: 27px;
+  padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  background: #14161a;
+  color: #c6c9ce;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+
+.atem-status-strip small {
+  color: #747981;
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+}
+
+.atem-status-strip .online {
+  color: #68dc83;
+}
+
+.atem-status-strip .warn {
+  color: #ffb64d;
+}
+
+.director-input-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: #777c84;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+}
+
+.director-input-footer strong {
+  color: #aeb2b9;
+}
+
+.director-cam-card.status-live .director-input-footer strong {
+  color: #ff6962;
+}
+
+.director-cam-card.status-preview .director-input-footer strong {
+  color: #68dc83;
+}
+
+@media (max-width: 760px) {
+  .mobile-view .atem-monitor-head {
+    height: 29px;
+    padding: 0 8px;
+    font-size: 0.56rem;
+  }
+
+  .mobile-view .atem-monitor-screen {
+    height: 100px;
+  }
+
+  .mobile-view .atem-me-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-view .atem-transition-block {
+    padding-top: 8px;
+    padding-left: 0;
+    border-top: 1px solid #44474e;
+    border-left: 0;
+  }
+
+  .mobile-view .atem-bus-row {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .mobile-view .atem-source-buttons button {
+    min-width: 82px;
+    min-height: 39px;
+  }
+
+  .mobile-view .atem-transition-actions button {
+    min-height: 42px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-view .director-tally-overlay {
+    gap: 7px;
+  }
+
+  .mobile-view .director-tally-header {
+    padding: 7px 10px;
+  }
+
+  .mobile-view .atem-monitor-screen {
+    height: 68px;
+  }
+
+  .mobile-view .atem-me-panel {
+    grid-template-columns: minmax(0, 1fr) 150px;
+    gap: 7px;
+    padding: 7px;
+  }
+
+  .mobile-view .atem-transition-block {
+    padding-top: 0;
+    padding-left: 7px;
+    border-top: 0;
+    border-left: 1px solid #44474e;
+  }
+
+  .mobile-view .atem-transition-actions button {
+    min-height: 40px;
+  }
+
+  .mobile-view .atem-status-strip,
+  .mobile-view .director-main-area {
+    display: none;
+  }
+}

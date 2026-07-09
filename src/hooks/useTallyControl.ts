@@ -43,9 +43,14 @@ interface UseTallyControlResult {
   handleManualTallyChange: (s: TallyState) => void;
   handleClientTallyChange: (clientId: string, s: TallyState) => void;
   handleAllTallyChange: (s: TallyState) => void;
+  handleSwitcherBusChange: (programId: string | null, previewId: string | null) => void;
   handleDimmerCycle: (e: React.MouseEvent) => void;
   handleTorchToggle: (e: React.MouseEvent) => void;
   handleTallyExit: (e: React.MouseEvent) => void;
+  tallyStyle: 'full' | 'border';
+  setTallyStyle: React.Dispatch<React.SetStateAction<'full' | 'border'>>;
+  tallyBorderSize: 'thin' | 'medium' | 'thick';
+  setTallyBorderSize: React.Dispatch<React.SetStateAction<'thin' | 'medium' | 'thick'>>;
 }
 
 const TALLY_HEARTBEAT_TIMEOUT_MS = 3000;
@@ -121,6 +126,30 @@ export function useTallyControl({
     } catch { return 'md'; }
   });
   const [tallyActionLog, setTallyActionLog] = useState<ActionLogEntry[]>([]);
+  const [tallyStyle, setTallyStyle] = useState<'full' | 'border'>(() => {
+    try {
+      const saved = localStorage.getItem('ltc-tally-style');
+      return (saved === 'full' || saved === 'border') ? saved : 'full';
+    } catch { return 'full'; }
+  });
+  const [tallyBorderSize, setTallyBorderSize] = useState<'thin' | 'medium' | 'thick'>(() => {
+    try {
+      const saved = localStorage.getItem('ltc-tally-border-size');
+      return (saved === 'thin' || saved === 'medium' || saved === 'thick') ? saved : 'medium';
+    } catch { return 'medium'; }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ltc-tally-style', tallyStyle);
+    } catch { /* ignore */ }
+  }, [tallyStyle]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ltc-tally-border-size', tallyBorderSize);
+    } catch { /* ignore */ }
+  }, [tallyBorderSize]);
 
   const playHapticFeedback = useCallback(() => {
     try {
@@ -270,13 +299,51 @@ export function useTallyControl({
     broadcastTally(peerSyncRef, false, newPayload);
   }, [isHost, peerSyncRef]);
 
+  const handleSwitcherBusChange = useCallback((programId: string | null, previewId: string | null) => {
+    if (!isHost) return;
+    tallyRevRef.current += 1;
+
+    const assignments: Record<string, TallyState> = {};
+    if (programId) {
+      assignments[programId] = 'live';
+    }
+    if (previewId && previewId !== programId) {
+      assignments[previewId] = 'preview';
+    }
+
+    const newPayload: TallyPayload = {
+      rev: tallyRevRef.current,
+      all: 'off',
+      assignments
+    };
+
+    setTallyPayload(newPayload);
+    broadcastTally(peerSyncRef, false, newPayload);
+
+    const logs: ActionLogEntry[] = [];
+    const tc = currentTcRef.current;
+    if (programId) {
+      const pgmLabel = cameraLabels[programId] || programId.slice(0, 6);
+      logs.push({ time: tc, cam: pgmLabel, state: 'live' });
+    }
+    if (previewId && previewId !== programId) {
+      const pvwLabel = cameraLabels[previewId] || previewId.slice(0, 6);
+      logs.push({ time: tc, cam: pvwLabel, state: 'preview' });
+    }
+
+    if (logs.length > 0) {
+      setTallyActionLog(prev => [...logs, ...prev].slice(0, ACTION_LOG_MAX_ENTRIES));
+    }
+  }, [isHost, cameraLabels, currentTcRef, peerSyncRef]);
+
   return {
     tallyOpen, setTallyOpen, tallyTorchEnabled, setTallyTorchEnabled,
     manualTally, tallyPayload, setTallyPayload, tallyTime, setTallyTime,
     tallyDimmerOpacity, setTallyDimmerOpacity, tallyTcSize, setTallyTcSize, tallyActionLog,
     tallyRevRef, tallyTimeRef, tallyOpenRef,
     isTallyConnected, tallyState,
-    playHapticFeedback, handleManualTallyChange, handleClientTallyChange, handleAllTallyChange,
+    playHapticFeedback, handleManualTallyChange, handleClientTallyChange, handleAllTallyChange, handleSwitcherBusChange,
     handleDimmerCycle, handleTorchToggle, handleTallyExit,
+    tallyStyle, setTallyStyle, tallyBorderSize, setTallyBorderSize,
   };
 }

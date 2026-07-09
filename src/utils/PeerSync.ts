@@ -6,7 +6,7 @@ import { debug } from './log';
 import { ICE_SERVERS } from './iceServers';
 
 export interface SyncMessage {
-  type: 'sync-request' | 'sync-response' | 'heartbeat' | 'report' | 'tally' | 'webrtc-offer' | 'webrtc-answer' | 'webrtc-candidate';
+  type: 'sync-request' | 'sync-response' | 'heartbeat' | 'report' | 'tally' | 'webrtc-offer' | 'webrtc-answer' | 'webrtc-candidate' | 'set-bitrate';
   masterTimecode: string;
   masterTimestamp: number;
   fps: number;
@@ -21,6 +21,7 @@ export interface SyncMessage {
   tally?: TallyPayload;
   sdp?: RTCSessionDescriptionInit; // For WebRTC signaling
   candidate?: RTCIceCandidateInit; // For WebRTC signaling
+  bitrateBps?: number;             // Dynamic bandwidth limit config
 }
 
 /** Factory used to create the underlying Peer — overridable for tests. */

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { LTCSyncProvider, useLTC } from './LTCSyncContext';
 import { FPS_OPTIONS } from './constants';
 import { VideoPlayer } from './VideoPlayer';
@@ -100,7 +100,7 @@ function MainApp() {
     handleManualResync,
     handleManualTallyChange,
     handleClientTallyChange,
-    handleAllTallyChange,
+    handleSwitcherBusChange,
     tallyState,
     isTallyConnected,
     handleDimmerCycle,
@@ -108,12 +108,16 @@ function MainApp() {
     handleTallyExit,
     holdStoppedRef,
     isVideoEnabled,
+    setIsVideoEnabled,
     toggleVideoMonitoring,
     mediaServiceRef
   } = useLTC();
 
   const mediaStreams = useMediaStreams();
   const [pgmSourceId, setPgmSourceId] = useState<string | null>(null);
+  const [previewSourceId, setPreviewSourceId] = useState<string | null>(null);
+  const [isAutoTransitioning, setIsAutoTransitioning] = useState(false);
+  const autoTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const returnStream = targetId ? (mediaStreams.get(targetId) ?? null) : null;
 
   const handleOutputModeChange = (mode: 'stereo' | 'mono-l') => {
@@ -161,34 +165,58 @@ function MainApp() {
     void service.setPgmStream(mediaStreams.get(pgmSourceId) ?? null);
   }, [isHost, isVideoEnabled, pgmSourceId, mediaStreams, mediaServiceRef]);
 
-  // Extracted from the Director Panel's inline onClick so mediaServiceRef.current
-  // is only read from within a component-level hook callback (an event-handler
-  // boundary), not from inside the render-time IIFE that builds the panel's JSX.
-  const handleSetOnAir = useCallback((id: string) => {
-    playHapticFeedback();
-    handleClientTallyChange(id, 'live');
-    setPgmSourceId(id);
-  }, [playHapticFeedback, handleClientTallyChange]);
-
-  const handleSetPreview = useCallback((id: string) => {
-    playHapticFeedback();
-    handleClientTallyChange(id, 'preview');
-    setPgmSourceId(current => current === id ? null : current);
-  }, [playHapticFeedback, handleClientTallyChange]);
-
-  const handleSetOff = useCallback((id: string) => {
-    playHapticFeedback();
-    handleClientTallyChange(id, 'off');
-    setPgmSourceId(current => current === id ? null : current);
-  }, [playHapticFeedback, handleClientTallyChange]);
-
-  const handleSetAllTally = useCallback((state: TallyState) => {
-    playHapticFeedback();
-    handleAllTallyChange(state);
-    if (state !== 'live') {
-      setPgmSourceId(null);
+  useEffect(() => () => {
+    if (autoTransitionTimerRef.current) {
+      clearTimeout(autoTransitionTimerRef.current);
     }
-  }, [playHapticFeedback, handleAllTallyChange]);
+  }, []);
+
+  const handleSelectProgram = useCallback((id: string) => {
+    playHapticFeedback();
+    setIsVideoEnabled(true);
+    setPgmSourceId(id);
+    handleSwitcherBusChange(id, previewSourceId);
+  }, [handleSwitcherBusChange, playHapticFeedback, previewSourceId, setIsVideoEnabled]);
+
+  const handleSelectPreview = useCallback((id: string) => {
+    playHapticFeedback();
+    setPreviewSourceId(id);
+    handleSwitcherBusChange(pgmSourceId, id);
+  }, [handleSwitcherBusChange, pgmSourceId, playHapticFeedback]);
+
+  const handleCut = useCallback(() => {
+    if (!previewSourceId) return;
+    playHapticFeedback();
+    const nextProgram = previewSourceId;
+    const nextPreview = pgmSourceId;
+    setIsVideoEnabled(true);
+    setPgmSourceId(nextProgram);
+    setPreviewSourceId(nextPreview);
+    handleSwitcherBusChange(nextProgram, nextPreview);
+  }, [handleSwitcherBusChange, pgmSourceId, playHapticFeedback, previewSourceId, setIsVideoEnabled]);
+
+  const handleAuto = useCallback(() => {
+    if (!previewSourceId || isAutoTransitioning) return;
+    playHapticFeedback();
+    setIsAutoTransitioning(true);
+    autoTransitionTimerRef.current = setTimeout(() => {
+      const nextProgram = previewSourceId;
+      const nextPreview = pgmSourceId;
+      setIsVideoEnabled(true);
+      setPgmSourceId(nextProgram);
+      setPreviewSourceId(nextPreview);
+      handleSwitcherBusChange(nextProgram, nextPreview);
+      setIsAutoTransitioning(false);
+      autoTransitionTimerRef.current = null;
+    }, 500);
+  }, [
+    handleSwitcherBusChange,
+    isAutoTransitioning,
+    pgmSourceId,
+    playHapticFeedback,
+    previewSourceId,
+    setIsVideoEnabled,
+  ]);
 
   return (
     <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
@@ -768,7 +796,8 @@ function MainApp() {
       })()}
 
       {directorPanelOpen && (() => {
-        const camCount = Object.keys(clients).length;
+        const clientEntries = Object.entries(clients);
+        const camCount = clientEntries.length;
         const liveCount = Object.entries(clients).filter(([id]) => {
           const assignedState = tallyPayload?.assignments?.[id] ?? tallyPayload?.all ?? 'off';
           return (assignedState === 'standby' ? 'preview' : assignedState) === 'live';
@@ -778,69 +807,154 @@ function MainApp() {
           return (assignedState === 'standby' ? 'preview' : assignedState) === 'preview';
         }).length;
         const offlineCount = Object.values(clients).filter((stats) => Date.now() - stats.lastSeen > 30000).length;
-        const globalState = tallyPayload?.all === 'standby' ? 'preview' : (tallyPayload?.all ?? 'off');
-        const monitorLabel = pgmSourceId
-          ? (cameraLabels[pgmSourceId] || `CAM${Object.keys(clients).findIndex((id) => id === pgmSourceId) + 1}`)
-          : null;
+        const getSourceLabel = (id: string | null) => {
+          if (!id) return 'NONE';
+          const sourceIndex = clientEntries.findIndex(([clientId]) => clientId === id);
+          return cameraLabels[id] || (sourceIndex >= 0 ? `CAM${sourceIndex + 1}` : id.slice(0, 6));
+        };
+        const programLabel = getSourceLabel(pgmSourceId);
+        const previewLabel = getSourceLabel(previewSourceId);
+        const programStream = pgmSourceId ? (mediaStreams.get(pgmSourceId) ?? null) : null;
+        const previewStream = previewSourceId ? (mediaStreams.get(previewSourceId) ?? null) : null;
         return (
           <div className="director-tally-overlay">
             <div className="director-tally-header">
               <div className="director-title-group">
                 <div className="director-title">
                   <span className="director-rec-dot" />
-                  DIRECTOR SWITCHER
-                  <span className="director-cam-count">{camCount} CAM{camCount !== 1 ? 'S' : ''}</span>
+                  1 M/E SWITCHER
+                  <span className="director-cam-count">{camCount} INPUT{camCount !== 1 ? 'S' : ''}</span>
                 </div>
-                <div className="director-subtitle">VIDEO MONITORING + TALLY BUS CONTROL</div>
+                <div className="director-subtitle">PROGRAM / PREVIEW SWITCHING</div>
               </div>
               <div className="director-header-right">
                 <button
                   className={`dir-video-toggle ${isVideoEnabled ? 'active' : ''}`}
                   onClick={() => { playHapticFeedback(); toggleVideoMonitoring(); }}
                 >
-                  {isVideoEnabled ? 'VIDEO ON' : 'VIDEO OFF'}
+                  {isVideoEnabled ? 'MONITOR ON' : 'MONITOR OFF'}
                 </button>
                 <div className="director-tc-large">{directorTime}</div>
                 <button className="director-close-btn" onClick={() => { playHapticFeedback(); setDirectorPanelOpen(false); }}>EXIT</button>
               </div>
             </div>
-            <div className="director-panel-summary">
-              <div className="director-summary-chip neutral">
-                <span className="director-summary-label">MONITOR</span>
-                <span className="director-summary-value">{monitorLabel ?? 'NONE'}</span>
+            <div className="atem-workspace">
+              <div className="atem-multiview">
+                <div className="atem-monitor program">
+                  <div className="atem-monitor-head">
+                    <span>PROGRAM</span>
+                    <strong>{programLabel}</strong>
+                  </div>
+                  <div className="atem-monitor-screen">
+                    {isVideoEnabled && programStream ? (
+                      <VideoRenderer stream={programStream} muted={true} className="atem-monitor-video" />
+                    ) : (
+                      <div className="atem-monitor-placeholder">
+                        <span>{isVideoEnabled ? 'NO PROGRAM SOURCE' : 'MONITORING OFF'}</span>
+                        <small>{pgmSourceId ? 'WAITING FOR CAMERA' : 'SELECT A PROGRAM INPUT'}</small>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="atem-monitor preview">
+                  <div className="atem-monitor-head">
+                    <span>PREVIEW</span>
+                    <strong>{previewLabel}</strong>
+                  </div>
+                  <div className="atem-monitor-screen">
+                    {isVideoEnabled && previewStream ? (
+                      <VideoRenderer stream={previewStream} muted={true} className="atem-monitor-video" />
+                    ) : (
+                      <div className="atem-monitor-placeholder">
+                        <span>{isVideoEnabled ? 'NO PREVIEW SOURCE' : 'MONITORING OFF'}</span>
+                        <small>{previewSourceId ? 'WAITING FOR CAMERA' : 'SELECT A PREVIEW INPUT'}</small>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className={`director-summary-chip ${liveCount > 0 ? 'live' : 'neutral'}`}>
-                <span className="director-summary-label">PGM</span>
-                <span className="director-summary-value">{liveCount}</span>
-              </div>
-              <div className={`director-summary-chip ${previewCount > 0 ? 'preview' : 'neutral'}`}>
-                <span className="director-summary-label">PVW</span>
-                <span className="director-summary-value">{previewCount}</span>
-              </div>
-              <div className={`director-summary-chip ${offlineCount > 0 ? 'offline' : 'neutral'}`}>
-                <span className="director-summary-label">OFFLINE</span>
-                <span className="director-summary-value">{offlineCount}</span>
+
+              <div className="atem-me-panel">
+                <div className="atem-bus-stack">
+                  <div className="atem-bus-row program">
+                    <span className="atem-bus-label">PROGRAM</span>
+                    <div className="atem-source-buttons">
+                      {clientEntries.length === 0 ? (
+                        <span className="atem-bus-empty">NO INPUTS</span>
+                      ) : clientEntries.map(([id, stats], idx) => {
+                        const isOffline = Date.now() - stats.lastSeen > 30000;
+                        return (
+                          <button
+                            key={id}
+                            className={pgmSourceId === id ? 'active' : ''}
+                            onClick={() => handleSelectProgram(id)}
+                            disabled={isOffline}
+                            aria-pressed={pgmSourceId === id}
+                          >
+                            <span>{idx + 1}</span>
+                            <strong>{cameraLabels[id] || `CAM${idx + 1}`}</strong>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="atem-bus-row preview">
+                    <span className="atem-bus-label">PREVIEW</span>
+                    <div className="atem-source-buttons">
+                      {clientEntries.length === 0 ? (
+                        <span className="atem-bus-empty">NO INPUTS</span>
+                      ) : clientEntries.map(([id, stats], idx) => {
+                        const isOffline = Date.now() - stats.lastSeen > 30000;
+                        return (
+                          <button
+                            key={id}
+                            className={previewSourceId === id ? 'active' : ''}
+                            onClick={() => handleSelectPreview(id)}
+                            disabled={isOffline}
+                            aria-pressed={previewSourceId === id}
+                          >
+                            <span>{idx + 1}</span>
+                            <strong>{cameraLabels[id] || `CAM${idx + 1}`}</strong>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="atem-transition-block">
+                  <div className="atem-transition-title">
+                    <span>NEXT TRANSITION</span>
+                    <strong>MIX 0.5s</strong>
+                  </div>
+                  <div className="atem-transition-actions">
+                    <button
+                      className="atem-cut-btn"
+                      onClick={handleCut}
+                      disabled={!previewSourceId || isAutoTransitioning}
+                    >
+                      CUT
+                    </button>
+                    <button
+                      className={`atem-auto-btn ${isAutoTransitioning ? 'active' : ''}`}
+                      onClick={handleAuto}
+                      disabled={!previewSourceId || isAutoTransitioning}
+                    >
+                      {isAutoTransitioning ? 'AUTO…' : 'AUTO'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="director-all-control">
-              <div className="director-all-label">
-                <span>{tr('director.allControl')}</span>
-                <span className={`director-all-bus state-${globalState}`}>{globalState.toUpperCase()}</span>
-              </div>
-              <div className="director-all-btns">
-                <button
-                  className={`dir-all-btn on-air ${globalState === 'live' ? 'active' : ''}`}
-                  onClick={() => handleSetAllTally('live')}
-                >PGM</button>
-                <button
-                  className={`dir-all-btn preview ${globalState === 'preview' ? 'active' : ''}`}
-                  onClick={() => handleSetAllTally('preview')}
-                >PVW</button>
-                <button
-                  className={`dir-all-btn off ${globalState === 'off' ? 'active' : ''}`}
-                  onClick={() => handleSetAllTally('off')}
-                >OFF</button>
-              </div>
+
+            <div className="atem-status-strip">
+              <span><small>PROGRAM</small>{programLabel}</span>
+              <span><small>PREVIEW</small>{previewLabel}</span>
+              <span><small>TALLY</small>{liveCount} PGM / {previewCount} PVW</span>
+              <span className={offlineCount > 0 ? 'warn' : ''}><small>OFFLINE</small>{offlineCount}</span>
+              <span className={isVideoEnabled ? 'online' : 'warn'}><small>RETURN OUT</small>{isVideoEnabled ? 'ENABLED' : 'DISABLED'}</span>
             </div>
             <div className="director-main-area">
               <div className="director-grid">
@@ -851,7 +965,7 @@ function MainApp() {
                     <div className="director-no-clients-sub">Connected P2P client cameras will appear here.</div>
                   </div>
                 ) : (
-                  Object.entries(clients).map(([id, stats], idx) => {
+                  clientEntries.map(([id, stats], idx) => {
                     const isOffline = Date.now() - stats.lastSeen > 30000;
                     const assignedState = tallyPayload?.assignments?.[id] ?? tallyPayload?.all ?? 'off';
                     const uiAssignedState = assignedState === 'standby' ? 'preview' : assignedState;
@@ -885,19 +999,9 @@ function MainApp() {
                             <small>{isVideoEnabled ? 'VIDEO STREAM WAITING' : 'ENABLE MONITORING TO PREVIEW'}</small>
                           </div>
                         )}
-                        <div className="director-cam-actions-v">
-                          <button
-                            className={`dir-cam-btn on-air ${uiAssignedState === 'live' ? 'active' : ''}`}
-                            onClick={() => handleSetOnAir(id)}
-                          >PGM</button>
-                          <button
-                            className={`dir-cam-btn preview ${uiAssignedState === 'preview' ? 'active' : ''}`}
-                            onClick={() => handleSetPreview(id)}
-                          >PVW</button>
-                          <button
-                            className={`dir-cam-btn off ${uiAssignedState === 'off' ? 'active' : ''}`}
-                            onClick={() => handleSetOff(id)}
-                          >OFF</button>
+                        <div className="director-input-footer">
+                          <span>INPUT {idx + 1}</span>
+                          <strong>{uiAssignedState === 'live' ? 'PROGRAM' : uiAssignedState === 'preview' ? 'PREVIEW' : 'IDLE'}</strong>
                         </div>
                       </div>
                     );

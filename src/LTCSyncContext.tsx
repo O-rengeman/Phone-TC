@@ -187,6 +187,7 @@ interface LTCActionsType {
   handleManualTallyChange: (s: TallyState) => void;
   handleClientTallyChange: (clientId: string, s: TallyState) => void;
   handleAllTallyChange: (s: TallyState) => void;
+  handleSwitcherBusChange: (programId: string | null, previewId: string | null) => void;
   handleDimmerCycle: (e: React.MouseEvent) => void;
   handleTorchToggle: (e: React.MouseEvent) => void;
   handleTallyExit: (e: React.MouseEvent) => void;
@@ -354,7 +355,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     tallyDimmerOpacity, setTallyDimmerOpacity, tallyTcSize, setTallyTcSize, tallyActionLog,
     tallyTimeRef, tallyOpenRef,
     isTallyConnected, tallyState,
-    playHapticFeedback, handleManualTallyChange, handleClientTallyChange, handleAllTallyChange,
+    playHapticFeedback, handleManualTallyChange, handleClientTallyChange, handleAllTallyChange, handleSwitcherBusChange,
     handleDimmerCycle, handleTorchToggle, handleTallyExit,
   } = useTallyControl({
     isHost, p2pRole, peerId, peerSyncRef, lastHeartbeatTimeRef,
@@ -947,6 +948,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     handleManualTallyChange,
     handleClientTallyChange,
     handleAllTallyChange,
+    handleSwitcherBusChange,
     handleDimmerCycle,
     handleTorchToggle,
     handleTallyExit,
@@ -957,7 +959,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     tr, playHapticFeedback, addToast, addMarker, removeMarker, updateMarkerComment, exportToEDL,
     exportToALE, handleSlateClick, resetP2P, setupP2PMaster, setupP2PClient, joinSession,
     handleStartStop, handlePause, beginStopHold, cancelStopHold, handleManualResync,
-    handleManualTallyChange, handleClientTallyChange, handleAllTallyChange, handleDimmerCycle,
+    handleManualTallyChange, handleClientTallyChange, handleAllTallyChange, handleSwitcherBusChange, handleDimmerCycle,
     handleTorchToggle, handleTallyExit, toggleVideoMonitoring, mediaServiceRef
   ]);
 

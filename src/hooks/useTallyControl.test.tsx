@@ -175,6 +175,34 @@ describe('useTallyControl tally-change handlers', () => {
     expect(hostResult.current.manualTally).toBe('live');
     expect(hostResult.current.tallyPayload).toMatchObject({ all: 'live' });
   });
+
+  it('handleSwitcherBusChange broadcasts program and preview assignments atomically', () => {
+    const peerSyncRef = makePeerSyncRef();
+    const { result } = renderHook(() => useTallyControl(makeParams({
+      peerSyncRef,
+      cameraLabels: { CAM1: 'Wide', CAM2: 'Close' },
+    })));
+
+    act(() => result.current.handleSwitcherBusChange('CAM1', 'CAM2'));
+
+    expect(result.current.tallyPayload).toMatchObject({
+      all: 'off',
+      assignments: { CAM1: 'live', CAM2: 'preview' },
+    });
+    expect(peerSyncRef.current.broadcast).toHaveBeenCalledTimes(1);
+    expect(result.current.tallyActionLog.slice(0, 2)).toEqual([
+      expect.objectContaining({ cam: 'Wide', state: 'live' }),
+      expect.objectContaining({ cam: 'Close', state: 'preview' }),
+    ]);
+  });
+
+  it('handleSwitcherBusChange avoids assigning preview twice when both buses match', () => {
+    const { result } = renderHook(() => useTallyControl(makeParams()));
+
+    act(() => result.current.handleSwitcherBusChange('CAM1', 'CAM1'));
+
+    expect(result.current.tallyPayload?.assignments).toEqual({ CAM1: 'live' });
+  });
 });
 
 describe('useTallyControl UI helpers', () => {
