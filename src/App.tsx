@@ -211,6 +211,8 @@ function MainApp() {
   const [pgmSourceId, setPgmSourceId] = useState<string | null>(null);
   const [previewSourceId, setPreviewSourceId] = useState<string | null>(null);
   const [isAutoTransitioning, setIsAutoTransitioning] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [transitionProgress, setTransitionProgress] = useState(0); // 0 (PGM) to 100 (PVW)
   const autoTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const returnStream = targetId ? (mediaStreams.get(targetId) ?? null) : null;
 
@@ -287,30 +289,71 @@ function MainApp() {
     setPgmSourceId(nextProgram);
     setPreviewSourceId(nextPreview);
     handleSwitcherBusChange(nextProgram, nextPreview);
+    setTransitionProgress(0);
+    setIsTransitioning(false);
   }, [handleSwitcherBusChange, pgmSourceId, playHapticFeedback, previewSourceId, setIsVideoEnabled]);
 
   const handleAuto = useCallback(() => {
-    if (!previewSourceId || isAutoTransitioning) return;
+    if (!previewSourceId || isAutoTransitioning || isTransitioning) return;
     playHapticFeedback();
     setIsAutoTransitioning(true);
-    autoTransitionTimerRef.current = setTimeout(() => {
+    setIsTransitioning(true);
+
+    const duration = 500; // 0.5s
+    const startTime = performance.now();
+
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      setTransitionProgress(Math.round(progress * 100));
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        const nextProgram = previewSourceId;
+        const nextPreview = pgmSourceId;
+        setIsVideoEnabled(true);
+        setPgmSourceId(nextProgram);
+        setPreviewSourceId(nextPreview);
+        handleSwitcherBusChange(nextProgram, nextPreview);
+        setIsAutoTransitioning(false);
+        setIsTransitioning(false);
+        setTransitionProgress(0);
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }, [
+    handleSwitcherBusChange,
+    isAutoTransitioning,
+    isTransitioning,
+    pgmSourceId,
+    playHapticFeedback,
+    previewSourceId,
+    setIsVideoEnabled,
+  ]);
+
+  const handleTBarChange = useCallback((value: number) => {
+    if (!previewSourceId) return;
+
+    if (value > 0 && value < 100) {
+      setIsTransitioning(true);
+      setTransitionProgress(value);
+    } else if (value === 100) {
+      playHapticFeedback();
       const nextProgram = previewSourceId;
       const nextPreview = pgmSourceId;
       setIsVideoEnabled(true);
       setPgmSourceId(nextProgram);
       setPreviewSourceId(nextPreview);
       handleSwitcherBusChange(nextProgram, nextPreview);
-      setIsAutoTransitioning(false);
-      autoTransitionTimerRef.current = null;
-    }, 500);
-  }, [
-    handleSwitcherBusChange,
-    isAutoTransitioning,
-    pgmSourceId,
-    playHapticFeedback,
-    previewSourceId,
-    setIsVideoEnabled,
-  ]);
+      setIsTransitioning(false);
+      setTransitionProgress(0);
+    } else {
+      setIsTransitioning(false);
+      setTransitionProgress(0);
+    }
+  }, [handleSwitcherBusChange, pgmSourceId, playHapticFeedback, previewSourceId, setIsVideoEnabled]);
 
   return (
     <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
@@ -933,15 +976,15 @@ function MainApp() {
         const programStream = pgmSourceId ? (mediaStreams.get(pgmSourceId) ?? null) : null;
         const previewStream = previewSourceId ? (mediaStreams.get(previewSourceId) ?? null) : null;
         return (
-          <div className="director-tally-overlay">
+          <div className="director-tally-overlay atem-chassis">
             <div className="director-tally-header">
               <div className="director-title-group">
                 <div className="director-title">
                   <span className="director-rec-dot" />
-                  1 M/E SWITCHER
+                  ATEM 1 M/E SWITCHER
                   <span className="director-cam-count">{camCount} INPUT{camCount !== 1 ? 'S' : ''}</span>
                 </div>
-                <div className="director-subtitle">PROGRAM / PREVIEW SWITCHING</div>
+                <div className="director-subtitle">PROGRAM / PREVIEW SWITCHING SYSTEM</div>
               </div>
               <div className="director-header-right">
                 <button
@@ -954,227 +997,278 @@ function MainApp() {
                 <button className="director-close-btn" onClick={() => { playHapticFeedback(); setDirectorPanelOpen(false); }}>EXIT</button>
               </div>
             </div>
-            <div className="atem-workspace">
-              <div className="atem-multiview">
-                <div className="atem-monitor program">
-                  <div className="atem-monitor-head">
-                    <span>PROGRAM</span>
-                    <strong>{programLabel}</strong>
-                  </div>
-                  <div className="atem-monitor-screen">
-                    {isVideoEnabled && programStream ? (
-                      <VideoRenderer stream={programStream} muted={true} className="atem-monitor-video" />
-                    ) : (
-                      <div className="atem-monitor-placeholder">
-                        <span>{isVideoEnabled ? 'NO PROGRAM SOURCE' : 'MONITORING OFF'}</span>
-                        <small>{pgmSourceId ? 'WAITING FOR CAMERA' : 'SELECT A PROGRAM INPUT'}</small>
-                      </div>
-                    )}
-                  </div>
-                </div>
 
-                <div className="atem-monitor preview">
-                  <div className="atem-monitor-head">
-                    <span>PREVIEW</span>
-                    <strong>{previewLabel}</strong>
-                  </div>
-                  <div className="atem-monitor-screen">
-                    {isVideoEnabled && previewStream ? (
-                      <VideoRenderer stream={previewStream} muted={true} className="atem-monitor-video" />
-                    ) : (
-                      <div className="atem-monitor-placeholder">
-                        <span>{isVideoEnabled ? 'NO PREVIEW SOURCE' : 'MONITORING OFF'}</span>
-                        <small>{previewSourceId ? 'WAITING FOR CAMERA' : 'SELECT A PREVIEW INPUT'}</small>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="atem-me-panel">
-                <div className="atem-bus-stack">
-                  <div className="atem-bus-row program">
-                    <span className="atem-bus-label">PROGRAM</span>
-                    <div className="atem-source-buttons">
-                      {clientEntries.length === 0 ? (
-                        <span className="atem-bus-empty">NO INPUTS</span>
-                      ) : clientEntries.map(([id, stats], idx) => {
-                        const isOffline = Date.now() - stats.lastSeen > 30000;
-                        return (
-                          <button
-                            key={id}
-                            className={pgmSourceId === id ? 'active' : ''}
-                            onClick={() => handleSelectProgram(id)}
-                            disabled={isOffline}
-                            aria-pressed={pgmSourceId === id}
-                          >
-                            <span>{idx + 1}</span>
-                            <strong>{cameraLabels[id] || `CAM${idx + 1}`}</strong>
-                          </button>
-                        );
-                      })}
+            <div className="atem-workspace-layout">
+              {/* 左側：マルチビュー（PGM/PVWモニター ＋ 入力カメラプレビューグリッド） */}
+              <div className="atem-multiview-board">
+                <div className="atem-mv-monitors">
+                  {/* PROGRAMモニター */}
+                  <div className={`atem-monitor program-monitor ${pgmSourceId ? 'has-source' : ''}`}>
+                    <div className="atem-monitor-head">
+                      <span>PROGRAM (PGM)</span>
+                      <strong className="source-label">{programLabel}</strong>
+                    </div>
+                    <div className="atem-monitor-screen">
+                      {isVideoEnabled && programStream ? (
+                        <div className="video-wrapper">
+                          <VideoRenderer stream={programStream} muted={true} className="atem-monitor-video" />
+                          {isTransitioning && previewStream && (
+                            <div className="video-transition-overlay" style={{ opacity: transitionProgress / 100 }}>
+                              <VideoRenderer stream={previewStream} muted={true} className="atem-monitor-video" />
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="atem-monitor-placeholder">
+                          <span>{isVideoEnabled ? 'NO PROGRAM SOURCE' : 'MONITORING OFF'}</span>
+                          <small>{pgmSourceId ? 'WAITING FOR CAMERA' : 'SELECT A PROGRAM INPUT'}</small>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="atem-bus-row preview">
-                    <span className="atem-bus-label">PREVIEW</span>
-                    <div className="atem-source-buttons">
-                      {clientEntries.length === 0 ? (
-                        <span className="atem-bus-empty">NO INPUTS</span>
-                      ) : clientEntries.map(([id, stats], idx) => {
-                        const isOffline = Date.now() - stats.lastSeen > 30000;
-                        return (
-                          <button
-                            key={id}
-                            className={previewSourceId === id ? 'active' : ''}
-                            onClick={() => handleSelectPreview(id)}
-                            disabled={isOffline}
-                            aria-pressed={previewSourceId === id}
-                          >
-                            <span>{idx + 1}</span>
-                            <strong>{cameraLabels[id] || `CAM${idx + 1}`}</strong>
-                          </button>
-                        );
-                      })}
+                  {/* PREVIEWモニター */}
+                  <div className={`atem-monitor preview-monitor ${previewSourceId ? 'has-source' : ''}`}>
+                    <div className="atem-monitor-head">
+                      <span>PREVIEW (PVW)</span>
+                      <strong className="source-label">{previewLabel}</strong>
+                    </div>
+                    <div className="atem-monitor-screen">
+                      {isVideoEnabled && previewStream ? (
+                        <VideoRenderer stream={previewStream} muted={true} className="atem-monitor-video" />
+                      ) : (
+                        <div className="atem-monitor-placeholder">
+                          <span>{isVideoEnabled ? 'NO PREVIEW SOURCE' : 'MONITORING OFF'}</span>
+                          <small>{previewSourceId ? 'WAITING FOR CAMERA' : 'SELECT A PREVIEW INPUT'}</small>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                <div className="atem-transition-block">
-                  <div className="atem-transition-title">
-                    <span>NEXT TRANSITION</span>
-                    <strong>MIX 0.5s</strong>
-                  </div>
-                  <div className="atem-transition-actions">
-                    <button
-                      className="atem-cut-btn"
-                      onClick={handleCut}
-                      disabled={!previewSourceId || isAutoTransitioning}
-                    >
-                      CUT
-                    </button>
-                    <button
-                      className={`atem-auto-btn ${isAutoTransitioning ? 'active' : ''}`}
-                      onClick={handleAuto}
-                      disabled={!previewSourceId || isAutoTransitioning}
-                    >
-                      {isAutoTransitioning ? 'AUTO…' : 'AUTO'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+                {/* 入力カメラプレビューグリッド */}
+                <div className="atem-mv-inputs-grid">
+                  {camCount === 0 ? (
+                    <div className="director-no-clients">
+                      <div className="director-no-clients-icon">CAM</div>
+                      <div>NO CAMERAS CONNECTED</div>
+                      <div className="director-no-clients-sub">Connected P2P client cameras will appear here.</div>
+                    </div>
+                  ) : (
+                    clientEntries.map(([id, stats], idx) => {
+                      const isOffline = Date.now() - stats.lastSeen > 30000;
+                      const defaultLabel = `CAM${idx + 1}`;
+                      const label = cameraLabels[id] || defaultLabel;
+                      
+                      const isPgmActive = pgmSourceId === id;
+                      const isPvwActive = previewSourceId === id;
+                      const cardTallyState = isPgmActive ? 'live' : isPvwActive ? 'preview' : 'off';
 
-            <div className="atem-status-strip">
-              <span><small>PROGRAM</small>{programLabel}</span>
-              <span><small>PREVIEW</small>{previewLabel}</span>
-              <span><small>TALLY</small>{liveCount} PGM / {previewCount} PVW</span>
-              <span className={offlineCount > 0 ? 'warn' : ''}><small>OFFLINE</small>{offlineCount}</span>
-              <span className={isVideoEnabled ? 'online' : 'warn'}><small>RETURN OUT</small>{isVideoEnabled ? 'ENABLED' : 'DISABLED'}</span>
-            </div>
-            <div className="director-main-area">
-              <div className="director-grid">
-                {camCount === 0 ? (
-                  <div className="director-no-clients">
-                    <div className="director-no-clients-icon">CAM</div>
-                    <div>NO CAMERAS CONNECTED</div>
-                    <div className="director-no-clients-sub">Connected P2P client cameras will appear here.</div>
-                  </div>
-                ) : (
-                  clientEntries.map(([id, stats], idx) => {
-                    const isOffline = Date.now() - stats.lastSeen > 30000;
-                    const assignedState = tallyPayload?.assignments?.[id] ?? tallyPayload?.all ?? 'off';
-                    const uiAssignedState = assignedState === 'standby' ? 'preview' : assignedState;
-                    const defaultLabel = `CAM${idx + 1}`;
-                    const label = cameraLabels[id] || defaultLabel;
-                    const isMonitorSource = pgmSourceId === id;
+                      let clientTc: string;
+                      const driftSec = stats.drift ?? 0;
+                      const driftAbs = Math.abs(driftSec);
+                      const isDriftWarning = driftAbs >= 0.03;
+                      try {
+                        const fps = FPS_OPTIONS[fpsIndex].value;
+                        const drop = FPS_OPTIONS[fpsIndex].drop;
+                        const tc = Timecode(directorTime, fps, drop);
+                        const driftFrames = Math.round(driftSec * fps);
+                        tc.add(driftFrames);
+                        clientTc = tc.toString();
+                      } catch {
+                        clientTc = directorTime;
+                      }
 
-                    let clientTc: string;
-                    const driftSec = stats.drift ?? 0;
-                    const driftAbs = Math.abs(driftSec);
-                    const isDriftWarning = driftAbs >= 0.03;
-                    try {
-                      const fps = FPS_OPTIONS[fpsIndex].value;
-                      const drop = FPS_OPTIONS[fpsIndex].drop;
-                      const tc = Timecode(directorTime, fps, drop);
-                      const driftFrames = Math.round(driftSec * fps);
-                      tc.add(driftFrames);
-                      clientTc = tc.toString();
-                    } catch {
-                      clientTc = directorTime;
-                    }
+                      return (
+                        <div
+                          key={id}
+                          className={`atem-mv-card status-${cardTallyState} ${isOffline ? 'offline' : ''}`}
+                          onClick={() => !isOffline && handleSelectPreview(id)}
+                          onDoubleClick={() => !isOffline && handleSelectProgram(id)}
+                          title="Click to Preview, Double Click to Program"
+                        >
+                          {isOffline && <div className="director-offline-overlay">OFFLINE</div>}
+                          <div className="input-card-header">
+                            <span className="input-num">{idx + 1}</span>
+                            <input
+                              className="input-card-label"
+                              value={label}
+                              onChange={e => setCameraLabels(prev => ({ ...prev, [id]: e.target.value }))}
+                              onClick={e => e.stopPropagation()}
+                              onDoubleClick={e => e.stopPropagation()}
+                              placeholder={defaultLabel}
+                              maxLength={8}
+                            />
+                            <div className="input-card-meta">
+                              <span className="stat-rtt">{stats.rtt.toFixed(0)}ms</span>
+                            </div>
+                          </div>
 
-                    return (
-                      <div key={id} className={`director-cam-card status-${uiAssignedState} ${isMonitorSource ? 'monitor-selected' : ''} ${isOffline ? 'offline' : ''}`}>
-                        {isOffline && <div className="director-offline-overlay">OFFLINE</div>}
-                        <div className="director-cam-header">
-                          <input
-                            className="director-cam-label-input"
-                            value={label}
-                            onChange={e => setCameraLabels(prev => ({ ...prev, [id]: e.target.value }))}
-                            placeholder={defaultLabel}
-                            maxLength={8}
-                          />
-                          <div className="director-cam-meta">
-                            <span className={`director-state-chip state-${uiAssignedState}`}>{tr(tallyLabelKey(uiAssignedState))}</span>
-                            {isMonitorSource && <span className="director-monitor-chip">MONITOR OUT</span>}
-                            <span className="director-cam-rtt">RTT {stats.rtt.toFixed(0)}ms</span>
+                          <div className="input-card-video">
+                            {isVideoEnabled && mediaStreams.get(id) ? (
+                              <VideoRenderer stream={mediaStreams.get(id)!} muted={true} className="dir-cam-video-el" />
+                            ) : (
+                              <div className="video-placeholder-mini">
+                                <span>{isVideoEnabled ? 'NO SIGNAL' : 'OFF'}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="input-card-footer">
+                            <div className="input-card-tc-row">
+                              <span className={`input-card-tc ${isDriftWarning ? 'warning' : 'ok'}`}>{clientTc}</span>
+                              <span className="input-card-drift">({driftSec >= 0 ? '+' : ''}{driftSec.toFixed(3)}s)</span>
+                            </div>
+                            <div className="input-card-bitrate" onClick={e => e.stopPropagation()}>
+                              <select
+                                className="input-card-bitrate-select"
+                                value={clientBitrates[id] ?? 500000}
+                                onChange={(e) => changeClientBitrate(id, Number(e.target.value))}
+                              >
+                                <option value={125000}>125k</option>
+                                <option value={250000}>250k</option>
+                                <option value={500000}>500k</option>
+                                <option value={1000000}>1M</option>
+                                <option value={2000000}>2M</option>
+                                <option value={4000000}>4M</option>
+                              </select>
+                            </div>
                           </div>
                         </div>
-                        {isVideoEnabled && mediaStreams.get(id) ? (
-                          <div className="director-cam-video">
-                            <VideoRenderer stream={mediaStreams.get(id)!} muted={true} className="dir-cam-video-el" />
-                          </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* 右側：ATEM 筐体型 M/E コントロールパネル */}
+              <div className="atem-control-chassis">
+                <div className="atem-chassis-panel">
+                  {/* スイッチャーバスボタン列 */}
+                  <div className="atem-buses">
+                    {/* PROGRAM バス */}
+                    <div className="atem-bus-row program-bus">
+                      <span className="bus-label">PROGRAM</span>
+                      <div className="bus-buttons">
+                        {clientEntries.length === 0 ? (
+                          <span className="bus-empty">NO INPUTS</span>
                         ) : (
-                          <div className={`director-cam-video director-cam-video-placeholder ${isVideoEnabled ? '' : 'disabled'}`.trim()}>
-                            <span>{isVideoEnabled ? 'NO SIGNAL' : 'VIDEO OFF'}</span>
-                            <small>{isVideoEnabled ? 'VIDEO STREAM WAITING' : 'ENABLE MONITORING TO PREVIEW'}</small>
-                          </div>
+                          clientEntries.map(([id, stats], idx) => {
+                            const isOffline = Date.now() - stats.lastSeen > 30000;
+                            const isActive = pgmSourceId === id;
+                            return (
+                              <button
+                                key={id}
+                                className={`atem-btn btn-pgm ${isActive ? 'lit' : ''}`}
+                                onClick={() => handleSelectProgram(id)}
+                                disabled={isOffline}
+                              >
+                                <span className="btn-num">{idx + 1}</span>
+                                <span className="btn-label">{cameraLabels[id] || `CAM${idx + 1}`}</span>
+                              </button>
+                            );
+                          })
                         )}
-                        <div className="director-cam-bitrate-panel">
-                          <label>遠隔ビットレート: </label>
-                          <select
-                            className="director-cam-bitrate-select"
-                            value={clientBitrates[id] ?? 500000}
-                            onChange={(e) => changeClientBitrate(id, Number(e.target.value))}
-                          >
-                            <option value={125000}>125 kbps (Eco)</option>
-                            <option value={250000}>250 kbps (Low)</option>
-                            <option value={500000}>500 kbps (Mid)</option>
-                            <option value={1000000}>1 Mbps (High)</option>
-                            <option value={2000000}>2 Mbps (Super)</option>
-                            <option value={4000000}>4 Mbps (Broadcast)</option>
-                          </select>
-                        </div>
-                        <div className="director-input-footer">
-                          <div>
-                            <span>INPUT {idx + 1}</span>
-                            <strong style={{ marginLeft: '8px' }}>{uiAssignedState === 'live' ? 'PROGRAM' : uiAssignedState === 'preview' ? 'PREVIEW' : 'IDLE'}</strong>
-                          </div>
-                          <div className={`director-cam-tc-sync ${isDriftWarning ? 'warning' : 'ok'}`}>
-                            <span className="director-cam-tc-val">{clientTc}</span>
-                            <span className="director-cam-drift-val">({driftSec >= 0 ? '+' : ''}{driftSec.toFixed(3)}s)</span>
-                          </div>
+                      </div>
+                    </div>
+
+                    {/* PREVIEW バス */}
+                    <div className="atem-bus-row preview-bus">
+                      <span className="bus-label">PREVIEW</span>
+                      <div className="bus-buttons">
+                        {clientEntries.length === 0 ? (
+                          <span className="bus-empty">NO INPUTS</span>
+                        ) : (
+                          clientEntries.map(([id, stats], idx) => {
+                            const isOffline = Date.now() - stats.lastSeen > 30000;
+                            const isActive = previewSourceId === id;
+                            return (
+                              <button
+                                key={id}
+                                className={`atem-btn btn-pvw ${isActive ? 'lit' : ''}`}
+                                onClick={() => handleSelectPreview(id)}
+                                disabled={isOffline}
+                              >
+                                <span className="btn-num">{idx + 1}</span>
+                                <span className="btn-label">{cameraLabels[id] || `CAM${idx + 1}`}</span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* トランジションブロック（CUT, AUTO, Tバー） */}
+                  <div className="atem-transition-block">
+                    <div className="tbar-chassis">
+                      <div className="tbar-track">
+                        <div className="tbar-fill" style={{ height: `${transitionProgress}%` }} />
+                        <input
+                          type="range"
+                          className="tbar-slider-input"
+                          min="0"
+                          max="100"
+                          value={transitionProgress}
+                          onChange={(e) => handleTBarChange(Number(e.target.value))}
+                        />
+                        <div className="tbar-handle" style={{ bottom: `calc(${transitionProgress}% - 8px)` }}>
+                          <div className="handle-grip" />
                         </div>
                       </div>
-                    );
-                  })
-                )}
-              </div>
-              {tallyActionLog.length > 0 && (
-                <div className="director-log">
-                  <div className="director-log-title">{tr('director.actionLog')}</div>
-                  {tallyActionLog.map((entry, i) => (
-                    <div key={i} className="director-log-row">
-                      <span className={`director-log-state state-text-${entry.state === 'live' ? 'live' : entry.state === 'preview' ? 'preview' : 'off'}`}>
-                        {tr(tallyLabelKey(entry.state as TallyState))}
-                      </span>
-                      <span className="director-log-cam">{entry.cam}</span>
-                      <span className="director-log-tc">{entry.time}</span>
+                      <div className="tbar-status">
+                        <span>MIX</span>
+                        <strong className="tbar-pct">{transitionProgress}%</strong>
+                      </div>
                     </div>
-                  ))}
+
+                    <div className="transition-actions">
+                      <button
+                        className="atem-btn-ctrl btn-cut"
+                        onClick={handleCut}
+                        disabled={!previewSourceId || isAutoTransitioning}
+                      >
+                        CUT
+                      </button>
+                      <button
+                        className={`atem-btn-ctrl btn-auto ${isAutoTransitioning ? 'transitioning' : ''}`}
+                        onClick={handleAuto}
+                        disabled={!previewSourceId || isAutoTransitioning}
+                      >
+                        AUTO
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                {/* ステータスストリップとログをパネル下部に綺麗に配置 */}
+                <div className="atem-panel-footer">
+                  <div className="atem-status-strip">
+                    <span><small>PROGRAM</small>{programLabel}</span>
+                    <span><small>PREVIEW</small>{previewLabel}</span>
+                    <span><small>TALLY</small>{liveCount} PGM / {previewCount} PVW</span>
+                    <span className={offlineCount > 0 ? 'warn' : ''}><small>OFFLINE</small>{offlineCount}</span>
+                    <span className={isVideoEnabled ? 'online' : 'warn'}><small>RETURN OUT</small>{isVideoEnabled ? 'ENABLED' : 'DISABLED'}</span>
+                  </div>
+
+                  {tallyActionLog.length > 0 && (
+                    <div className="director-log">
+                      <div className="director-log-title">{tr('director.actionLog')}</div>
+                      <div className="director-log-scroll">
+                        {tallyActionLog.map((entry, i) => (
+                          <div key={i} className="director-log-row">
+                            <span className={`director-log-state state-text-${entry.state === 'live' ? 'live' : entry.state === 'preview' ? 'preview' : 'off'}`}>
+                              {tr(tallyLabelKey(entry.state as TallyState))}
+                            </span>
+                            <span className="director-log-cam">{entry.cam}</span>
+                            <span className="director-log-tc">{entry.time}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         );

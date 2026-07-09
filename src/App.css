@@ -4676,3 +4676,680 @@ input[type="range"] {
   background-repeat: no-repeat;
   border-bottom-right-radius: 6px;
 }
+
+/* ==========================================================================
+   ATEM SWITCHER PANEL REDESIGN (BlackMagic ATEM Style UI)
+   ========================================================================== */
+
+/* 1. 全体筐体 (Chassis) */
+.atem-chassis {
+  background: radial-gradient(circle at top left, rgba(50, 55, 65, 0.4), transparent 40%),
+              radial-gradient(circle at bottom right, rgba(20, 22, 28, 0.6), transparent 30%),
+              linear-gradient(135deg, #181a1f 0%, #0d0f12 100%) !important;
+  color: #e2e8f0 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  border: 2px solid #2d3139;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.director-tally-header {
+  border-bottom: 2px solid #2d3139 !important;
+  background: rgba(13, 15, 18, 0.6) !important;
+  padding: 12px 20px !important;
+  margin-bottom: 12px !important;
+}
+
+.director-tc-large {
+  background: #090a0d;
+  border: 1px solid #2d3139;
+  padding: 4px 16px;
+  border-radius: 6px;
+  color: #ff3b30 !important; /* LED赤 */
+  font-family: "Courier New", Courier, monospace;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  box-shadow: inset 0 0 10px rgba(255, 59, 48, 0.2), 0 0 15px rgba(255, 59, 48, 0.15);
+  text-shadow: 0 0 8px rgba(255, 59, 48, 0.6);
+}
+
+/* 2. ワークスペースレイアウト */
+.atem-workspace-layout {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* 3. 左側：マルチビューボード */
+.atem-multiview-board {
+  flex: 1.6;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* モニター (PGM/PVW) */
+.atem-mv-monitors {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.atem-monitor {
+  background: #060709;
+  border: 3px solid #2d3139;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+}
+
+.atem-monitor.program-monitor {
+  border-color: #381c1c; /* 暗い赤枠（未アクティブ時） */
+}
+.atem-monitor.program-monitor.has-source {
+  border-color: #ff3b30;
+  box-shadow: 0 0 15px rgba(255, 59, 48, 0.3), 0 10px 20px rgba(0, 0, 0, 0.4);
+}
+
+.atem-monitor.preview-monitor {
+  border-color: #1c3822; /* 暗い緑枠（未アクティブ時） */
+}
+.atem-monitor.preview-monitor.has-source {
+  border-color: #4cd964;
+  box-shadow: 0 0 15px rgba(76, 217, 100, 0.3), 0 10px 20px rgba(0, 0, 0, 0.4);
+}
+
+.atem-monitor-head {
+  background: #14171d;
+  padding: 6px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #2d3139;
+  font-size: 0.7rem;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  color: #a0aec0;
+}
+
+.program-monitor .atem-monitor-head {
+  border-bottom-color: #381c1c;
+}
+.program-monitor.has-source .atem-monitor-head {
+  background: #ff3b30;
+  color: #fff;
+  border-bottom-color: #ff3b30;
+}
+
+.preview-monitor .atem-monitor-head {
+  border-bottom-color: #1c3822;
+}
+.preview-monitor.has-source .atem-monitor-head {
+  background: #4cd964;
+  color: #000;
+  border-bottom-color: #4cd964;
+}
+
+.atem-monitor-screen {
+  flex: 1;
+  aspect-ratio: 16/9;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.atem-monitor-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.video-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.video-transition-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.atem-monitor-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #4a5568;
+  text-align: center;
+  gap: 4px;
+}
+.atem-monitor-placeholder span {
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+.atem-monitor-placeholder small {
+  font-size: 0.6rem;
+  opacity: 0.7;
+}
+
+/* 入力カメラプレビューグリッド */
+.atem-mv-inputs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  flex: 1;
+  overflow-y: auto;
+  align-content: start;
+}
+
+.atem-mv-card {
+  background: #111318;
+  border: 3px solid #2d3139;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  user-select: none;
+}
+
+.atem-mv-card:hover {
+  transform: translateY(-2px);
+  border-color: #4a5568;
+}
+
+/* タリーボーダー */
+.atem-mv-card.status-live {
+  border-color: #ff3b30 !important;
+  box-shadow: 0 0 10px rgba(255, 59, 48, 0.4);
+}
+.atem-mv-card.status-preview {
+  border-color: #4cd964 !important;
+  box-shadow: 0 0 10px rgba(76, 217, 100, 0.4);
+}
+
+.input-card-header {
+  background: #1a1d24;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #2c313d;
+  gap: 4px;
+}
+
+.status-live .input-card-header {
+  background: rgba(255, 59, 48, 0.15);
+}
+.status-preview .input-card-header {
+  background: rgba(76, 217, 100, 0.1);
+}
+
+.input-num {
+  font-size: 0.75rem;
+  font-weight: 900;
+  color: #a0aec0;
+  background: #0d0f12;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.input-card-label {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: bold;
+  outline: none;
+  width: 70px;
+  padding: 0 2px;
+  text-align: left;
+}
+.input-card-label:focus {
+  border-bottom-color: #4cd964;
+}
+
+.input-card-meta {
+  font-size: 0.6rem;
+  color: #718096;
+}
+
+.input-card-video {
+  aspect-ratio: 16/9;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.video-placeholder-mini {
+  font-size: 0.6rem;
+  font-weight: bold;
+  color: #4a5568;
+}
+
+.input-card-footer {
+  padding: 4px 8px;
+  background: #14171d;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  gap: 4px;
+}
+
+.input-card-tc-row {
+  display: flex;
+  flex-direction: column;
+}
+.input-card-tc {
+  font-family: monospace;
+  color: #cbd5e0;
+}
+.input-card-tc.warning {
+  color: #ff9900;
+  font-weight: bold;
+}
+.input-card-drift {
+  color: #718096;
+  font-size: 0.55rem;
+}
+
+.input-card-bitrate-select {
+  background: #0d0f12;
+  border: 1px solid #2d3139;
+  color: #a0aec0;
+  font-size: 0.6rem;
+  border-radius: 3px;
+  padding: 1px 3px;
+  outline: none;
+}
+
+/* 4. 右側：ATEM 筐体型 M/E コントロールパネル */
+.atem-control-chassis {
+  flex: 1;
+  background: linear-gradient(180deg, #20232a 0%, #16181c 100%);
+  border: 2px solid #2d3139;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.05), 0 10px 25px rgba(0, 0, 0, 0.5);
+  min-width: 280px;
+}
+
+.atem-chassis-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* スイッチャーバス (Buses) */
+.atem-buses {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #0f1013;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #22252c;
+}
+
+.atem-bus-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bus-label {
+  font-size: 0.6rem;
+  font-weight: 900;
+  width: 60px;
+  color: #718096;
+  letter-spacing: 0.05em;
+  text-align: right;
+}
+
+.program-bus .bus-label {
+  color: #ff3b30;
+}
+.preview-bus .bus-label {
+  color: #4cd964;
+}
+
+.bus-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ATEM 丸角押しボタン */
+.atem-btn {
+  background: radial-gradient(circle, #2d313a 0%, #20232a 100%);
+  border: 2px solid #1a1b20;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  color: #a0aec0;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  user-select: none;
+}
+
+.atem-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.atem-btn .btn-num {
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+.atem-btn .btn-label {
+  font-size: 0.5rem;
+  font-weight: bold;
+  max-width: 38px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* PROGRAM 点灯状態 (赤) */
+.btn-pgm.lit {
+  background: radial-gradient(circle, #ff5e57 0%, #ff3b30 100%) !important;
+  border-color: #ff9f9b !important;
+  color: #fff !important;
+  box-shadow: 0 0 12px rgba(255, 59, 48, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.3) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* PREVIEW 点灯状態 (緑) */
+.btn-pvw.lit {
+  background: radial-gradient(circle, #63e67e 0%, #4cd964 100%) !important;
+  border-color: #a3f7b2 !important;
+  color: #000 !important;
+  box-shadow: 0 0 12px rgba(76, 217, 100, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.4) !important;
+  font-weight: 800;
+}
+
+.bus-empty {
+  font-size: 0.65rem;
+  color: #4a5568;
+  font-weight: bold;
+  padding: 8px;
+}
+
+/* 5. トランジションブロック */
+.atem-transition-block {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: center;
+}
+
+.transition-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* コントロール用ボタン */
+.atem-btn-ctrl {
+  background: linear-gradient(180deg, #3a3d46 0%, #292b31 100%);
+  border: 2px solid #1a1b20;
+  border-radius: 6px;
+  color: #cbd5e0;
+  font-weight: 900;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  padding: 12px 0;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.1s ease;
+  user-select: none;
+}
+.atem-btn-ctrl:active {
+  transform: scale(0.96);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* CUT ボタン */
+.btn-cut {
+  background: linear-gradient(180deg, #4e525d 0%, #353841 100%);
+}
+
+/* AUTO ボタン */
+.btn-auto.transitioning {
+  background: radial-gradient(circle, #ff5e57 0%, #ff3b30 100%) !important;
+  border-color: #ff9f9b !important;
+  color: #fff !important;
+  animation: pulse-glow 0.3s infinite alternate;
+}
+
+@keyframes pulse-glow {
+  0% { box-shadow: 0 0 5px rgba(255, 59, 48, 0.4); }
+  100% { box-shadow: 0 0 15px rgba(255, 59, 48, 0.8); }
+}
+
+/* Tバー (Fader) デザイン */
+.tbar-chassis {
+  background: #090a0d;
+  border: 2px solid #2d3139;
+  border-radius: 8px;
+  padding: 12px 8px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  height: 120px;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+}
+
+.tbar-track {
+  position: relative;
+  width: 12px;
+  height: 100%;
+  background: #1a1d24;
+  border-radius: 999px;
+  border: 1px solid #2d3139;
+  overflow: visible;
+}
+
+.tbar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(0deg, #ff3b30 0%, #ff9500 100%);
+  border-radius: 999px;
+  opacity: 0.3;
+}
+
+.tbar-slider-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 10;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.tbar-handle {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 16px;
+  background: linear-gradient(180deg, #cbd5e0 0%, #718096 100%);
+  border: 2px solid #1a1b20;
+  border-radius: 4px;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  transition: bottom 0.05s ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+.handle-grip {
+  width: 16px;
+  height: 4px;
+  background: #1a1b20;
+  border-radius: 2px;
+}
+
+.tbar-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.6rem;
+  color: #718096;
+}
+.tbar-pct {
+  color: #cbd5e0;
+  font-size: 0.75rem;
+  font-family: monospace;
+}
+
+/* 6. パネル下部 (ステータス・ログ) */
+.atem-panel-footer {
+  margin-top: auto;
+  border-top: 2px solid #2d3139;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.atem-status-strip {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  font-size: 0.65rem;
+  color: #a0aec0;
+}
+
+.atem-status-strip span {
+  background: #090a0d;
+  border: 1px solid #22252c;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.atem-status-strip small {
+  color: #718096;
+  font-weight: bold;
+}
+
+.atem-status-strip .warn {
+  border-color: #ff9900;
+  color: #ff9900;
+}
+.atem-status-strip .online {
+  border-color: #4cd964;
+  color: #4cd964;
+}
+
+.director-log {
+  background: #090a0d !important;
+  border: 1px solid #2d3139 !important;
+  border-radius: 6px !important;
+  width: auto !important;
+  padding: 8px !important;
+  max-height: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.director-log-title {
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #718096;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+.director-log-scroll {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.director-log-row {
+  font-size: 0.6rem !important;
+  padding: 4px 6px !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-left-width: 2px !important;
+}
+
+/* 7. モバイル・レスポンシブ対応 */
+@media (max-width: 768px) {
+  .atem-workspace-layout {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  
+  .atem-multiview-board {
+    flex: none;
+    overflow: visible;
+  }
+  
+  .atem-control-chassis {
+    flex: none;
+    min-width: 0;
+  }
+
+  .atem-mv-monitors {
+    grid-template-columns: 1fr;
+  }
+  
+  .atem-buses {
+    padding: 8px;
+  }
+  
+  .atem-btn {
+    width: 38px;
+    height: 38px;
+  }
+}
+
