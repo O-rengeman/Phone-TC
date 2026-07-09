@@ -14,6 +14,7 @@ import { VuMeter } from './components/VuMeter';
 import { VideoRenderer } from './components/VideoRenderer';
 import { ReturnMonitor } from './components/ReturnMonitor';
 import { useMediaStreams } from './hooks/useMediaStreams';
+import { getAutoSwitcherAssignment, resolveReturnFeed } from './utils/switcherRouting';
 import Timecode from 'smpte-timecode';
 import './App.css';
 
@@ -160,7 +161,6 @@ function MainApp() {
     setTallyBorderSize,
     pipEnabled,
     setPipEnabled,
-    clientBitrates,
     directorPanelOpen,
     setDirectorPanelOpen,
     directorTime,
@@ -203,8 +203,7 @@ function MainApp() {
     isVideoEnabled,
     setIsVideoEnabled,
     toggleVideoMonitoring,
-    mediaServiceRef,
-    changeClientBitrate
+    mediaServiceRef
   } = useLTC();
 
   const mediaStreams = useMediaStreams();
@@ -214,7 +213,11 @@ function MainApp() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionProgress, setTransitionProgress] = useState(0); // 0 (PGM) to 100 (PVW)
   const autoTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const returnStream = targetId ? (mediaStreams.get(targetId) ?? null) : null;
+  const returnFeed = resolveReturnFeed(targetId, mediaStreams);
+  const returnStream = returnFeed.stream;
+  const { programId: effectivePgmSourceId, previewId: effectivePreviewSourceId } = isHost
+    ? getAutoSwitcherAssignment(Object.keys(clients), pgmSourceId, previewSourceId)
+    : { programId: pgmSourceId, previewId: previewSourceId };
 
   const handleOutputModeChange = (mode: 'stereo' | 'mono-l') => {
     setOutputMode(mode);
@@ -253,13 +256,18 @@ function MainApp() {
     const service = mediaServiceRef.current;
     if (!service) return;
 
-    if (!isVideoEnabled || !pgmSourceId) {
+    if (!effectivePgmSourceId) {
       void service.setPgmStream(null);
       return;
     }
 
-    void service.setPgmStream(mediaStreams.get(pgmSourceId) ?? null);
-  }, [isHost, isVideoEnabled, pgmSourceId, mediaStreams, mediaServiceRef]);
+    void service.setPgmStream(mediaStreams.get(effectivePgmSourceId) ?? null);
+  }, [effectivePgmSourceId, isHost, mediaStreams, mediaServiceRef]);
+
+  useEffect(() => {
+    if (!isHost) return;
+    handleSwitcherBusChange(effectivePgmSourceId, effectivePreviewSourceId);
+  }, [effectivePgmSourceId, effectivePreviewSourceId, handleSwitcherBusChange, isHost]);
 
   useEffect(() => () => {
     if (autoTransitionTimerRef.current) {
@@ -271,30 +279,30 @@ function MainApp() {
     playHapticFeedback();
     setIsVideoEnabled(true);
     setPgmSourceId(id);
-    handleSwitcherBusChange(id, previewSourceId);
-  }, [handleSwitcherBusChange, playHapticFeedback, previewSourceId, setIsVideoEnabled]);
+    handleSwitcherBusChange(id, effectivePreviewSourceId);
+  }, [effectivePreviewSourceId, handleSwitcherBusChange, playHapticFeedback, setIsVideoEnabled]);
 
   const handleSelectPreview = useCallback((id: string) => {
     playHapticFeedback();
     setPreviewSourceId(id);
-    handleSwitcherBusChange(pgmSourceId, id);
-  }, [handleSwitcherBusChange, pgmSourceId, playHapticFeedback]);
+    handleSwitcherBusChange(effectivePgmSourceId, id);
+  }, [effectivePgmSourceId, handleSwitcherBusChange, playHapticFeedback]);
 
   const handleCut = useCallback(() => {
-    if (!previewSourceId) return;
+    if (!effectivePreviewSourceId) return;
     playHapticFeedback();
-    const nextProgram = previewSourceId;
-    const nextPreview = pgmSourceId;
+    const nextProgram = effectivePreviewSourceId;
+    const nextPreview = effectivePgmSourceId;
     setIsVideoEnabled(true);
     setPgmSourceId(nextProgram);
     setPreviewSourceId(nextPreview);
     handleSwitcherBusChange(nextProgram, nextPreview);
     setTransitionProgress(0);
     setIsTransitioning(false);
-  }, [handleSwitcherBusChange, pgmSourceId, playHapticFeedback, previewSourceId, setIsVideoEnabled]);
+  }, [effectivePgmSourceId, effectivePreviewSourceId, handleSwitcherBusChange, playHapticFeedback, setIsVideoEnabled]);
 
   const handleAuto = useCallback(() => {
-    if (!previewSourceId || isAutoTransitioning || isTransitioning) return;
+    if (!effectivePreviewSourceId || isAutoTransitioning || isTransitioning) return;
     playHapticFeedback();
     setIsAutoTransitioning(true);
     setIsTransitioning(true);
@@ -310,8 +318,8 @@ function MainApp() {
       if (progress < 1) {
         requestAnimationFrame(animate);
       } else {
-        const nextProgram = previewSourceId;
-        const nextPreview = pgmSourceId;
+        const nextProgram = effectivePreviewSourceId;
+        const nextPreview = effectivePgmSourceId;
         setIsVideoEnabled(true);
         setPgmSourceId(nextProgram);
         setPreviewSourceId(nextPreview);
@@ -324,25 +332,25 @@ function MainApp() {
 
     requestAnimationFrame(animate);
   }, [
+    effectivePgmSourceId,
+    effectivePreviewSourceId,
     handleSwitcherBusChange,
     isAutoTransitioning,
     isTransitioning,
-    pgmSourceId,
     playHapticFeedback,
-    previewSourceId,
     setIsVideoEnabled,
   ]);
 
   const handleTBarChange = useCallback((value: number) => {
-    if (!previewSourceId) return;
+    if (!effectivePreviewSourceId) return;
 
     if (value > 0 && value < 100) {
       setIsTransitioning(true);
       setTransitionProgress(value);
     } else if (value === 100) {
       playHapticFeedback();
-      const nextProgram = previewSourceId;
-      const nextPreview = pgmSourceId;
+      const nextProgram = effectivePreviewSourceId;
+      const nextPreview = effectivePgmSourceId;
       setIsVideoEnabled(true);
       setPgmSourceId(nextProgram);
       setPreviewSourceId(nextPreview);
@@ -353,7 +361,7 @@ function MainApp() {
       setIsTransitioning(false);
       setTransitionProgress(0);
     }
-  }, [handleSwitcherBusChange, pgmSourceId, playHapticFeedback, previewSourceId, setIsVideoEnabled]);
+  }, [effectivePgmSourceId, effectivePreviewSourceId, handleSwitcherBusChange, playHapticFeedback, setIsVideoEnabled]);
 
   return (
     <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
@@ -448,6 +456,7 @@ function MainApp() {
             {p2pRole === 'client' && (
               <ReturnMonitor
                 stream={returnStream}
+                sourceId={returnFeed.peerId}
                 connected={isTallyConnected}
                 onOpenFullscreen={() => {
                   setDirectorPanelOpen(false);
@@ -971,10 +980,10 @@ function MainApp() {
           const sourceIndex = clientEntries.findIndex(([clientId]) => clientId === id);
           return cameraLabels[id] || (sourceIndex >= 0 ? `CAM${sourceIndex + 1}` : id.slice(0, 6));
         };
-        const programLabel = getSourceLabel(pgmSourceId);
-        const previewLabel = getSourceLabel(previewSourceId);
-        const programStream = pgmSourceId ? (mediaStreams.get(pgmSourceId) ?? null) : null;
-        const previewStream = previewSourceId ? (mediaStreams.get(previewSourceId) ?? null) : null;
+        const programLabel = getSourceLabel(effectivePgmSourceId);
+        const previewLabel = getSourceLabel(effectivePreviewSourceId);
+        const programStream = effectivePgmSourceId ? (mediaStreams.get(effectivePgmSourceId) ?? null) : null;
+        const previewStream = effectivePreviewSourceId ? (mediaStreams.get(effectivePreviewSourceId) ?? null) : null;
         return (
           <div className="director-tally-overlay atem-chassis">
             <div className="director-tally-header">
@@ -1003,7 +1012,7 @@ function MainApp() {
               <div className="atem-multiview-board">
                 <div className="atem-mv-monitors">
                   {/* PROGRAMモニター */}
-                  <div className={`atem-monitor program-monitor ${pgmSourceId ? 'has-source' : ''}`}>
+                  <div className={`atem-monitor program-monitor ${effectivePgmSourceId ? 'has-source' : ''}`}>
                     <div className="atem-monitor-head">
                       <span>PROGRAM (PGM)</span>
                       <strong className="source-label">{programLabel}</strong>
@@ -1021,14 +1030,14 @@ function MainApp() {
                       ) : (
                         <div className="atem-monitor-placeholder">
                           <span>{isVideoEnabled ? 'NO PROGRAM SOURCE' : 'MONITORING OFF'}</span>
-                          <small>{pgmSourceId ? 'WAITING FOR CAMERA' : 'SELECT A PROGRAM INPUT'}</small>
+                          <small>{effectivePgmSourceId ? 'WAITING FOR CAMERA' : 'SELECT A PROGRAM INPUT'}</small>
                         </div>
                       )}
                     </div>
                   </div>
 
                   {/* PREVIEWモニター */}
-                  <div className={`atem-monitor preview-monitor ${previewSourceId ? 'has-source' : ''}`}>
+                  <div className={`atem-monitor preview-monitor ${effectivePreviewSourceId ? 'has-source' : ''}`}>
                     <div className="atem-monitor-head">
                       <span>PREVIEW (PVW)</span>
                       <strong className="source-label">{previewLabel}</strong>
@@ -1039,7 +1048,7 @@ function MainApp() {
                       ) : (
                         <div className="atem-monitor-placeholder">
                           <span>{isVideoEnabled ? 'NO PREVIEW SOURCE' : 'MONITORING OFF'}</span>
-                          <small>{previewSourceId ? 'WAITING FOR CAMERA' : 'SELECT A PREVIEW INPUT'}</small>
+                          <small>{effectivePreviewSourceId ? 'WAITING FOR CAMERA' : 'SELECT A PREVIEW INPUT'}</small>
                         </div>
                       )}
                     </div>
@@ -1060,8 +1069,8 @@ function MainApp() {
                       const defaultLabel = `CAM${idx + 1}`;
                       const label = cameraLabels[id] || defaultLabel;
                       
-                      const isPgmActive = pgmSourceId === id;
-                      const isPvwActive = previewSourceId === id;
+                      const isPgmActive = effectivePgmSourceId === id;
+                      const isPvwActive = effectivePreviewSourceId === id;
                       const cardTallyState = isPgmActive ? 'live' : isPvwActive ? 'preview' : 'off';
 
                       let clientTc: string;
@@ -1084,10 +1093,13 @@ function MainApp() {
                           key={id}
                           className={`atem-mv-card status-${cardTallyState} ${isOffline ? 'offline' : ''}`}
                           onClick={() => !isOffline && handleSelectPreview(id)}
-                          onDoubleClick={() => !isOffline && handleSelectProgram(id)}
-                          title="Click to Preview, Double Click to Program"
+                          title="Click to assign Preview"
                         >
                           {isOffline && <div className="director-offline-overlay">OFFLINE</div>}
+                          <div className="input-card-state-rail">
+                            {isPgmActive && <span className="input-state-badge program">PGM</span>}
+                            {isPvwActive && <span className="input-state-badge preview">PVW</span>}
+                          </div>
                           <div className="input-card-header">
                             <span className="input-num">{idx + 1}</span>
                             <input
@@ -1100,6 +1112,7 @@ function MainApp() {
                               maxLength={8}
                             />
                             <div className="input-card-meta">
+                              <span className={`input-link-dot ${isOffline ? 'offline' : isDriftWarning ? 'warning' : 'ok'}`} />
                               <span className="stat-rtt">{stats.rtt.toFixed(0)}ms</span>
                             </div>
                           </div>
@@ -1112,26 +1125,36 @@ function MainApp() {
                                 <span>{isVideoEnabled ? 'NO SIGNAL' : 'OFF'}</span>
                               </div>
                             )}
+                            <div className="input-card-video-overlay">
+                              <span className="input-card-tc-val">{clientTc}</span>
+                              <span className={`input-card-sync-pill ${isOffline ? 'offline' : isDriftWarning ? 'warning' : 'ok'}`}>
+                                {isOffline ? 'OFFLINE' : isDriftWarning ? `${driftSec >= 0 ? '+' : ''}${driftSec.toFixed(3)}s` : 'SYNC'}
+                              </span>
+                            </div>
                           </div>
 
                           <div className="input-card-footer">
-                            <div className="input-card-tc-row">
-                              <span className={`input-card-tc ${isDriftWarning ? 'warning' : 'ok'}`}>{clientTc}</span>
-                              <span className="input-card-drift">({driftSec >= 0 ? '+' : ''}{driftSec.toFixed(3)}s)</span>
+                            <div className="input-card-footer-meta">
+                              <span className="input-card-footer-label">RETURN OUT</span>
+                              <strong>{isPgmActive ? 'LIVE' : isPvwActive ? 'READY' : 'IDLE'}</strong>
                             </div>
-                            <div className="input-card-bitrate" onClick={e => e.stopPropagation()}>
-                              <select
-                                className="input-card-bitrate-select"
-                                value={clientBitrates[id] ?? 500000}
-                                onChange={(e) => changeClientBitrate(id, Number(e.target.value))}
+                            <div className="input-card-actions" onClick={e => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                className={`input-card-action pvw ${isPvwActive ? 'active' : ''}`}
+                                onClick={() => handleSelectPreview(id)}
+                                disabled={isOffline}
                               >
-                                <option value={125000}>125k</option>
-                                <option value={250000}>250k</option>
-                                <option value={500000}>500k</option>
-                                <option value={1000000}>1M</option>
-                                <option value={2000000}>2M</option>
-                                <option value={4000000}>4M</option>
-                              </select>
+                                PVW
+                              </button>
+                              <button
+                                type="button"
+                                className={`input-card-action pgm ${isPgmActive ? 'active' : ''}`}
+                                onClick={() => handleSelectProgram(id)}
+                                disabled={isOffline}
+                              >
+                                PGM
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -1155,7 +1178,7 @@ function MainApp() {
                         ) : (
                           clientEntries.map(([id, stats], idx) => {
                             const isOffline = Date.now() - stats.lastSeen > 30000;
-                            const isActive = pgmSourceId === id;
+                            const isActive = effectivePgmSourceId === id;
                             return (
                               <button
                                 key={id}
@@ -1181,7 +1204,7 @@ function MainApp() {
                         ) : (
                           clientEntries.map(([id, stats], idx) => {
                             const isOffline = Date.now() - stats.lastSeen > 30000;
-                            const isActive = previewSourceId === id;
+                            const isActive = effectivePreviewSourceId === id;
                             return (
                               <button
                                 key={id}
@@ -1226,14 +1249,14 @@ function MainApp() {
                       <button
                         className="atem-btn-ctrl btn-cut"
                         onClick={handleCut}
-                        disabled={!previewSourceId || isAutoTransitioning}
+                        disabled={!effectivePreviewSourceId || isAutoTransitioning}
                       >
                         CUT
                       </button>
                       <button
                         className={`atem-btn-ctrl btn-auto ${isAutoTransitioning ? 'transitioning' : ''}`}
                         onClick={handleAuto}
-                        disabled={!previewSourceId || isAutoTransitioning}
+                        disabled={!effectivePreviewSourceId || isAutoTransitioning}
                       >
                         AUTO
                       </button>
@@ -1248,7 +1271,7 @@ function MainApp() {
                     <span><small>PREVIEW</small>{previewLabel}</span>
                     <span><small>TALLY</small>{liveCount} PGM / {previewCount} PVW</span>
                     <span className={offlineCount > 0 ? 'warn' : ''}><small>OFFLINE</small>{offlineCount}</span>
-                    <span className={isVideoEnabled ? 'online' : 'warn'}><small>RETURN OUT</small>{isVideoEnabled ? 'ENABLED' : 'DISABLED'}</span>
+                    <span className={effectivePgmSourceId ? 'online' : 'warn'}><small>RETURN OUT</small>{effectivePgmSourceId ? 'LIVE' : 'IDLE'}</span>
                   </div>
 
                   {tallyActionLog.length > 0 && (

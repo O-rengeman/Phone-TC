@@ -10,6 +10,7 @@ describe('ReturnMonitor', () => {
     render(
       <ReturnMonitor
         stream={null}
+        sourceId={null}
         connected={false}
         onOpenFullscreen={onOpenFullscreen}
         pipEnabled={false}
@@ -28,6 +29,7 @@ describe('ReturnMonitor', () => {
     render(
       <ReturnMonitor
         stream={null}
+        sourceId={null}
         connected={true}
         onOpenFullscreen={() => undefined}
         pipEnabled={false}

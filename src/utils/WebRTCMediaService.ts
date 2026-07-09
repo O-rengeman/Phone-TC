@@ -36,7 +36,27 @@ export class WebRTCMediaService {
   private iceCandidateQueues = new Map<string, RTCIceCandidateInit[]>();
   private disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private localStream: MediaStream | null = null;
-  private pgmStream: MediaStream | null = null;
+  private pgmStream: MediaStream = typeof MediaStream !== 'undefined'
+    ? new MediaStream()
+    : (() => {
+        const tracks: MediaStreamTrack[] = [];
+        return {
+          getVideoTracks: () => tracks,
+          getAudioTracks: () => [],
+          getTracks: () => tracks,
+          addTrack: (track: MediaStreamTrack) => {
+            if (!tracks.includes(track)) {
+              tracks.push(track);
+            }
+          },
+          removeTrack: (track: MediaStreamTrack) => {
+            const idx = tracks.indexOf(track);
+            if (idx !== -1) {
+              tracks.splice(idx, 1);
+            }
+          },
+        } as unknown as MediaStream;
+      })();
 
   // Callbacks
   public onRemoteStream?: (event: WebRTCStreamEvent) => void;
@@ -101,9 +121,16 @@ export class WebRTCMediaService {
    */
   public async setPgmStream(stream: MediaStream | null) {
     if (!this.isMaster) return;
-    this.pgmStream = stream;
 
     const newVideoTrack = stream?.getVideoTracks()[0] || null;
+    const oldTrack = this.pgmStream.getVideoTracks()[0];
+
+    if (oldTrack) {
+      this.pgmStream.removeTrack(oldTrack);
+    }
+    if (newVideoTrack) {
+      this.pgmStream.addTrack(newVideoTrack);
+    }
 
     // Replace track on all existing connections. Senders are tracked by
     // reference from creation time (see `senders`), so this works even for a
@@ -271,7 +298,7 @@ export class WebRTCMediaService {
     const localTrack = streamToSend?.getVideoTracks()[0] ?? null;
     const transceiver = localTrack
       ? pc.addTransceiver(localTrack, { direction: 'sendrecv', streams: streamToSend ? [streamToSend] : [] })
-      : pc.addTransceiver('video', { direction: 'sendrecv' });
+      : pc.addTransceiver('video', { direction: 'sendrecv', streams: streamToSend ? [streamToSend] : [] });
     this.senders.set(peerId, transceiver.sender);
     if (localTrack) {
       // Apply bandwidth constraints
@@ -350,6 +377,6 @@ export class WebRTCMediaService {
     this.disconnectTimers.forEach(timer => clearTimeout(timer));
     this.disconnectTimers.clear();
     this.stopLocalCamera();
-    this.pgmStream = null;
+    this.pgmStream.getVideoTracks().forEach(t => this.pgmStream.removeTrack(t));
   }
 }

@@ -2,6 +2,7 @@ import { VideoRenderer } from './VideoRenderer';
 
 interface ReturnMonitorProps {
   stream: MediaStream | null;
+  sourceId: string | null;
   connected: boolean;
   onOpenFullscreen: () => void;
   pipEnabled: boolean;
@@ -10,36 +11,30 @@ interface ReturnMonitorProps {
 
 export function ReturnMonitor({
   stream,
+  sourceId,
   connected,
   onOpenFullscreen,
   pipEnabled,
   setPipEnabled,
 }: ReturnMonitorProps) {
   const hasSignal = stream !== null;
+  const sourceLabel = sourceId ? `PGM ${sourceId.slice(0, 6).toUpperCase()}` : 'PGM --';
+  const statusLabel = hasSignal ? 'LIVE' : connected ? 'WAITING' : 'OFFLINE';
 
   return (
     <section className="return-monitor-card" aria-label="Return monitor">
       <div className="return-monitor-header">
-        <div>
+        <div className="return-monitor-heading">
           <div className="return-monitor-title">RETURN MONITOR</div>
-          <div className="return-monitor-subtitle">PROGRAM FEED FROM DIRECTOR</div>
+          <div className="return-monitor-subtitle">PROGRAM OUT FROM MASTER SWITCHER</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="return-monitor-controls">
+          <span className="return-monitor-source">{sourceLabel}</span>
           {stream && (
             <button
               type="button"
               className={`pip-toggle-btn ${pipEnabled ? 'active' : ''}`}
               onClick={(e) => { e.stopPropagation(); setPipEnabled(v => !v); }}
-              style={{
-                background: pipEnabled ? '#2563eb' : '#27272a',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                padding: '4px 8px',
-                fontSize: '11px',
-                fontWeight: 'bold',
-                cursor: 'pointer'
-              }}
             >
               PIP {pipEnabled ? 'ON' : 'OFF'}
             </button>
@@ -49,7 +44,7 @@ export function ReturnMonitor({
             aria-live="polite"
           >
             <span className="return-monitor-status-dot" />
-            {hasSignal ? 'LIVE' : connected ? 'WAITING' : 'OFFLINE'}
+            {statusLabel}
           </span>
         </div>
       </div>
@@ -71,7 +66,7 @@ export function ReturnMonitor({
             <strong>{connected ? 'NO PROGRAM SIGNAL' : 'CONNECT TO DIRECTOR'}</strong>
             <small>
               {connected
-                ? 'The selected PGM source will appear here'
+                ? 'Master PGM output appears here when a source is on air'
                 : 'Join a P2P master session to receive video'}
             </small>
           </span>
