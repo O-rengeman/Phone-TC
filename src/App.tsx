@@ -284,9 +284,10 @@ function MainApp() {
 
   const handleSelectPreview = useCallback((id: string) => {
     playHapticFeedback();
+    setIsVideoEnabled(true);
     setPreviewSourceId(id);
     handleSwitcherBusChange(effectivePgmSourceId, id);
-  }, [effectivePgmSourceId, handleSwitcherBusChange, playHapticFeedback]);
+  }, [effectivePgmSourceId, handleSwitcherBusChange, playHapticFeedback, setIsVideoEnabled]);
 
   const handleCut = useCallback(() => {
     if (!effectivePreviewSourceId) return;
@@ -362,6 +363,53 @@ function MainApp() {
       setTransitionProgress(0);
     }
   }, [effectivePgmSourceId, effectivePreviewSourceId, handleSwitcherBusChange, playHapticFeedback, setIsVideoEnabled]);
+
+  useEffect(() => {
+    if (!directorPanelOpen) return;
+
+    const handleSwitcherShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.isContentEditable
+        || target?.tagName === 'INPUT'
+        || target?.tagName === 'TEXTAREA'
+        || target?.tagName === 'SELECT'
+      ) {
+        return;
+      }
+
+      const inputIndex = Number(event.key) - 1;
+      if (inputIndex >= 0 && inputIndex <= 8) {
+        const sourceId = Object.keys(clients)[inputIndex];
+        if (!sourceId) return;
+        event.preventDefault();
+        if (event.shiftKey) {
+          handleSelectProgram(sourceId);
+        } else {
+          handleSelectPreview(sourceId);
+        }
+        return;
+      }
+
+      if (event.code === 'Space') {
+        event.preventDefault();
+        handleCut();
+      } else if (event.key === 'Enter') {
+        event.preventDefault();
+        handleAuto();
+      }
+    };
+
+    window.addEventListener('keydown', handleSwitcherShortcut);
+    return () => window.removeEventListener('keydown', handleSwitcherShortcut);
+  }, [
+    clients,
+    directorPanelOpen,
+    handleAuto,
+    handleCut,
+    handleSelectPreview,
+    handleSelectProgram,
+  ]);
 
   return (
     <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
@@ -975,6 +1023,7 @@ function MainApp() {
           return (assignedState === 'standby' ? 'preview' : assignedState) === 'preview';
         }).length;
         const offlineCount = Object.values(clients).filter((stats) => Date.now() - stats.lastSeen > 30000).length;
+        const signalCount = clientEntries.filter(([id]) => mediaStreams.has(id)).length;
         const getSourceLabel = (id: string | null) => {
           if (!id) return 'NONE';
           const sourceIndex = clientEntries.findIndex(([clientId]) => clientId === id);
@@ -990,17 +1039,21 @@ function MainApp() {
               <div className="director-title-group">
                 <div className="director-title">
                   <span className="director-rec-dot" />
-                  ATEM 1 M/E SWITCHER
+                  DIRECTOR SWITCHER
                   <span className="director-cam-count">{camCount} INPUT{camCount !== 1 ? 'S' : ''}</span>
                 </div>
-                <div className="director-subtitle">PROGRAM / PREVIEW SWITCHING SYSTEM</div>
+                <div className="director-subtitle">1 M/E · PROGRAM / PREVIEW</div>
               </div>
               <div className="director-header-right">
+                <div className={`director-signal-state ${signalCount > 0 ? 'online' : 'waiting'}`}>
+                  <span />
+                  {signalCount}/{camCount} SIGNAL
+                </div>
                 <button
                   className={`dir-video-toggle ${isVideoEnabled ? 'active' : ''}`}
                   onClick={() => { playHapticFeedback(); toggleVideoMonitoring(); }}
                 >
-                  {isVideoEnabled ? 'MONITOR ON' : 'MONITOR OFF'}
+                  MV {isVideoEnabled ? 'ON' : 'OFF'}
                 </button>
                 <div className="director-tc-large">{directorTime}</div>
                 <button className="director-close-btn" onClick={() => { playHapticFeedback(); setDirectorPanelOpen(false); }}>EXIT</button>
@@ -1014,7 +1067,7 @@ function MainApp() {
                   {/* PROGRAMモニター */}
                   <div className={`atem-monitor program-monitor ${effectivePgmSourceId ? 'has-source' : ''}`}>
                     <div className="atem-monitor-head">
-                      <span>PROGRAM (PGM)</span>
+                      <span><i className="monitor-tally-dot" />PROGRAM</span>
                       <strong className="source-label">{programLabel}</strong>
                     </div>
                     <div className="atem-monitor-screen">
@@ -1039,7 +1092,7 @@ function MainApp() {
                   {/* PREVIEWモニター */}
                   <div className={`atem-monitor preview-monitor ${effectivePreviewSourceId ? 'has-source' : ''}`}>
                     <div className="atem-monitor-head">
-                      <span>PREVIEW (PVW)</span>
+                      <span><i className="monitor-tally-dot" />PREVIEW</span>
                       <strong className="source-label">{previewLabel}</strong>
                     </div>
                     <div className="atem-monitor-screen">
@@ -1093,7 +1146,16 @@ function MainApp() {
                           key={id}
                           className={`atem-mv-card status-${cardTallyState} ${isOffline ? 'offline' : ''}`}
                           onClick={() => !isOffline && handleSelectPreview(id)}
-                          title="Click to assign Preview"
+                          onKeyDown={(event) => {
+                            if (!isOffline && (event.key === 'Enter' || event.key === ' ')) {
+                              event.preventDefault();
+                              handleSelectPreview(id);
+                            }
+                          }}
+                          role="button"
+                          tabIndex={isOffline ? -1 : 0}
+                          aria-label={`Set ${label} to preview`}
+                          title="Click to set Preview"
                         >
                           {isOffline && <div className="director-offline-overlay">OFFLINE</div>}
                           <div className="input-card-state-rail">
@@ -1166,6 +1228,16 @@ function MainApp() {
 
               {/* 右側：ATEM 筐体型 M/E コントロールパネル */}
               <div className="atem-control-chassis">
+                <div className="atem-control-heading">
+                  <div>
+                    <span>ME 1</span>
+                    <strong>SWITCHING BUS</strong>
+                  </div>
+                  <div className="atem-next-take">
+                    <small>NEXT TAKE</small>
+                    <strong>{previewLabel}</strong>
+                  </div>
+                </div>
                 <div className="atem-chassis-panel">
                   {/* スイッチャーバスボタン列 */}
                   <div className="atem-buses">
@@ -1251,6 +1323,7 @@ function MainApp() {
                         onClick={handleCut}
                         disabled={!effectivePreviewSourceId || isAutoTransitioning}
                       >
+                        <small>SPACE</small>
                         CUT
                       </button>
                       <button
@@ -1258,6 +1331,7 @@ function MainApp() {
                         onClick={handleAuto}
                         disabled={!effectivePreviewSourceId || isAutoTransitioning}
                       >
+                        <small>ENTER</small>
                         AUTO
                       </button>
                     </div>
@@ -1266,6 +1340,12 @@ function MainApp() {
 
                 {/* ステータスストリップとログをパネル下部に綺麗に配置 */}
                 <div className="atem-panel-footer">
+                  <div className="atem-shortcuts" aria-label="Keyboard shortcuts">
+                    <span><kbd>1–9</kbd> PREVIEW</span>
+                    <span><kbd>SHIFT</kbd> + <kbd>1–9</kbd> PROGRAM</span>
+                    <span><kbd>SPACE</kbd> CUT</span>
+                    <span><kbd>ENTER</kbd> AUTO</span>
+                  </div>
                   <div className="atem-status-strip">
                     <span><small>PROGRAM</small>{programLabel}</span>
                     <span><small>PREVIEW</small>{previewLabel}</span>
