@@ -26,12 +26,22 @@ import { useLtcEngine } from './hooks/useLtcEngine';
 import { WebRTCMediaService } from './utils/WebRTCMediaService';
 import { mediaStreamActions } from './hooks/useMediaStreams';
 import { shouldActivateMediaService, shouldStartClientCamera } from './utils/videoMonitoring';
+import { shouldUseMobileLayout } from './utils/layout';
 
 export type SyncMode = 'system' | 'network' | 'p2p' | 'freerun';
 export type ToastLevel = 'info' | 'warn' | 'error';
 export type Toast = { id: number; msg: string; level: ToastLevel };
 
-const getIsMobileLayout = () => Math.min(window.innerWidth, window.innerHeight) <= 768;
+const getIsMobileLayout = () => {
+  const hasCoarsePointer = typeof window.matchMedia === 'function'
+    && window.matchMedia('(pointer: coarse)').matches;
+
+  return shouldUseMobileLayout({
+    width: window.innerWidth,
+    height: window.innerHeight,
+    hasTouchInput: navigator.maxTouchPoints > 0 || hasCoarsePointer,
+  });
+};
 
 // Split into two contexts so that a consumer reading only stable actions/refs
 // doesn't re-render on every volatile state tick (masterDrift, clients,
