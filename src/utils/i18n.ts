@@ -15,9 +15,9 @@ const LANG_STORAGE_KEY = 'ltc-lang';
 type Dict = Record<string, string>;
 
 const en: Dict = {
-  'tab.main': 'MAIN',
-  'tab.sync': 'SYNC',
-  'tab.tools': 'TOOLS',
+  'tab.record': 'RECORD',
+  'tab.monitor': 'MONITOR',
+  'tab.setup': 'SETUP',
 
   'status.ready': 'READY',
   'status.syncing': 'SYNCING',
@@ -128,9 +128,9 @@ const en: Dict = {
 };
 
 const ja: Dict = {
-  'tab.main': 'メイン',
-  'tab.sync': '同期',
-  'tab.tools': 'ツール',
+  'tab.record': '記録',
+  'tab.monitor': 'モニター',
+  'tab.setup': '設定',
 
   'status.ready': '待機中',
   'status.syncing': '同期中',
