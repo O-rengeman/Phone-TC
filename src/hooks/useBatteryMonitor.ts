@@ -51,7 +51,7 @@ export function useBatteryMonitor(langRef: React.RefObject<Lang>): UseBatteryMon
       const c = batt.level;
       if (p !== null && !batt.charging) {
         if (p > 0.20 && c <= 0.20 && c > 0.10) {
-          toast(translate('toast.batteryLow', langRef.current, { level: Math.round(c * 100) }), { icon: 'BAT', style: { background: '#1d1d20', color: '#f4f4f5', border: '1px solid #5a5a60' } });
+          toast(translate('toast.batteryLow', langRef.current, { level: Math.round(c * 100) }), { icon: '🔋', style: { background: '#f5a623', color: '#000' } });
         } else if (p > 0.10 && c <= 0.10) {
           toast.error(translate('toast.batteryCritical', langRef.current, { level: Math.round(c * 100) }));
         }
@@ -79,7 +79,7 @@ export function useBatteryMonitor(langRef: React.RefObject<Lang>): UseBatteryMon
         if (c) {
           toast.success(translate('toast.chargingStarted', langRef.current));
         } else {
-          toast(translate('toast.chargingStopped', langRef.current), { icon: 'BAT' });
+          toast(translate('toast.chargingStopped', langRef.current), { icon: '🔋' });
         }
       }
       prevChargingRef.current = c;

@@ -11,7 +11,6 @@ interface FooterControlsProps {
   addMarker: (color: 'Red' | 'Blue' | 'Green' | 'Yellow') => void;
   syncMode: string;
   p2pRole: 'master' | 'client' | null;
-  showMarkers?: boolean;
   tr: (key: string) => string;
 }
 
@@ -28,7 +27,6 @@ export function FooterControls({
   addMarker,
   syncMode,
   p2pRole,
-  showMarkers = true,
   tr,
 }: FooterControlsProps) {
   return (
@@ -63,7 +61,7 @@ export function FooterControls({
             </button>
           )}
         </div>
-        {showMarkers && <div className="footer-right">
+        <div className="footer-right">
           <div className="mark-label">{tr('btn.mark')}</div>
           <div className="mark-colors-container">
             <button className="btn-mark-color red" onClick={() => addMarker('Red')} title={tr('marker.redTitle')}>R</button>
@@ -71,7 +69,7 @@ export function FooterControls({
             <button className="btn-mark-color green" onClick={() => addMarker('Green')} title={tr('marker.greenTitle')}>G</button>
             <button className="btn-mark-color yellow" onClick={() => addMarker('Yellow')} title={tr('marker.yellowTitle')}>Y</button>
           </div>
-        </div>}
+        </div>
       </div>
     </footer>
   );

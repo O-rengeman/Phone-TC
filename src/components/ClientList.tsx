@@ -1,4 +1,5 @@
 import type { TallyState } from '../utils/tally';
+import { TALLY_COLORS } from '../utils/tally';
 import { tallyLabelKey } from '../utils/tally';
 
 interface ClientStats {
@@ -50,6 +51,7 @@ export function ClientList({
                      <button
                        key={s}
                        className={`tally-state-btn mini ${isActive ? 'active' : ''}`}
+                       style={isActive ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
                        onClick={() => handleClientTallyChange(id, s)}
                      >
                        {tr(tallyLabelKey(s))}

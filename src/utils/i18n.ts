@@ -15,9 +15,9 @@ const LANG_STORAGE_KEY = 'ltc-lang';
 type Dict = Record<string, string>;
 
 const en: Dict = {
-  'tab.record': 'RECORD',
-  'tab.monitor': 'MONITOR',
-  'tab.setup': 'SETUP',
+  'tab.main': 'MAIN',
+  'tab.sync': 'SYNC',
+  'tab.tools': 'TOOLS',
 
   'status.ready': 'READY',
   'status.syncing': 'SYNCING',
@@ -124,13 +124,13 @@ const en: Dict = {
   'tally.dim.mid': 'MID',
   'tally.dim.dark': 'LOW',
   'tally.conn.ok': '✓ CONNECTED TO DIRECTOR',
-  'tally.conn.lost': 'WARN · DISCONNECTED - STANDALONE MODE',
+  'tally.conn.lost': '⚠️ DISCONNECTED - STANDALONE MODE',
 };
 
 const ja: Dict = {
-  'tab.record': '記録',
-  'tab.monitor': 'モニター',
-  'tab.setup': '設定',
+  'tab.main': 'メイン',
+  'tab.sync': '同期',
+  'tab.tools': 'ツール',
 
   'status.ready': '待機中',
   'status.syncing': '同期中',
@@ -237,7 +237,7 @@ const ja: Dict = {
   'tally.dim.mid': '中',
   'tally.dim.dark': '暗',
   'tally.conn.ok': '✓ ディレクターと接続中',
-  'tally.conn.lost': 'WARN · 切断 - スタンドアロン動作中',
+  'tally.conn.lost': '⚠️ 切断 - スタンドアロン動作中',
 };
 
 const DICTS: Record<Lang, Dict> = { en, ja };

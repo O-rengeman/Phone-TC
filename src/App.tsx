@@ -3,7 +3,7 @@ import { LTCSyncProvider, useLTC } from './LTCSyncContext';
 import { FPS_OPTIONS } from './constants';
 import { VideoPlayer } from './VideoPlayer';
 import { ConnectionManager } from './ConnectionManager';
-import { tallyLabelKey } from './utils/tally';
+import { tallyLabelKey, TALLY_COLORS } from './utils/tally';
 import type { TallyState } from './utils/tally';
 import type { SyncMode } from './LTCSyncContext';
 import { formatSyncAge } from './utils/DriftMonitor';
@@ -16,13 +16,10 @@ import { GuideOverlay } from './components/GuideOverlay';
 import { useMediaStreams } from './hooks/useMediaStreams';
 import { FloatingPip } from './components/FloatingPip';
 import { HeaderBar } from './components/HeaderBar';
-import { RecordingFooter } from './components/RecordingFooter';
-import { AdvancedControlsPanel } from './components/AdvancedControlsPanel';
-import { CreatorReadyRail } from './components/CreatorReadyRail';
+import { FooterControls } from './components/FooterControls';
 import { MarkerList } from './components/MarkerList';
 import { ClientList } from './components/ClientList';
 import { getAutoSwitcherAssignment, resolveReturnFeed } from './utils/switcherRouting';
-import { AppDomainProvider } from './hooks/useAppDomains';
 import './App.css';
 
 function MainApp() {
@@ -59,6 +56,8 @@ function MainApp() {
     targetId,
     isHost,
     driftStatus,
+    isPaused,
+    stopHoldPct,
     showGuide,
     setShowGuide,
     tallyOpen,
@@ -99,6 +98,10 @@ function MainApp() {
     exportToEDL,
     exportToALE,
     handleSlateClick,
+    handleStartStop,
+    handlePause,
+    beginStopHold,
+    cancelStopHold,
     handleManualResync,
     handleManualTallyChange,
     handleClientTallyChange,
@@ -108,6 +111,7 @@ function MainApp() {
     handleDimmerCycle,
     handleTorchToggle,
     handleTallyExit,
+    holdStoppedRef,
     setIsVideoEnabled,
     mediaServiceRef
   } = useLTC();
@@ -118,7 +122,6 @@ function MainApp() {
   const [isAutoTransitioning, setIsAutoTransitioning] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionProgress, setTransitionProgress] = useState(0); // 0 (PGM) to 100 (PVW)
-  const [detailLevel, setDetailLevel] = useState<'basic' | 'expanded' | 'advanced'>('basic');
   const autoTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const returnFeed = resolveReturnFeed(targetId, mediaStreams);
   const returnStream = returnFeed.stream;
@@ -129,9 +132,9 @@ function MainApp() {
   const handleOutputModeChange = (mode: 'stereo' | 'mono-l') => {
     setOutputMode(mode);
     if (mode === 'mono-l') {
-      toast('HEADPHONES REQUIRED for L-TC / R-AUDIO mode to prevent audio feedback loop!', {
-        icon: 'HP',
-        style: { background: '#1d1d20', color: '#f4f4f5', border: '1px solid #5a5a60', fontWeight: 'bold' }
+      toast('⚠️ HEADPHONES REQUIRED for L-TC / R-AUDIO mode to prevent audio feedback loop!', {
+        icon: '🎧',
+        style: { background: '#f5a623', color: '#000', fontWeight: 'bold' }
       });
     }
   };
@@ -272,7 +275,7 @@ function MainApp() {
   }, [effectivePgmSourceId, effectivePreviewSourceId, handleSwitcherBusChange, playHapticFeedback, setIsVideoEnabled]);
 
   return (
-    <div className={`app-container pro-theme bm-monochrome ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
+    <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
       <HeaderBar
         isRunning={isRunning}
         isPreparing={isPreparing}
@@ -290,55 +293,20 @@ function MainApp() {
         setDirectorPanelOpen={setDirectorPanelOpen}
         setIsVisualSlate={setIsVisualSlate}
         setTallyOpen={setTallyOpen}
-        showWorkflowActions={detailLevel !== 'basic'}
-        showDirectorAction={detailLevel === 'advanced'}
         tr={tr}
       />
 
-      <div className="workspace-navigation">
-        <nav className="tab-bar" aria-label="Workspace">
-          <button className={activeTab === 'record' ? 'active' : ''} onClick={() => { setActiveTab('record'); setDetailLevel('basic'); }}>
-            {lang === 'ja' ? '収録' : 'Record'}
-          </button>
-          <button className={activeTab === 'setup' ? 'active' : ''} onClick={() => { setActiveTab('setup'); setDetailLevel('expanded'); }}>
-            {lang === 'ja' ? '現場ツール' : 'Shoot Tools'}
-          </button>
-          <button className={activeTab === 'monitor' ? 'active' : ''} onClick={() => { setActiveTab('monitor'); setDetailLevel('expanded'); }}>
-            {lang === 'ja' ? '接続' : 'Connect'}
-          </button>
+      {isMobile && (
+        <nav className="tab-bar">
+          <button className={activeTab === 'main' ? 'active' : ''} onClick={() => setActiveTab('main')}>{tr('tab.main')}</button>
+          <button className={activeTab === 'sync' ? 'active' : ''} onClick={() => setActiveTab('sync')}>{tr('tab.sync')}</button>
+          <button className={activeTab === 'tools' ? 'active' : ''} onClick={() => setActiveTab('tools')}>{tr('tab.tools')}</button>
         </nav>
-        <div className="disclosure-switch" aria-label="Information level">
-          <button className={detailLevel === 'basic' ? 'active' : ''} onClick={() => { setDetailLevel('basic'); setActiveTab('record'); }}>
-            {lang === 'ja' ? '基本' : 'Basic'}
-          </button>
-          <button className={detailLevel === 'expanded' ? 'active' : ''} onClick={() => setDetailLevel('expanded')}>
-            {lang === 'ja' ? '撮影設定' : 'Shoot setup'}
-          </button>
-          <button className={detailLevel === 'advanced' ? 'active' : ''} onClick={() => setDetailLevel('advanced')}>
-            Pro
-          </button>
-        </div>
-      </div>
+      )}
 
-      <div className={`workspace-shell detail-${detailLevel}`}>
-      <main className="tab-content workspace-main">
-        {/* デスクトップは全タブ常時表示、モバイルは activeTab で切り替え */}
-        {activeTab === 'record' && (
-          <div className="tab-pane record-pane">
-            {detailLevel !== 'basic' && (
-              <CreatorReadyRail
-                isRunning={isRunning}
-                isPreparing={isPreparing}
-                fpsLabel={FPS_OPTIONS[fpsIndex].label}
-                syncMode={syncMode}
-                syncLatency={syncStatus?.latency ?? null}
-                cameraCount={Object.keys(clients).length}
-                outputMode={outputMode}
-                outputOffset={outputOffset}
-                lang={lang}
-                onOpenPro={() => setDetailLevel('advanced')}
-              />
-            )}
+      <main className={isMobile ? 'tab-content' : 'desktop-dashboard'}>
+        {(isMobile ? activeTab === 'main' : true) && (
+          <div className="tab-pane main-pane">
             <VideoPlayer />
 
             {p2pRole === 'client' && (
@@ -360,7 +328,7 @@ function MainApp() {
               <FloatingPip stream={returnStream} onClose={() => setPipEnabled(false)} />
             )}
 
-            {detailLevel !== 'basic' && syncMode === 'network' && (
+            {syncMode === 'network' && (
               <div className="main-sync-bar">
                 <div className="msb-info">
                   <span className="msb-label">{tr('sync.label')}</span>
@@ -375,8 +343,8 @@ function MainApp() {
               </div>
             )}
 
-            {detailLevel !== 'basic' && (
-              <div className="creator-setup-grid">
+            {isMobile && (
+              <>
                 <div className="control-section">
                   <label className="section-label">{tr('label.frameRate')}</label>
                   <div className="fps-grid-compact">
@@ -411,18 +379,13 @@ function MainApp() {
                   </div>
                 </div>
 
-              </div>
+              </>
             )}
           </div>
         )}
 
-        {activeTab === 'monitor' && (
-          <div className="tab-pane monitor-pane">
-            <div className="workspace-page-header">
-              <span>{lang === 'ja' ? '接続と同期' : 'Connect & Sync'}</span>
-              <strong>{lang === 'ja' ? 'すべてのカメラを同じ時間軸へ' : 'Keep every camera on the same timeline'}</strong>
-              <p>{lang === 'ja' ? '同期方式を選び、スマートフォンやサブカメラを接続します。' : 'Choose a sync source, then connect phones and secondary cameras.'}</p>
-            </div>
+        {(isMobile ? activeTab === 'sync' : true) && (
+          <div className="tab-pane sync-pane">
             <div className="control-section">
               <label className="section-label">{tr('label.syncMethod')}</label>
               <div className="sync-toggle-pro">
@@ -447,7 +410,7 @@ function MainApp() {
                     <span>{formatSyncAge(driftStatus.msSinceSync)} {tr('drift.ago')}</span>
                   </div>
                   {driftStatus.msSinceSync >= 3600000 && (
-                    <div className="drift-rejam">WARN · {tr('drift.rejam')}</div>
+                    <div className="drift-rejam">⚠️ {tr('drift.rejam')}</div>
                   )}
                 </div>
               )}
@@ -472,16 +435,31 @@ function MainApp() {
 
             <ConnectionManager />
 
+            {!isMobile && (
+              <div className="control-section">
+                <label className="section-label">{tr('label.frameRate')}</label>
+                <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '8px' }}>
+                  59.94p 撮影時は 29.97 を、50p 撮影時は 25 を選択してください。
+                </div>
+                <div className="fps-grid-compact">
+                  {FPS_OPTIONS.map((opt, i) => (
+                    <button 
+                      key={opt.label} 
+                      className={`btn-pill ${fpsIndex === i ? 'active' : ''}`}
+                      onClick={() => setFpsIndex(i)}
+                      disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {activeTab === 'setup' && (
-          <div className="tab-pane setup-pane">
-            <div className="workspace-page-header">
-              <span>{lang === 'ja' ? '現場ツール' : 'Shoot Tools'}</span>
-              <strong>{lang === 'ja' ? '良いテイクを残し、出演者へ合図する' : 'Mark the best takes and cue your talent'}</strong>
-              <p>{lang === 'ja' ? 'マーカー、Tally、編集用メタデータを撮影中にすばやく操作できます。' : 'Reach markers, tally cues, and edit metadata without slowing the shoot.'}</p>
-            </div>
+        {(isMobile ? activeTab === 'tools' : true) && (
+          <div className="tab-pane tools-pane">
             <section className="tool-section-shell tool-section-shell-tally">
               <div className="tool-section-head">
                 <label className="section-label">{tr('label.tally')}</label>
@@ -497,11 +475,20 @@ function MainApp() {
                 </div>
               </div>
               <div className="control-section tally-section">
+                {isHost && (
+                  <button
+                    className="tally-open-btn btn-director-switcher"
+                    onClick={() => { setTallyOpen(false); setIsVisualSlate(false); setDirectorPanelOpen(true); }}
+                  >
+                    DIRECTOR SWITCHER PANEL
+                  </button>
+                )}
                 <div className="tally-state-row">
                   {(['live', 'preview', 'off'] as TallyState[]).map(s => (
                     <button
                       key={s}
                       className={`tally-state-btn ${manualTally === s ? 'active' : ''}`}
+                      style={manualTally === s ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
                       onClick={() => handleManualTallyChange(s)}
                     >
                       {tr(tallyLabelKey(s))}
@@ -511,6 +498,45 @@ function MainApp() {
                 <button className="tally-open-btn" onClick={() => { setDirectorPanelOpen(false); setIsVisualSlate(false); setTallyOpen(true); }}>{tr('tally.fullscreen')}</button>
               </div>
             </section>
+
+            {isHost && Object.keys(clients).length > 0 && (
+              <section className="tool-section-shell clients-list-section">
+                <div className="tool-section-head">
+                  <label className="section-label">CONNECTED CLIENTS ({Object.keys(clients).length})</label>
+                </div>
+                <div className="clients-grid">
+                  {Object.entries(clients).map(([id, stats]) => {
+                    const isOffline = nowTick - stats.lastSeen > 30000;
+                    return (
+                      <div key={id} className={`client-card ${isOffline ? 'offline' : ''}`}>
+                        <div className="client-id">{id}</div>
+                        <div className="client-stats">
+                          <span className="stat">RTT: {stats.rtt.toFixed(0)}ms</span>
+                          <span className={`stat ${stats.drift >= 0.5 ? 'drift-warn' : ''}`}>
+                            δ: {stats.drift.toFixed(2)}s
+                          </span>
+                        </div>
+                        <div className="client-tally-controls">
+                          {(['live', 'preview', 'off'] as TallyState[]).map(s => {
+                             const isActive = tallyPayload?.assignments?.[id] === s;
+                             return (
+                               <button
+                                 key={s}
+                                 className={`tally-state-btn mini ${isActive ? 'active' : ''}`}
+                                 style={isActive ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
+                                 onClick={() => handleClientTallyChange(id, s)}
+                               >
+                                 {tr(tallyLabelKey(s))}
+                               </button>
+                             );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
             <section className="tool-section-shell tool-section-shell-meta">
               <div className="tools-grid-pro tools-grid-meta">
@@ -539,6 +565,28 @@ function MainApp() {
                     placeholder="001"
                   />
                 </div>
+                {!isMobile && (
+                  <>
+
+
+                    <div className="tool-card span-2">
+                      <label className="section-label">{tr('label.outputMode')}</label>
+                      <div className="sync-toggle-pro">
+                        <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')}>STEREO TC</button>
+                        <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')}>L-TC / R-AUDIO</button>
+                      </div>
+                    </div>
+
+                    <div className="tool-card span-2">
+                      <label className="section-label">TC OFFSET (FRAMES)</label>
+                      <div className="offset-control">
+                        <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} />
+                        <span className="offset-value">{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
+                      </div>
+                    </div>
+
+                  </>
+                )}
               </div>
             </section>
             
@@ -567,17 +615,6 @@ function MainApp() {
         )}
       </main>
 
-      {detailLevel === 'advanced' && (
-        <AdvancedControlsPanel
-          lang={lang}
-          isHost={isHost}
-          cameraLabels={cameraLabels}
-          onClose={() => setDetailLevel('expanded')}
-          onOpenDirector={() => { setTallyOpen(false); setIsVisualSlate(false); setDirectorPanelOpen(true); }}
-        />
-      )}
-      </div>
-
       {markerFlash && (
         <div className={`marker-flash ${markerFlash.color.toLowerCase()}`}>
           <span className={`mf-dot ${markerFlash.color.toLowerCase()}`}>{markerFlash.color.charAt(0)}</span>
@@ -586,19 +623,23 @@ function MainApp() {
         </div>
       )}
 
-      <RecordingFooter
-        showMarkers={detailLevel !== 'basic' && activeTab === 'setup'}
+      <FooterControls
+        isRunning={isRunning}
+        isPreparing={isPreparing}
+        isPaused={isPaused}
+        stopHoldPct={stopHoldPct}
+        holdStoppedRef={holdStoppedRef}
+        handleStartStop={handleStartStop}
+        beginStopHold={beginStopHold}
+        cancelStopHold={cancelStopHold}
+        handlePause={handlePause}
+        addMarker={addMarker}
+        syncMode={syncMode}
+        p2pRole={p2pRole}
         tr={tr}
       />
 
-      <Toaster
-        position="top-center"
-        containerStyle={{ zIndex: 10500 }}
-        toastOptions={{
-          style: { background: '#1d1d20', color: '#f4f4f5', border: '1px solid #5a5a60' },
-          iconTheme: { primary: '#f4f4f5', secondary: '#111113' },
-        }}
-      />
+      <Toaster position="top-center" containerStyle={{ zIndex: 10500 }} toastOptions={{ style: { background: '#333', color: '#fff' } }} />
 
       {tallyOpen && (
         <TallyOverlay
@@ -665,9 +706,7 @@ function MainApp() {
 export default function App() {
   return (
     <LTCSyncProvider>
-      <AppDomainProvider>
-        <MainApp />
-      </AppDomainProvider>
+      <MainApp />
     </LTCSyncProvider>
   );
 }

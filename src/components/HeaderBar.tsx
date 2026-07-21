@@ -18,8 +18,6 @@ interface HeaderBarProps {
   setDirectorPanelOpen: (v: boolean) => void;
   setIsVisualSlate: (v: boolean) => void;
   setTallyOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
-  showWorkflowActions?: boolean;
-  showDirectorAction?: boolean;
   tr: (key: string) => string;
 }
 
@@ -40,8 +38,6 @@ export function HeaderBar({
   setDirectorPanelOpen,
   setIsVisualSlate,
   setTallyOpen: setTallyOpenState,
-  showWorkflowActions = true,
-  showDirectorAction = true,
   tr,
 }: HeaderBarProps) {
   return (
@@ -63,7 +59,7 @@ export function HeaderBar({
           </div>
           {batteryLevel !== null && (
             <div className={`batt-chip ${batteryLevel <= 0.15 && !isCharging ? 'low' : ''}`}>
-              <span className="batt-pct">{isCharging ? 'CHG ' : ''}{Math.round(batteryLevel * 100)}%</span>
+              <span className="batt-pct">{isCharging ? '⚡' : ''}{Math.round(batteryLevel * 100)}%</span>
               {!isCharging && isRunning && batteryEta !== null && (
                 <span className="batt-eta">{batteryEta.toFixed(0)}s</span>
               )}
@@ -72,7 +68,7 @@ export function HeaderBar({
         </div>
         <div className="hdr-divider" />
         <div className="hdr-actions">
-          {showWorkflowActions && <button
+          <button
             type="button"
             className={`hdr-tally-btn ${tallyOpen ? 'active' : ''}`}
             onClick={() => { setDirectorPanelOpen(false); setIsVisualSlate(false); setTallyOpenState((v: boolean) => !v); }}
@@ -86,8 +82,8 @@ export function HeaderBar({
               }} 
             />
             TALLY
-          </button>}
-          {showDirectorAction && isHost && (
+          </button>
+          {isHost && (
             <button
               type="button"
               className="hdr-director-btn"

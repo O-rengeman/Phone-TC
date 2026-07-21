@@ -73,8 +73,8 @@ interface LTCStateType {
   manualTimecode: string;
   setManualTimecode: React.Dispatch<React.SetStateAction<string>>;
   p2pRole: 'master' | 'client' | null;
-  activeTab: 'record' | 'monitor' | 'setup';
-  setActiveTab: React.Dispatch<React.SetStateAction<'record' | 'monitor' | 'setup'>>;
+  activeTab: 'main' | 'sync' | 'tools';
+  setActiveTab: React.Dispatch<React.SetStateAction<'main' | 'sync' | 'tools'>>;
   isMobile: boolean;
   outputMode: 'stereo' | 'mono-l';
   setOutputMode: React.Dispatch<React.SetStateAction<'stereo' | 'mono-l'>>;
@@ -220,7 +220,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [isPreparing, setIsPreparing] = useState(false);
   const [manualTimecode, setManualTimecode] = useState('00:00:00:00');
   const [p2pRole, setP2pRole] = useState<'master' | 'client' | null>(null);
-  const [activeTab, setActiveTab] = useState<'record' | 'monitor' | 'setup'>('record');
+  const [activeTab, setActiveTab] = useState<'main' | 'sync' | 'tools'>('main');
   const [isMobile, setIsMobile] = useState(getIsMobileLayout);
   
   const [outputMode, setOutputMode] = useState<'stereo' | 'mono-l'>(() => {
@@ -329,7 +329,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     if (level === 'error') {
       toast.error(msg);
     } else if (level === 'warn') {
-      toast(msg, { icon: 'WARN' });
+      toast(msg, { icon: '⚠️' });
     } else {
       toast.success(msg);
     }
