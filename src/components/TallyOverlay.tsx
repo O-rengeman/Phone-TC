@@ -1,4 +1,4 @@
-import { TALLY_COLORS, tallyLabelKey } from '../utils/tally';
+import { tallyLabelKey } from '../utils/tally';
 import type { TallyState } from '../utils/tally';
 import { VideoRenderer } from './VideoRenderer';
 
@@ -58,8 +58,7 @@ export function TallyOverlay({
 
   return (
     <div
-      className={`tally-overlay tally-${uiState} style-${tallyStyle} border-${tallyBorderSize}`}
-      style={tallyStyle === 'full' ? { background: TALLY_COLORS[uiState] } : {}}
+      className={`tally-overlay tally-${uiState} style-${tallyStyle} border-${tallyBorderSize} monochrome-tally`}
     >
       <div className="tally-dimmer" style={{ opacity: tallyDimmerOpacity }} />
       {p2pRole === 'client' && (
@@ -89,7 +88,7 @@ export function TallyOverlay({
           {peerId ? (cameraLabels[peerId] || peerId.slice(0, 8)) : 'LOCAL'}
         </span>
         <span className="tally-header-battery">
-          {batteryLevel !== null ? `${isCharging ? '⚡' : '🔋'} ${Math.round(batteryLevel * 100)}%` : ''}
+          {batteryLevel !== null ? `${isCharging ? 'CHG' : 'BAT'} ${Math.round(batteryLevel * 100)}%` : ''}
         </span>
       </div>
       <div className="tally-body">
@@ -99,11 +98,11 @@ export function TallyOverlay({
       </div>
       <div className="tally-control-bar">
         <button className="tally-ctrl-bar-btn" onClick={(e) => { playHapticFeedback(); handleDimmerCycle(e); }}>
-          <span className="tally-ctrl-icon">☀</span>
+          <span className="tally-ctrl-icon">DIM</span>
           <span>{tallyDimmerOpacity === 0 ? tr('tally.dim.bright') : tallyDimmerOpacity === 0.5 ? tr('tally.dim.mid') : tr('tally.dim.dark')}</span>
         </button>
         <button className={`tally-ctrl-bar-btn ${tallyTorchEnabled ? 'active' : ''}`} onClick={(e) => { playHapticFeedback(); handleTorchToggle(e); }}>
-          <span className="tally-ctrl-icon">🔦</span>
+          <span className="tally-ctrl-icon">LED</span>
           <span>TORCH {tallyTorchEnabled ? 'ON' : 'OFF'}</span>
         </button>
         <button className="tally-ctrl-bar-btn" onClick={(e) => {
@@ -111,7 +110,7 @@ export function TallyOverlay({
           playHapticFeedback();
           setTallyStyle((prev: 'full' | 'border') => prev === 'full' ? 'border' : 'full');
         }}>
-          <span className="tally-ctrl-icon">🖼</span>
+          <span className="tally-ctrl-icon">VIEW</span>
           <span>STYLE: {tallyStyle.toUpperCase()}</span>
         </button>
         <button className="tally-ctrl-bar-btn" onClick={(e) => {
@@ -119,7 +118,7 @@ export function TallyOverlay({
           playHapticFeedback();
           setTallyBorderSize((prev: 'thin' | 'medium' | 'thick') => prev === 'thin' ? 'medium' : prev === 'medium' ? 'thick' : 'thin');
         }}>
-          <span className="tally-ctrl-icon">📏</span>
+          <span className="tally-ctrl-icon">EDGE</span>
           <span>BORDER: {tallyBorderSize.toUpperCase()}</span>
         </button>
         <button className="tally-ctrl-bar-btn" onClick={(e) => {
@@ -127,11 +126,11 @@ export function TallyOverlay({
           playHapticFeedback();
           setTallyTcSize((prev: 'sm' | 'md' | 'lg') => prev === 'sm' ? 'md' : prev === 'md' ? 'lg' : 'sm');
         }}>
-          <span className="tally-ctrl-icon">🅰</span>
+          <span className="tally-ctrl-icon">TC</span>
           <span>TC: {tallyTcSize.toUpperCase()}</span>
         </button>
         <button className="tally-ctrl-bar-btn exit" onClick={(e) => { playHapticFeedback(); handleTallyExit(e); }}>
-          <span className="tally-ctrl-icon">✕</span>
+          <span className="tally-ctrl-icon">EXIT</span>
           <span>CLOSE</span>
         </button>
       </div>

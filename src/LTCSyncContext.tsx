@@ -329,7 +329,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     if (level === 'error') {
       toast.error(msg);
     } else if (level === 'warn') {
-      toast(msg, { icon: '⚠️' });
+      toast(msg, { icon: 'WARN' });
     } else {
       toast.success(msg);
     }

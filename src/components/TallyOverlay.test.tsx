@@ -51,7 +51,7 @@ describe('TallyOverlay', () => {
 
   it('shows charging indicator when charging', () => {
     render(<TallyOverlay {...baseProps} isCharging />);
-    expect(screen.getByText(/⚡/)).toBeTruthy();
+    expect(screen.getByText(/CHG/)).toBeTruthy();
   });
 
   it('shows disconnected banner when not connected', () => {

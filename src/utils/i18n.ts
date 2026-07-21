@@ -124,7 +124,7 @@ const en: Dict = {
   'tally.dim.mid': 'MID',
   'tally.dim.dark': 'LOW',
   'tally.conn.ok': '✓ CONNECTED TO DIRECTOR',
-  'tally.conn.lost': '⚠️ DISCONNECTED - STANDALONE MODE',
+  'tally.conn.lost': 'WARN · DISCONNECTED - STANDALONE MODE',
 };
 
 const ja: Dict = {
@@ -237,7 +237,7 @@ const ja: Dict = {
   'tally.dim.mid': '中',
   'tally.dim.dark': '暗',
   'tally.conn.ok': '✓ ディレクターと接続中',
-  'tally.conn.lost': '⚠️ 切断 - スタンドアロン動作中',
+  'tally.conn.lost': 'WARN · 切断 - スタンドアロン動作中',
 };
 
 const DICTS: Record<Lang, Dict> = { en, ja };

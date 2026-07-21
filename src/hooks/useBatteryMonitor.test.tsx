@@ -97,7 +97,7 @@ describe('useBatteryMonitor', () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 
     act(() => fakeBattery.setLevel(0.18));
-    expect(toastFn).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ icon: '🔋' }));
+    expect(toastFn).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ icon: 'BAT' }));
   });
 
   it('toasts a critical-battery error when level crosses below 10%%', async () => {
@@ -138,7 +138,7 @@ describe('useBatteryMonitor', () => {
     expect(toastFn.success).toHaveBeenCalled();
 
     act(() => fakeBattery.setCharging(false));
-    expect(toastFn).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ icon: '🔋' }));
+    expect(toastFn).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ icon: 'BAT' }));
   });
 
   it('unsubscribes battery event listeners on unmount', async () => {

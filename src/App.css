@@ -7697,3 +7697,708 @@ input[type="range"] {
   gap: 12px;
 }
 
+/* ========================================================================
+   Blackmagic-inspired monochrome control deck
+   Colour is removed from chrome; state is communicated by luminance,
+   borders, labels and placement so the interface remains readable on set.
+   ======================================================================== */
+
+.app-container.pro-theme.bm-monochrome {
+  --bm-black: #050505;
+  --bm-deck: #0b0b0c;
+  --bm-panel: #151516;
+  --bm-panel-raised: #1d1d1f;
+  --bm-control: #27272a;
+  --bm-control-hover: #323236;
+  --bm-border: #37373b;
+  --bm-border-strong: #5a5a60;
+  --bm-text: #f4f4f5;
+  --bm-muted: #a1a1a6;
+  --bm-dim: #707076;
+  --bm-active: #f4f4f5;
+  --bm-active-text: #080808;
+  color: var(--bm-text);
+  background: var(--bm-deck);
+  color-scheme: dark;
+}
+
+.bm-monochrome button,
+.bm-monochrome .control-section,
+.bm-monochrome .tool-section-shell,
+.bm-monochrome .tool-card,
+.bm-monochrome .marker-section-pro,
+.bm-monochrome .advanced-panel-section,
+.bm-monochrome .atem-mv-card,
+.bm-monochrome .atem-control-chassis,
+.bm-monochrome .atem-multiview-board {
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.app-container.pro-theme.bm-monochrome > header {
+  color: var(--bm-text);
+  background: var(--bm-black);
+  border-bottom: 1px solid var(--bm-border);
+}
+
+.bm-monochrome .status-pill,
+.bm-monochrome .batt-chip,
+.bm-monochrome .hdr-tally-btn,
+.bm-monochrome .hdr-director-btn,
+.bm-monochrome .lang-btn,
+.bm-monochrome .help-btn {
+  color: var(--bm-muted);
+  background: var(--bm-panel);
+  border-color: var(--bm-border);
+}
+
+.bm-monochrome .status-pill.live,
+.bm-monochrome .status-pill.prep,
+.bm-monochrome .hdr-tally-btn.active {
+  color: var(--bm-active-text);
+  background: var(--bm-active);
+  border-color: var(--bm-active);
+}
+
+.bm-monochrome .status-dot,
+.bm-monochrome .hdr-tally-dot {
+  background: currentColor !important;
+  box-shadow: none !important;
+}
+
+.bm-monochrome .workspace-navigation {
+  color: var(--bm-text);
+  background: rgba(11, 11, 12, 0.96);
+  border-color: var(--bm-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.bm-monochrome .workspace-navigation .tab-bar button,
+.bm-monochrome .disclosure-switch button {
+  color: var(--bm-muted);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.bm-monochrome .workspace-navigation .tab-bar button:hover,
+.bm-monochrome .disclosure-switch button:hover {
+  color: var(--bm-text);
+  background: var(--bm-control);
+}
+
+.bm-monochrome .workspace-navigation .tab-bar button.active,
+.bm-monochrome .disclosure-switch button.active {
+  color: var(--bm-active-text);
+  background: var(--bm-active);
+  border-color: var(--bm-active);
+}
+
+.bm-monochrome .disclosure-switch {
+  background: var(--bm-panel-raised);
+  border: 1px solid var(--bm-border);
+}
+
+.app-container.pro-theme.bm-monochrome.desktop-view,
+.app-container.pro-theme.bm-monochrome.mobile-view,
+.app-container.pro-theme.bm-monochrome .workspace-shell,
+.app-container.pro-theme.bm-monochrome .workspace-main {
+  color: var(--bm-text);
+  background: var(--bm-deck);
+}
+
+.bm-monochrome .workspace-page-header > span,
+.bm-monochrome .workspace-page-header > p {
+  color: var(--bm-muted);
+}
+
+.bm-monochrome .workspace-page-header > strong {
+  color: var(--bm-text);
+}
+
+.bm-monochrome .timecode-card-pro {
+  background: var(--bm-black);
+  border: 1px solid var(--bm-border-strong);
+  box-shadow: none !important;
+}
+
+.bm-monochrome .info-strip-pro {
+  color: var(--bm-muted);
+  background: var(--bm-panel-raised);
+  border-color: var(--bm-border);
+}
+
+.bm-monochrome .creator-ready-rail {
+  color: var(--bm-text);
+  background: var(--bm-panel);
+  border-color: var(--bm-border-strong);
+}
+
+.bm-monochrome .creator-ready-rail::before,
+.bm-monochrome .creator-ready-indicator {
+  background: var(--bm-active);
+}
+
+.bm-monochrome .creator-ready-indicator {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.bm-monochrome .creator-ready-rail.is-live .creator-ready-indicator {
+  background: var(--bm-active);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.bm-monochrome .creator-ready-lead strong,
+.bm-monochrome .creator-ready-metrics strong {
+  color: var(--bm-text);
+}
+
+.bm-monochrome .creator-ready-lead small,
+.bm-monochrome .creator-ready-lead span,
+.bm-monochrome .creator-ready-metrics small,
+.bm-monochrome .creator-ready-metrics span {
+  color: var(--bm-muted);
+}
+
+.bm-monochrome .creator-ready-metrics {
+  border-color: var(--bm-border);
+}
+
+.bm-monochrome .creator-ready-metrics > div {
+  border-color: var(--bm-border);
+}
+
+.bm-monochrome .creator-ready-pro-button,
+.bm-monochrome .advanced-primary-action,
+.bm-monochrome .btn-main-action.start,
+.bm-monochrome .btn-main-action.pause {
+  color: var(--bm-active-text);
+  background: var(--bm-active);
+  border-color: var(--bm-active);
+}
+
+.bm-monochrome .creator-ready-pro-button:hover,
+.bm-monochrome .advanced-primary-action:hover,
+.bm-monochrome .btn-main-action.start:hover {
+  background: #d8d8dc;
+}
+
+.app-container.pro-theme.bm-monochrome .workspace-main .control-section,
+.app-container.pro-theme.bm-monochrome .workspace-main .tool-section-shell,
+.app-container.pro-theme.bm-monochrome .workspace-main .marker-section-pro,
+.app-container.pro-theme.bm-monochrome .workspace-main .tool-card {
+  color: var(--bm-text);
+  background: var(--bm-panel);
+  border-color: var(--bm-border);
+}
+
+.app-container.pro-theme.bm-monochrome .workspace-main .section-label,
+.app-container.pro-theme.bm-monochrome .workspace-main .tool-card label,
+.app-container.pro-theme.bm-monochrome .workspace-main .mark-label,
+.bm-monochrome .sync-detail,
+.bm-monochrome .empty-msg {
+  color: var(--bm-muted);
+}
+
+.app-container.pro-theme.bm-monochrome .workspace-main input,
+.app-container.pro-theme.bm-monochrome .workspace-main select,
+.bm-monochrome .tc-input {
+  color: var(--bm-text);
+  background: var(--bm-black);
+  border-color: var(--bm-border-strong);
+}
+
+.bm-monochrome input[type="range"] {
+  accent-color: var(--bm-active);
+}
+
+.bm-monochrome .btn-pill,
+.bm-monochrome .sync-toggle-pro button,
+.bm-monochrome .tally-open-btn,
+.bm-monochrome .btn-export-pro,
+.bm-monochrome .p2p-init-pro button,
+.bm-monochrome .btn-small {
+  color: var(--bm-text);
+  background: var(--bm-control);
+  border-color: var(--bm-border-strong);
+}
+
+.bm-monochrome .btn-pill:hover:not(:disabled),
+.bm-monochrome .sync-toggle-pro button:hover:not(:disabled),
+.bm-monochrome .p2p-init-pro button:hover:not(:disabled) {
+  background: var(--bm-control-hover);
+}
+
+.app-container.pro-theme.bm-monochrome .btn-pill.active,
+.app-container.pro-theme.bm-monochrome .sync-toggle-pro button.active,
+.app-container.pro-theme.bm-monochrome .tally-open-btn,
+.app-container.pro-theme.bm-monochrome .btn-export-pro:not(:disabled) {
+  color: var(--bm-active-text);
+  background: var(--bm-active);
+  border-color: var(--bm-active);
+}
+
+.bm-monochrome .main-sync-bar,
+.bm-monochrome .drift-panel,
+.bm-monochrome .p2p-panel-pro,
+.bm-monochrome .p2p-init-pro,
+.bm-monochrome .client-card {
+  color: var(--bm-text);
+  background: var(--bm-panel);
+  border-color: var(--bm-border);
+  box-shadow: none;
+}
+
+.bm-monochrome .msb-mode,
+.bm-monochrome .msb-resync,
+.bm-monochrome .role-tag {
+  color: var(--bm-text);
+}
+
+.app-container.pro-theme.bm-monochrome .setup-pane .marker-scroll {
+  color: var(--bm-text);
+  background: var(--bm-black);
+  border-color: var(--bm-border);
+}
+
+.bm-monochrome .marker-row-pro {
+  background: var(--bm-panel-raised);
+  border-color: var(--bm-border);
+}
+
+.bm-monochrome .marker-comment-input {
+  color: var(--bm-text);
+  background: var(--bm-black);
+  border-color: var(--bm-border);
+}
+
+.bm-monochrome .btn-mark-color,
+.bm-monochrome .btn-mark-large,
+.bm-monochrome .color-dot {
+  color: var(--bm-active-text) !important;
+  background-image: none !important;
+  border: 1px solid var(--bm-border-strong);
+  box-shadow: none !important;
+}
+
+.bm-monochrome .btn-mark-color.red,
+.bm-monochrome .btn-mark-large.red,
+.bm-monochrome .color-dot.red {
+  background: #f2f2f2 !important;
+}
+
+.bm-monochrome .btn-mark-color.blue,
+.bm-monochrome .btn-mark-large.blue,
+.bm-monochrome .color-dot.blue {
+  color: #fff !important;
+  background: #9a9a9f !important;
+}
+
+.bm-monochrome .btn-mark-color.green,
+.bm-monochrome .btn-mark-large.green,
+.bm-monochrome .color-dot.green {
+  color: #fff !important;
+  background: #5f5f64 !important;
+}
+
+.bm-monochrome .btn-mark-color.yellow,
+.bm-monochrome .btn-mark-large.yellow,
+.bm-monochrome .color-dot.yellow {
+  color: #fff !important;
+  background: #2d2d30 !important;
+}
+
+.bm-monochrome .tally-state-btn {
+  color: var(--bm-muted);
+  background: var(--bm-control) !important;
+  border-color: var(--bm-border-strong) !important;
+}
+
+.bm-monochrome .tally-state-btn.active {
+  color: var(--bm-active-text) !important;
+  background: var(--bm-active) !important;
+  border-color: var(--bm-active) !important;
+  outline: 2px solid var(--bm-active);
+  outline-offset: 2px;
+}
+
+.app-container.pro-theme.bm-monochrome .fixed-footer {
+  color: var(--bm-text);
+  background: rgba(5, 5, 5, 0.96);
+  border-color: var(--bm-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.bm-monochrome .btn-main-action.running,
+.bm-monochrome .btn-main-action.danger {
+  color: var(--bm-text);
+  background: var(--bm-panel-raised);
+  border-color: var(--bm-active);
+}
+
+.bm-monochrome .stop-hold-fill {
+  background: #4a4a4f;
+}
+
+.bm-monochrome :is(button, input, select):focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* Advanced side panel */
+.bm-monochrome .advanced-side-panel {
+  color: var(--bm-text);
+  background: var(--bm-deck);
+  border-color: var(--bm-border);
+}
+
+.bm-monochrome .advanced-panel-head span,
+.bm-monochrome .advanced-panel-head strong,
+.bm-monochrome .advanced-panel-section > strong,
+.bm-monochrome .advanced-metric-grid strong,
+.bm-monochrome .advanced-drift-row strong {
+  color: var(--bm-text);
+}
+
+.bm-monochrome .advanced-panel-head button {
+  color: var(--bm-text);
+  background: var(--bm-control);
+}
+
+.bm-monochrome .advanced-panel-section,
+.bm-monochrome .director-launch-card {
+  color: var(--bm-text);
+  background: var(--bm-panel);
+  border-color: var(--bm-border);
+}
+
+.bm-monochrome .advanced-metric-grid,
+.bm-monochrome .advanced-bitrate-list {
+  background: var(--bm-border);
+}
+
+.bm-monochrome .advanced-metric-grid > div,
+.bm-monochrome .advanced-bitrate-row {
+  color: var(--bm-text);
+  background: var(--bm-panel-raised);
+}
+
+/* Monochrome tally lamp: labels and luminance replace hue. */
+.bm-monochrome .tally-overlay.monochrome-tally {
+  background-image: none !important;
+}
+
+.bm-monochrome .tally-overlay.monochrome-tally.tally-live {
+  color: #050505;
+  background: #f4f4f5 !important;
+}
+
+.bm-monochrome .tally-overlay.monochrome-tally.tally-preview,
+.bm-monochrome .tally-overlay.monochrome-tally.tally-standby {
+  color: #fff;
+  background: #66666b !important;
+}
+
+.bm-monochrome .tally-overlay.monochrome-tally.tally-off {
+  color: #fff;
+  background: #050505 !important;
+}
+
+.bm-monochrome .tally-overlay.monochrome-tally .tally-timecode,
+.bm-monochrome .tally-overlay.monochrome-tally .tally-state-label,
+.bm-monochrome .tally-overlay.monochrome-tally .tally-state-sublabel,
+.bm-monochrome .tally-overlay.monochrome-tally .tally-header-slim {
+  color: inherit;
+  text-shadow: none;
+}
+
+.bm-monochrome .tally-overlay.monochrome-tally.style-border {
+  color: #fff;
+  background: #050505 !important;
+}
+
+.bm-monochrome .tally-overlay.monochrome-tally.style-border.tally-live {
+  border-color: #fff !important;
+}
+
+.bm-monochrome .tally-overlay.monochrome-tally.style-border.tally-preview,
+.bm-monochrome .tally-overlay.monochrome-tally.style-border.tally-standby {
+  border-color: #77777c !important;
+}
+
+.bm-monochrome .tally-control-bar,
+.bm-monochrome .tally-conn-banner,
+.bm-monochrome .tally-return-status {
+  color: #fff;
+  background: rgba(5, 5, 5, 0.92);
+  border-color: #4a4a4f;
+}
+
+/* Director / ATEM control surface */
+.bm-monochrome .apple-director-switcher {
+  --director-blue: #f4f4f5;
+  color: var(--bm-text);
+  background: var(--bm-black);
+}
+
+.bm-monochrome .apple-director-switcher .apple-director-header {
+  color: var(--bm-text);
+  background: var(--bm-black);
+  border-bottom: 1px solid var(--bm-border-strong);
+}
+
+.bm-monochrome .apple-director-switcher .creator-live-mark,
+.bm-monochrome .apple-director-switcher .creator-signal-dot,
+.bm-monochrome .apple-director-switcher .creator-monitor-dot,
+.bm-monochrome .apple-director-switcher .input-link-dot {
+  background: var(--bm-active) !important;
+  box-shadow: none !important;
+}
+
+.bm-monochrome .apple-director-switcher .creator-mode-badge,
+.bm-monochrome .apple-director-switcher .dir-video-toggle,
+.bm-monochrome .apple-director-switcher .director-close-btn {
+  color: var(--bm-muted);
+  background: var(--bm-panel-raised);
+  border: 1px solid var(--bm-border);
+}
+
+.bm-monochrome .apple-director-switcher .dir-video-toggle.active {
+  color: var(--bm-active-text);
+  background: var(--bm-active);
+  border-color: var(--bm-active);
+}
+
+.bm-monochrome .apple-director-switcher .atem-workspace-layout {
+  color: var(--bm-text);
+  background: var(--bm-black);
+}
+
+.bm-monochrome .apple-director-switcher .atem-multiview-board,
+.bm-monochrome .apple-director-switcher .atem-control-chassis,
+.bm-monochrome .apple-director-switcher .creator-camera-section,
+.bm-monochrome .apple-director-switcher .creator-control-section,
+.bm-monochrome .apple-director-switcher .atem-buses,
+.bm-monochrome .apple-director-switcher .atem-transition-block {
+  color: var(--bm-text);
+  background: var(--bm-panel);
+  border-color: var(--bm-border);
+  box-shadow: none;
+}
+
+.bm-monochrome .apple-director-switcher .atem-monitor,
+.bm-monochrome .apple-director-switcher .atem-monitor-screen,
+.bm-monochrome .apple-director-switcher .input-card-video {
+  background: var(--bm-black);
+  border-color: var(--bm-border-strong);
+  box-shadow: none;
+}
+
+.bm-monochrome .apple-director-switcher .program-monitor.has-source .atem-monitor-head,
+.bm-monochrome .apple-director-switcher .preview-monitor.has-source .atem-monitor-head,
+.bm-monochrome .apple-director-switcher .atem-monitor-head {
+  color: var(--bm-text);
+  background: var(--bm-panel-raised);
+  border-color: var(--bm-border);
+}
+
+.bm-monochrome .apple-director-switcher .atem-mv-card {
+  color: var(--bm-text);
+  background: var(--bm-panel-raised);
+  border: 1px solid var(--bm-border);
+}
+
+.bm-monochrome .apple-director-switcher .atem-mv-card.status-live {
+  border: 3px solid #fff;
+}
+
+.bm-monochrome .apple-director-switcher .atem-mv-card.status-preview,
+.bm-monochrome .apple-director-switcher .atem-mv-card:hover {
+  border: 2px solid #8a8a90;
+}
+
+.bm-monochrome .apple-director-switcher .input-card-header,
+.bm-monochrome .apple-director-switcher .input-card-footer {
+  color: var(--bm-text);
+  background: var(--bm-panel-raised);
+  border-color: var(--bm-border);
+}
+
+.bm-monochrome .apple-director-switcher .input-card-label {
+  color: var(--bm-text);
+  background: var(--bm-black);
+  border-color: var(--bm-border);
+}
+
+.bm-monochrome .apple-director-switcher .input-state-badge.program {
+  color: #050505;
+  background: #fff;
+}
+
+.bm-monochrome .apple-director-switcher .input-state-badge.preview {
+  color: #fff;
+  background: #66666b;
+}
+
+.bm-monochrome .apple-director-switcher .input-card-action,
+.bm-monochrome .apple-director-switcher .creator-quick-buttons button,
+.bm-monochrome .apple-director-switcher .atem-btn,
+.bm-monochrome .apple-director-switcher .atem-btn-ctrl {
+  color: var(--bm-text);
+  background: var(--bm-control);
+  border-color: var(--bm-border-strong);
+  box-shadow: none;
+}
+
+.bm-monochrome .apple-director-switcher .input-card-action.pvw.active,
+.bm-monochrome .apple-director-switcher .creator-quick-buttons button.active,
+.bm-monochrome .apple-director-switcher .btn-pgm.lit {
+  color: var(--bm-active-text);
+  background: var(--bm-active);
+  border-color: var(--bm-active);
+}
+
+.bm-monochrome .apple-director-switcher .btn-pvw.lit {
+  color: #fff;
+  background: #66666b;
+  border-color: #aaaab0;
+}
+
+.bm-monochrome .apple-director-switcher .program-bus .bus-label {
+  color: #fff;
+}
+
+.bm-monochrome .apple-director-switcher .preview-bus .bus-label {
+  color: #aaaab0;
+}
+
+.bm-monochrome .apple-director-switcher .creator-flow-source {
+  color: var(--bm-text);
+  background: var(--bm-panel-raised);
+  border-color: var(--bm-border-strong);
+}
+
+.bm-monochrome .apple-director-switcher .creator-flow-source.on-air {
+  border: 2px solid #fff;
+}
+
+.bm-monochrome .apple-director-switcher .creator-flow-source.next {
+  border: 2px solid #77777c;
+}
+
+.bm-monochrome .apple-director-switcher .creator-control-header > span.ready {
+  color: var(--bm-active-text);
+  background: var(--bm-active);
+}
+
+.bm-monochrome .apple-director-switcher .creator-take-button.cut,
+.bm-monochrome .apple-director-switcher .btn-cut {
+  color: var(--bm-active-text);
+  background: var(--bm-active);
+  border-color: var(--bm-active);
+}
+
+.bm-monochrome .apple-director-switcher .creator-take-button.mix,
+.bm-monochrome .apple-director-switcher .btn-auto {
+  color: var(--bm-text);
+  background: var(--bm-control);
+  border-color: var(--bm-border-strong);
+}
+
+.bm-monochrome .apple-director-switcher .creator-progress-track,
+.bm-monochrome .apple-director-switcher .tbar-track {
+  background: var(--bm-black);
+  border-color: var(--bm-border);
+}
+
+.bm-monochrome .apple-director-switcher .creator-progress-track > span,
+.bm-monochrome .apple-director-switcher .tbar-fill,
+.bm-monochrome .apple-director-switcher .tbar-handle {
+  background: var(--bm-active);
+}
+
+.bm-monochrome .apple-director-switcher .atem-panel-footer,
+.bm-monochrome .apple-director-switcher .atem-status-strip,
+.bm-monochrome .apple-director-switcher .director-log {
+  color: var(--bm-muted);
+  background: var(--bm-panel);
+  border-color: var(--bm-border);
+}
+
+@media (max-width: 700px) {
+  .bm-monochrome .creator-ready-metrics > div:nth-child(n + 3) {
+    border-color: var(--bm-border);
+  }
+}
+
+/* Footer actions need the full theme scope to outrank legacy color themes. */
+.app-container.pro-theme.bm-monochrome .fixed-footer .btn-main-action.start,
+.app-container.pro-theme.bm-monochrome .fixed-footer .btn-main-action.pause {
+  color: #080808 !important;
+  background: #f4f4f5 !important;
+  border-color: #f4f4f5 !important;
+}
+
+.app-container.pro-theme.bm-monochrome .fixed-footer .btn-main-action.start:hover,
+.app-container.pro-theme.bm-monochrome .fixed-footer .btn-main-action.pause:hover {
+  background: #d8d8dc !important;
+  border-color: #d8d8dc !important;
+}
+
+.app-container.pro-theme.bm-monochrome .fixed-footer .btn-main-action.start .btn-icon {
+  background: #080808 !important;
+  box-shadow: none !important;
+}
+
+.app-container.pro-theme.bm-monochrome .fixed-footer .btn-main-action.running .btn-icon {
+  background: #f4f4f5 !important;
+  box-shadow: none !important;
+}
+
+/* Alerts remain monochrome and communicate severity through labels and weight. */
+.bm-monochrome .batt-chip.low,
+.bm-monochrome .drift-rejam,
+.bm-monochrome .info-label.warn,
+.bm-monochrome .badge.drift-warn,
+.bm-monochrome .p2p-status-mini.error,
+.bm-monochrome .client-stats .stat.drift-warn {
+  color: #f4f4f5 !important;
+  background: #242428 !important;
+  border-color: #8a8a90 !important;
+}
+
+.bm-monochrome .tally-ctrl-bar-btn,
+.bm-monochrome .tally-ctrl-bar-btn.exit {
+  color: #d1d1d4;
+  border-color: #38383d;
+}
+
+.bm-monochrome .tally-ctrl-bar-btn.active,
+.bm-monochrome .tally-ctrl-bar-btn:active {
+  color: #fff;
+  background: #303035;
+}
+
+.bm-monochrome .tally-ctrl-icon {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.bm-monochrome .apple-director-switcher .director-cam-tc-sync.warning,
+.bm-monochrome .apple-director-switcher .input-card-tc.warning,
+.bm-monochrome .apple-director-switcher .input-card-sync-pill.warning,
+.bm-monochrome .apple-director-switcher .input-card-sync-pill.offline,
+.bm-monochrome .apple-director-switcher .director-log-state,
+.bm-monochrome .apple-director-switcher .warn {
+  color: #f4f4f5 !important;
+  border-color: #8a8a90 !important;
+}
+
+.bm-monochrome .apple-director-switcher .input-link-dot.warning,
+.bm-monochrome .apple-director-switcher .input-link-dot.offline {
+  background: #8a8a90 !important;
+  box-shadow: none !important;
+}
+

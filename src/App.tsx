@@ -3,7 +3,7 @@ import { LTCSyncProvider, useLTC } from './LTCSyncContext';
 import { FPS_OPTIONS } from './constants';
 import { VideoPlayer } from './VideoPlayer';
 import { ConnectionManager } from './ConnectionManager';
-import { tallyLabelKey, TALLY_COLORS } from './utils/tally';
+import { tallyLabelKey } from './utils/tally';
 import type { TallyState } from './utils/tally';
 import type { SyncMode } from './LTCSyncContext';
 import { formatSyncAge } from './utils/DriftMonitor';
@@ -129,9 +129,9 @@ function MainApp() {
   const handleOutputModeChange = (mode: 'stereo' | 'mono-l') => {
     setOutputMode(mode);
     if (mode === 'mono-l') {
-      toast('⚠️ HEADPHONES REQUIRED for L-TC / R-AUDIO mode to prevent audio feedback loop!', {
-        icon: '🎧',
-        style: { background: '#f5a623', color: '#000', fontWeight: 'bold' }
+      toast('HEADPHONES REQUIRED for L-TC / R-AUDIO mode to prevent audio feedback loop!', {
+        icon: 'HP',
+        style: { background: '#1d1d20', color: '#f4f4f5', border: '1px solid #5a5a60', fontWeight: 'bold' }
       });
     }
   };
@@ -272,7 +272,7 @@ function MainApp() {
   }, [effectivePgmSourceId, effectivePreviewSourceId, handleSwitcherBusChange, playHapticFeedback, setIsVideoEnabled]);
 
   return (
-    <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
+    <div className={`app-container pro-theme bm-monochrome ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
       <HeaderBar
         isRunning={isRunning}
         isPreparing={isPreparing}
@@ -447,7 +447,7 @@ function MainApp() {
                     <span>{formatSyncAge(driftStatus.msSinceSync)} {tr('drift.ago')}</span>
                   </div>
                   {driftStatus.msSinceSync >= 3600000 && (
-                    <div className="drift-rejam">⚠️ {tr('drift.rejam')}</div>
+                    <div className="drift-rejam">WARN · {tr('drift.rejam')}</div>
                   )}
                 </div>
               )}
@@ -502,7 +502,6 @@ function MainApp() {
                     <button
                       key={s}
                       className={`tally-state-btn ${manualTally === s ? 'active' : ''}`}
-                      style={manualTally === s ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
                       onClick={() => handleManualTallyChange(s)}
                     >
                       {tr(tallyLabelKey(s))}
@@ -592,7 +591,14 @@ function MainApp() {
         tr={tr}
       />
 
-      <Toaster position="top-center" containerStyle={{ zIndex: 10500 }} toastOptions={{ style: { background: '#333', color: '#fff' } }} />
+      <Toaster
+        position="top-center"
+        containerStyle={{ zIndex: 10500 }}
+        toastOptions={{
+          style: { background: '#1d1d20', color: '#f4f4f5', border: '1px solid #5a5a60' },
+          iconTheme: { primary: '#f4f4f5', secondary: '#111113' },
+        }}
+      />
 
       {tallyOpen && (
         <TallyOverlay

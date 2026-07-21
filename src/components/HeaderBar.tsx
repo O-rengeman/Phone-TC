@@ -63,7 +63,7 @@ export function HeaderBar({
           </div>
           {batteryLevel !== null && (
             <div className={`batt-chip ${batteryLevel <= 0.15 && !isCharging ? 'low' : ''}`}>
-              <span className="batt-pct">{isCharging ? '⚡' : ''}{Math.round(batteryLevel * 100)}%</span>
+              <span className="batt-pct">{isCharging ? 'CHG ' : ''}{Math.round(batteryLevel * 100)}%</span>
               {!isCharging && isRunning && batteryEta !== null && (
                 <span className="batt-eta">{batteryEta.toFixed(0)}s</span>
               )}

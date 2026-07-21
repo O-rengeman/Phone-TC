@@ -51,7 +51,7 @@ describe('HeaderBar', () => {
 
   it('shows charging indicator', () => {
     render(<HeaderBar {...baseProps} batteryLevel={0.5} isCharging />);
-    expect(screen.getByText((content) => content.includes('⚡'))).toBeTruthy();
+    expect(screen.getByText((content) => content.includes('CHG'))).toBeTruthy();
   });
 
   it('toggles tally open when TALLY button is clicked', () => {
