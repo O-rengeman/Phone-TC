@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useLTC } from '../LTCSyncContext';
 import { useMediaStreams } from '../hooks/useMediaStreams';
 import { VideoRenderer } from './VideoRenderer';
@@ -7,6 +7,8 @@ import { tallyLabelKey } from '../utils/tally';
 import type { TallyState } from '../utils/tally';
 import Timecode from 'smpte-timecode';
 import '../App.css';
+
+import { getStableTimestamp } from '../utils/time';
 
 interface DirectorPanelProps {
   effectivePgmSourceId: string | null;
@@ -19,6 +21,7 @@ interface DirectorPanelProps {
   handleCut: () => void;
   handleAuto: () => void;
   handleTBarChange: (value: number) => void;
+  currentTime?: number;
 }
 
 export function DirectorPanel({
@@ -32,6 +35,7 @@ export function DirectorPanel({
   handleCut,
   handleAuto,
   handleTBarChange,
+  currentTime,
 }: DirectorPanelProps) {
   const {
     directorTime,
@@ -50,12 +54,8 @@ export function DirectorPanel({
 
   const mediaStreams = useMediaStreams();
 
-  // Use a state-based timestamp to avoid calling Date.now() during render
-  const [now, setNow] = useState<number>(0);
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  // Use injected stable timestamp or fall back to utility (avoids Date.now() during render)
+  const now = currentTime ?? getStableTimestamp();
 
   const clientEntries = useMemo(() => Object.entries(clients), [clients]);
   const camCount = clientEntries.length;

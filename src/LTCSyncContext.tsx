@@ -73,8 +73,8 @@ interface LTCStateType {
   manualTimecode: string;
   setManualTimecode: React.Dispatch<React.SetStateAction<string>>;
   p2pRole: 'master' | 'client' | null;
-  activeTab: 'main' | 'sync' | 'tools';
-  setActiveTab: React.Dispatch<React.SetStateAction<'main' | 'sync' | 'tools'>>;
+  activeTab: 'record' | 'monitor' | 'setup';
+  setActiveTab: React.Dispatch<React.SetStateAction<'record' | 'monitor' | 'setup'>>;
   isMobile: boolean;
   outputMode: 'stereo' | 'mono-l';
   setOutputMode: React.Dispatch<React.SetStateAction<'stereo' | 'mono-l'>>;
@@ -220,7 +220,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [isPreparing, setIsPreparing] = useState(false);
   const [manualTimecode, setManualTimecode] = useState('00:00:00:00');
   const [p2pRole, setP2pRole] = useState<'master' | 'client' | null>(null);
-  const [activeTab, setActiveTab] = useState<'main' | 'sync' | 'tools'>('main');
+  const [activeTab, setActiveTab] = useState<'record' | 'monitor' | 'setup'>('record');
   const [isMobile, setIsMobile] = useState(getIsMobileLayout);
   
   const [outputMode, setOutputMode] = useState<'stereo' | 'mono-l'>(() => {

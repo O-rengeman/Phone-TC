@@ -3,8 +3,8 @@ import { t, getInitialLang, persistLang, LANGS } from './i18n';
 
 describe('t', () => {
   it('looks up English and Japanese', () => {
-    expect(t('tab.main', 'en')).toBe('MAIN');
-    expect(t('tab.main', 'ja')).toBe('メイン');
+    expect(t('tab.record', 'en')).toBe('RECORD');
+    expect(t('tab.record', 'ja')).toBe('記録');
   });
 
   it('falls back to English for a missing Japanese key is not needed (full parity), but falls back to the key when unknown', () => {
@@ -25,7 +25,7 @@ describe('t', () => {
     const enKeys = Object.keys(
       // re-derive by probing a representative set
       {
-        'tab.main': 1, 'status.ready': 1, 'label.frameRate': 1, 'btn.start': 1,
+        'tab.record': 1, 'status.ready': 1, 'label.frameRate': 1, 'btn.start': 1,
         'drift.accuracy': 1, 'sync.network': 1, 'guide.title': 1, 'slate.close': 1,
         'toast.resynced': 1,
       },

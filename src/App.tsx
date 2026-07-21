@@ -298,15 +298,16 @@ function MainApp() {
 
       {isMobile && (
         <nav className="tab-bar">
-          <button className={activeTab === 'main' ? 'active' : ''} onClick={() => setActiveTab('main')}>{tr('tab.main')}</button>
-          <button className={activeTab === 'sync' ? 'active' : ''} onClick={() => setActiveTab('sync')}>{tr('tab.sync')}</button>
-          <button className={activeTab === 'tools' ? 'active' : ''} onClick={() => setActiveTab('tools')}>{tr('tab.tools')}</button>
+          <button className={activeTab === 'record' ? 'active' : ''} onClick={() => setActiveTab('record')}>{tr('tab.record')}</button>
+          <button className={activeTab === 'monitor' ? 'active' : ''} onClick={() => setActiveTab('monitor')}>{tr('tab.monitor')}</button>
+          <button className={activeTab === 'setup' ? 'active' : ''} onClick={() => setActiveTab('setup')}>{tr('tab.setup')}</button>
         </nav>
       )}
 
       <main className={isMobile ? 'tab-content' : 'desktop-dashboard'}>
-        {(isMobile ? activeTab === 'main' : true) && (
-          <div className="tab-pane main-pane">
+        {/* デスクトップは全タブ常時表示、モバイルは activeTab で切り替え */}
+        {(!isMobile || activeTab === 'record') && (
+          <div className="tab-pane record-pane">
             <VideoPlayer />
 
             {p2pRole === 'client' && (
@@ -384,8 +385,8 @@ function MainApp() {
           </div>
         )}
 
-        {(isMobile ? activeTab === 'sync' : true) && (
-          <div className="tab-pane sync-pane">
+        {(!isMobile || activeTab === 'monitor') && (
+          <div className="tab-pane monitor-pane">
             <div className="control-section">
               <label className="section-label">{tr('label.syncMethod')}</label>
               <div className="sync-toggle-pro">
@@ -458,8 +459,8 @@ function MainApp() {
           </div>
         )}
 
-        {(isMobile ? activeTab === 'tools' : true) && (
-          <div className="tab-pane tools-pane">
+        {(!isMobile || activeTab === 'setup') && (
+          <div className="tab-pane setup-pane">
             <section className="tool-section-shell tool-section-shell-tally">
               <div className="tool-section-head">
                 <label className="section-label">{tr('label.tally')}</label>
