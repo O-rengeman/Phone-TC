@@ -16,10 +16,12 @@ import { GuideOverlay } from './components/GuideOverlay';
 import { useMediaStreams } from './hooks/useMediaStreams';
 import { FloatingPip } from './components/FloatingPip';
 import { HeaderBar } from './components/HeaderBar';
-import { FooterControls } from './components/FooterControls';
+import { RecordingFooter } from './components/RecordingFooter';
+import { AdvancedControlsPanel } from './components/AdvancedControlsPanel';
 import { MarkerList } from './components/MarkerList';
 import { ClientList } from './components/ClientList';
 import { getAutoSwitcherAssignment, resolveReturnFeed } from './utils/switcherRouting';
+import { AppDomainProvider } from './hooks/useAppDomains';
 import './App.css';
 
 function MainApp() {
@@ -56,8 +58,6 @@ function MainApp() {
     targetId,
     isHost,
     driftStatus,
-    isPaused,
-    stopHoldPct,
     showGuide,
     setShowGuide,
     tallyOpen,
@@ -98,10 +98,6 @@ function MainApp() {
     exportToEDL,
     exportToALE,
     handleSlateClick,
-    handleStartStop,
-    handlePause,
-    beginStopHold,
-    cancelStopHold,
     handleManualResync,
     handleManualTallyChange,
     handleClientTallyChange,
@@ -111,7 +107,6 @@ function MainApp() {
     handleDimmerCycle,
     handleTorchToggle,
     handleTallyExit,
-    holdStoppedRef,
     setIsVideoEnabled,
     mediaServiceRef
   } = useLTC();
@@ -122,6 +117,7 @@ function MainApp() {
   const [isAutoTransitioning, setIsAutoTransitioning] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionProgress, setTransitionProgress] = useState(0); // 0 (PGM) to 100 (PVW)
+  const [detailLevel, setDetailLevel] = useState<'basic' | 'expanded' | 'advanced'>('basic');
   const autoTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const returnFeed = resolveReturnFeed(targetId, mediaStreams);
   const returnStream = returnFeed.stream;
@@ -293,20 +289,40 @@ function MainApp() {
         setDirectorPanelOpen={setDirectorPanelOpen}
         setIsVisualSlate={setIsVisualSlate}
         setTallyOpen={setTallyOpen}
+        showWorkflowActions={detailLevel !== 'basic'}
+        showDirectorAction={detailLevel === 'advanced'}
         tr={tr}
       />
 
-      {isMobile && (
-        <nav className="tab-bar">
-          <button className={activeTab === 'record' ? 'active' : ''} onClick={() => setActiveTab('record')}>{tr('tab.record')}</button>
-          <button className={activeTab === 'monitor' ? 'active' : ''} onClick={() => setActiveTab('monitor')}>{tr('tab.monitor')}</button>
-          <button className={activeTab === 'setup' ? 'active' : ''} onClick={() => setActiveTab('setup')}>{tr('tab.setup')}</button>
+      <div className="workspace-navigation">
+        <nav className="tab-bar" aria-label="Workspace">
+          <button className={activeTab === 'record' ? 'active' : ''} onClick={() => { setActiveTab('record'); setDetailLevel('basic'); }}>
+            {lang === 'ja' ? '収録' : 'Record'}
+          </button>
+          <button className={activeTab === 'setup' ? 'active' : ''} onClick={() => { setActiveTab('setup'); setDetailLevel('expanded'); }}>
+            {lang === 'ja' ? 'マーカー・Tally' : 'Markers & Tally'}
+          </button>
+          <button className={activeTab === 'monitor' ? 'active' : ''} onClick={() => { setActiveTab('monitor'); setDetailLevel('expanded'); }}>
+            {lang === 'ja' ? '同期・接続' : 'Sync & Connect'}
+          </button>
         </nav>
-      )}
+        <div className="disclosure-switch" aria-label="Information level">
+          <button className={detailLevel === 'basic' ? 'active' : ''} onClick={() => { setDetailLevel('basic'); setActiveTab('record'); }}>
+            {lang === 'ja' ? '基本' : 'Basic'}
+          </button>
+          <button className={detailLevel === 'expanded' ? 'active' : ''} onClick={() => setDetailLevel('expanded')}>
+            {lang === 'ja' ? '詳細' : 'Details'}
+          </button>
+          <button className={detailLevel === 'advanced' ? 'active' : ''} onClick={() => setDetailLevel('advanced')}>
+            {lang === 'ja' ? '上級' : 'Advanced'}
+          </button>
+        </div>
+      </div>
 
-      <main className={isMobile ? 'tab-content' : 'desktop-dashboard'}>
+      <div className={`workspace-shell detail-${detailLevel}`}>
+      <main className="tab-content workspace-main">
         {/* デスクトップは全タブ常時表示、モバイルは activeTab で切り替え */}
-        {(!isMobile || activeTab === 'record') && (
+        {activeTab === 'record' && (
           <div className="tab-pane record-pane">
             <VideoPlayer />
 
@@ -329,7 +345,7 @@ function MainApp() {
               <FloatingPip stream={returnStream} onClose={() => setPipEnabled(false)} />
             )}
 
-            {syncMode === 'network' && (
+            {detailLevel !== 'basic' && syncMode === 'network' && (
               <div className="main-sync-bar">
                 <div className="msb-info">
                   <span className="msb-label">{tr('sync.label')}</span>
@@ -344,7 +360,7 @@ function MainApp() {
               </div>
             )}
 
-            {isMobile && (
+            {detailLevel !== 'basic' && (
               <>
                 <div className="control-section">
                   <label className="section-label">{tr('label.frameRate')}</label>
@@ -385,7 +401,7 @@ function MainApp() {
           </div>
         )}
 
-        {(!isMobile || activeTab === 'monitor') && (
+        {activeTab === 'monitor' && (
           <div className="tab-pane monitor-pane">
             <div className="control-section">
               <label className="section-label">{tr('label.syncMethod')}</label>
@@ -436,7 +452,7 @@ function MainApp() {
 
             <ConnectionManager />
 
-            {!isMobile && (
+            {(
               <div className="control-section">
                 <label className="section-label">{tr('label.frameRate')}</label>
                 <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '8px' }}>
@@ -459,7 +475,7 @@ function MainApp() {
           </div>
         )}
 
-        {(!isMobile || activeTab === 'setup') && (
+        {activeTab === 'setup' && (
           <div className="tab-pane setup-pane">
             <section className="tool-section-shell tool-section-shell-tally">
               <div className="tool-section-head">
@@ -616,6 +632,17 @@ function MainApp() {
         )}
       </main>
 
+      {detailLevel === 'advanced' && (
+        <AdvancedControlsPanel
+          lang={lang}
+          isHost={isHost}
+          cameraLabels={cameraLabels}
+          onClose={() => setDetailLevel('expanded')}
+          onOpenDirector={() => { setTallyOpen(false); setIsVisualSlate(false); setDirectorPanelOpen(true); }}
+        />
+      )}
+      </div>
+
       {markerFlash && (
         <div className={`marker-flash ${markerFlash.color.toLowerCase()}`}>
           <span className={`mf-dot ${markerFlash.color.toLowerCase()}`}>{markerFlash.color.charAt(0)}</span>
@@ -624,19 +651,8 @@ function MainApp() {
         </div>
       )}
 
-      <FooterControls
-        isRunning={isRunning}
-        isPreparing={isPreparing}
-        isPaused={isPaused}
-        stopHoldPct={stopHoldPct}
-        holdStoppedRef={holdStoppedRef}
-        handleStartStop={handleStartStop}
-        beginStopHold={beginStopHold}
-        cancelStopHold={cancelStopHold}
-        handlePause={handlePause}
-        addMarker={addMarker}
-        syncMode={syncMode}
-        p2pRole={p2pRole}
+      <RecordingFooter
+        showMarkers={detailLevel !== 'basic' && activeTab === 'setup'}
         tr={tr}
       />
 
@@ -707,7 +723,9 @@ function MainApp() {
 export default function App() {
   return (
     <LTCSyncProvider>
-      <MainApp />
+      <AppDomainProvider>
+        <MainApp />
+      </AppDomainProvider>
     </LTCSyncProvider>
   );
 }

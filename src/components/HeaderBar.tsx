@@ -18,6 +18,8 @@ interface HeaderBarProps {
   setDirectorPanelOpen: (v: boolean) => void;
   setIsVisualSlate: (v: boolean) => void;
   setTallyOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
+  showWorkflowActions?: boolean;
+  showDirectorAction?: boolean;
   tr: (key: string) => string;
 }
 
@@ -38,6 +40,8 @@ export function HeaderBar({
   setDirectorPanelOpen,
   setIsVisualSlate,
   setTallyOpen: setTallyOpenState,
+  showWorkflowActions = true,
+  showDirectorAction = true,
   tr,
 }: HeaderBarProps) {
   return (
@@ -68,7 +72,7 @@ export function HeaderBar({
         </div>
         <div className="hdr-divider" />
         <div className="hdr-actions">
-          <button
+          {showWorkflowActions && <button
             type="button"
             className={`hdr-tally-btn ${tallyOpen ? 'active' : ''}`}
             onClick={() => { setDirectorPanelOpen(false); setIsVisualSlate(false); setTallyOpenState((v: boolean) => !v); }}
@@ -82,8 +86,8 @@ export function HeaderBar({
               }} 
             />
             TALLY
-          </button>
-          {isHost && (
+          </button>}
+          {showDirectorAction && isHost && (
             <button
               type="button"
               className="hdr-director-btn"
