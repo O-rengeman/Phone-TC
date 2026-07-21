@@ -1,18 +1,23 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MarkerList } from './MarkerList';
+import type { Marker } from '../utils/export';
+
+const makeMarker = (overrides: Partial<Marker> = {}): Marker => ({
+  id: 1,
+  tc: '01:00:00:00',
+  time: '12:00',
+  color: 'Red',
+  reelName: 'AX',
+  take: 1,
+  sceneName: '001',
+  comment: '',
+  ...overrides,
+});
 
 describe('MarkerList', () => {
   const baseProps = {
-    markers: [] as Array<{
-      id: string;
-      color: string;
-      tc: string;
-      time: string;
-      take: number;
-      sceneName?: string;
-      comment?: string;
-    }>,
+    markers: [] as Marker[],
     addMarker: vi.fn(),
     removeMarker: vi.fn(),
     updateMarkerComment: vi.fn(),
@@ -28,9 +33,7 @@ describe('MarkerList', () => {
   });
 
   it('renders markers with correct data', () => {
-    const markers = [
-      { id: '1', color: 'Red', tc: '01:00:00:00', time: '12:00', take: 1, sceneName: '001', comment: 'Test comment' },
-    ];
+    const markers = [makeMarker({ id: 1, tc: '01:00:00:00', sceneName: '001', comment: 'Test comment' })];
     render(<MarkerList {...baseProps} markers={markers} />);
     expect(screen.getByText('01:00:00:00')).toBeTruthy();
     expect(screen.getByText('Sc.001 Tk.1')).toBeTruthy();
@@ -39,24 +42,24 @@ describe('MarkerList', () => {
 
   it('calls removeMarker when delete button is clicked', () => {
     const removeMarker = vi.fn();
-    const markers = [{ id: '1', color: 'Red', tc: '01:00:00:00', time: '12:00', take: 1 }];
+    const markers = [makeMarker({ id: 1 })];
     render(<MarkerList {...baseProps} markers={markers} removeMarker={removeMarker} />);
     fireEvent.click(screen.getByText('✕'));
-    expect(removeMarker).toHaveBeenCalledWith('1');
+    expect(removeMarker).toHaveBeenCalledWith(1);
   });
 
   it('calls updateMarkerComment when comment input changes', () => {
     const updateMarkerComment = vi.fn();
-    const markers = [{ id: '1', color: 'Red', tc: '01:00:00:00', time: '12:00', take: 1, comment: '' }];
+    const markers = [makeMarker({ id: 1, comment: '' })];
     render(<MarkerList {...baseProps} markers={markers} updateMarkerComment={updateMarkerComment} />);
     const input = screen.getByPlaceholderText('placeholder.comment');
     fireEvent.change(input, { target: { value: 'New comment' } });
-    expect(updateMarkerComment).toHaveBeenCalledWith('1', 'New comment');
+    expect(updateMarkerComment).toHaveBeenCalledWith(1, 'New comment');
   });
 
   it('calls exportToEDL when EDL button is clicked', () => {
     const exportToEDL = vi.fn();
-    const markers = [{ id: '1', color: 'Red', tc: '01:00:00:00', time: '12:00', take: 1 }];
+    const markers = [makeMarker({ id: 1 })];
     render(<MarkerList {...baseProps} markers={markers} exportToEDL={exportToEDL} />);
     fireEvent.click(screen.getByText('EDL'));
     expect(exportToEDL).toHaveBeenCalledOnce();
@@ -64,7 +67,7 @@ describe('MarkerList', () => {
 
   it('calls exportToALE when ALE button is clicked', () => {
     const exportToALE = vi.fn();
-    const markers = [{ id: '1', color: 'Red', tc: '01:00:00:00', time: '12:00', take: 1 }];
+    const markers = [makeMarker({ id: 1 })];
     render(<MarkerList {...baseProps} markers={markers} exportToALE={exportToALE} />);
     fireEvent.click(screen.getByText('ALE'));
     expect(exportToALE).toHaveBeenCalledOnce();

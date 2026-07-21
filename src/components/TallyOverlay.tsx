@@ -10,7 +10,7 @@ interface TallyOverlayProps {
   tallyStyle: 'full' | 'border';
   tallyBorderSize: 'thin' | 'medium' | 'thick';
   isTallyConnected: boolean;
-  p2pRole: 'client' | 'host' | null;
+  p2pRole: 'master' | 'client' | null;
   returnStream: MediaStream | null;
   peerId: string | null;
   cameraLabels: Record<string, string>;
@@ -21,9 +21,9 @@ interface TallyOverlayProps {
   handleDimmerCycle: (e: React.MouseEvent<HTMLButtonElement>) => void;
   handleTorchToggle: (e: React.MouseEvent<HTMLButtonElement>) => void;
   handleTallyExit: (e: React.MouseEvent<HTMLButtonElement>) => void;
-  setTallyStyle: (style: 'full' | 'border') => void;
-  setTallyBorderSize: (size: 'thin' | 'medium' | 'thick') => void;
-  setTallyTcSize: (size: 'sm' | 'md' | 'lg') => void;
+  setTallyStyle: (style: 'full' | 'border' | ((prev: 'full' | 'border') => 'full' | 'border')) => void;
+  setTallyBorderSize: (size: 'thin' | 'medium' | 'thick' | ((prev: 'thin' | 'medium' | 'thick') => 'thin' | 'medium' | 'thick')) => void;
+  setTallyTcSize: (size: 'sm' | 'md' | 'lg' | ((prev: 'sm' | 'md' | 'lg') => 'sm' | 'md' | 'lg')) => void;
   tallyTorchEnabled: boolean;
 }
 
@@ -86,7 +86,7 @@ export function TallyOverlay({
       )}
       <div className="tally-header-slim">
         <span className="tally-header-id">
-          {cameraLabels[peerId] || (peerId ? peerId.slice(0, 8) : 'LOCAL')}
+          {peerId ? (cameraLabels[peerId] || peerId.slice(0, 8)) : 'LOCAL'}
         </span>
         <span className="tally-header-battery">
           {batteryLevel !== null ? `${isCharging ? '⚡' : '🔋'} ${Math.round(batteryLevel * 100)}%` : ''}
@@ -109,7 +109,7 @@ export function TallyOverlay({
         <button className="tally-ctrl-bar-btn" onClick={(e) => {
           e.stopPropagation();
           playHapticFeedback();
-          setTallyStyle(prev => prev === 'full' ? 'border' : 'full');
+          setTallyStyle((prev: 'full' | 'border') => prev === 'full' ? 'border' : 'full');
         }}>
           <span className="tally-ctrl-icon">🖼</span>
           <span>STYLE: {tallyStyle.toUpperCase()}</span>
@@ -117,7 +117,7 @@ export function TallyOverlay({
         <button className="tally-ctrl-bar-btn" onClick={(e) => {
           e.stopPropagation();
           playHapticFeedback();
-          setTallyBorderSize(prev => prev === 'thin' ? 'medium' : prev === 'medium' ? 'thick' : 'thin');
+          setTallyBorderSize((prev: 'thin' | 'medium' | 'thick') => prev === 'thin' ? 'medium' : prev === 'medium' ? 'thick' : 'thin');
         }}>
           <span className="tally-ctrl-icon">📏</span>
           <span>BORDER: {tallyBorderSize.toUpperCase()}</span>
@@ -125,7 +125,7 @@ export function TallyOverlay({
         <button className="tally-ctrl-bar-btn" onClick={(e) => {
           e.stopPropagation();
           playHapticFeedback();
-          setTallyTcSize(prev => prev === 'sm' ? 'md' : prev === 'md' ? 'lg' : 'sm');
+          setTallyTcSize((prev: 'sm' | 'md' | 'lg') => prev === 'sm' ? 'md' : prev === 'md' ? 'lg' : 'sm');
         }}>
           <span className="tally-ctrl-icon">🅰</span>
           <span>TC: {tallyTcSize.toUpperCase()}</span>

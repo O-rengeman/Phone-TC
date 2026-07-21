@@ -1,6 +1,6 @@
 import { QRCodeCanvas } from 'qrcode.react';
 import { FPS_OPTIONS } from '../constants';
-import type { Marker } from '../LTCSyncContext';
+import type { Marker } from '../utils/export';
 
 interface VisualSlateProps {
   slateTime: string;
@@ -10,7 +10,7 @@ interface VisualSlateProps {
   sceneName: string;
   markers: Marker[];
   fpsIndex: number;
-  userBits: number;
+  userBits: string;
   tr: (key: string) => string;
   setIsVisualSlate: (v: boolean) => void;
 }

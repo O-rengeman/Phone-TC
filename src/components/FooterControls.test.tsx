@@ -15,7 +15,7 @@ describe('FooterControls', () => {
     handlePause: vi.fn(),
     addMarker: vi.fn(),
     syncMode: 'ltc' as const,
-    p2pRole: null as 'client' | 'host' | null,
+    p2pRole: null as 'master' | 'client' | null,
     tr: (key: string) => key,
   };
 

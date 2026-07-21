@@ -1,16 +1,10 @@
+import type { Marker } from '../utils/export';
+
 interface MarkerListProps {
-  markers: Array<{
-    id: string;
-    color: string;
-    tc: string;
-    time: string;
-    take: number;
-    sceneName?: string;
-    comment?: string;
-  }>;
-  addMarker: (color: string) => void;
-  removeMarker: (id: string) => void;
-  updateMarkerComment: (id: string, comment: string) => void;
+  markers: Marker[];
+  addMarker: (color: Marker['color']) => void;
+  removeMarker: (id: Marker['id']) => void;
+  updateMarkerComment: (id: Marker['id'], comment: string) => void;
   exportToEDL: () => void;
   exportToALE: () => void;
   isMobile: boolean;

@@ -13,11 +13,11 @@ interface HeaderBarProps {
   tallyState: TallyState;
   isHost: boolean;
   lang: 'en' | 'ja';
-  setLang: (l: 'en' | 'ja') => void;
+  setLang: (l: 'en' | 'ja' | ((prev: 'en' | 'ja') => 'en' | 'ja')) => void;
   setShowGuide: (v: boolean) => void;
   setDirectorPanelOpen: (v: boolean) => void;
   setIsVisualSlate: (v: boolean) => void;
-  setTallyOpen: (v: boolean) => void;
+  setTallyOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
   tr: (key: string) => string;
 }
 
@@ -71,7 +71,7 @@ export function HeaderBar({
           <button
             type="button"
             className={`hdr-tally-btn ${tallyOpen ? 'active' : ''}`}
-            onClick={() => { setDirectorPanelOpen(false); setIsVisualSlate(false); setTallyOpenState(v => !v); }}
+            onClick={() => { setDirectorPanelOpen(false); setIsVisualSlate(false); setTallyOpenState((v: boolean) => !v); }}
             aria-label="タリーランプを開く"
             title="TALLY"
           >
@@ -97,7 +97,7 @@ export function HeaderBar({
           <button
             type="button"
             className="lang-btn"
-            onClick={() => setLang((l) => (l === 'en' ? 'ja' : 'en'))}
+            onClick={() => setLang((l: 'en' | 'ja') => (l === 'en' ? 'ja' : 'en'))}
             aria-label="Toggle language"
             title="Language"
           >

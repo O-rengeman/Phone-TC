@@ -7,9 +7,7 @@ import { tallyLabelKey, TALLY_COLORS } from './utils/tally';
 import type { TallyState } from './utils/tally';
 import type { SyncMode } from './LTCSyncContext';
 import { formatSyncAge } from './utils/DriftMonitor';
-import { formatDuration } from './utils/battery';
 import { Toaster, toast } from 'react-hot-toast';
-import { VideoRenderer } from './components/VideoRenderer';
 import { ReturnMonitor } from './components/ReturnMonitor';
 import { DirectorPanel } from './components/DirectorPanel';
 import { TallyOverlay } from './components/TallyOverlay';
@@ -22,7 +20,6 @@ import { FooterControls } from './components/FooterControls';
 import { MarkerList } from './components/MarkerList';
 import { ClientList } from './components/ClientList';
 import { getAutoSwitcherAssignment, resolveReturnFeed } from './utils/switcherRouting';
-import Timecode from 'smpte-timecode';
 import './App.css';
 
 function MainApp() {
@@ -81,10 +78,7 @@ function MainApp() {
     setPipEnabled,
     directorPanelOpen,
     setDirectorPanelOpen,
-    directorTime,
     cameraLabels,
-    setCameraLabels,
-    tallyActionLog,
     isResyncing,
     lang,
     setLang,
@@ -118,9 +112,7 @@ function MainApp() {
     handleTorchToggle,
     handleTallyExit,
     holdStoppedRef,
-    isVideoEnabled,
     setIsVideoEnabled,
-    toggleVideoMonitoring,
     mediaServiceRef
   } = useLTC();
 

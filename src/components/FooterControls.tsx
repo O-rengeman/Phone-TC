@@ -8,9 +8,9 @@ interface FooterControlsProps {
   beginStopHold: () => void;
   cancelStopHold: () => void;
   handlePause: () => void;
-  addMarker: (color: string) => void;
+  addMarker: (color: 'Red' | 'Blue' | 'Green' | 'Yellow') => void;
   syncMode: string;
-  p2pRole: 'client' | 'host' | null;
+  p2pRole: 'master' | 'client' | null;
   tr: (key: string) => string;
 }
 
