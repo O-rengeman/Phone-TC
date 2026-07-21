@@ -73,7 +73,7 @@ describe('VisualSlate', () => {
   it('calls setIsVisualSlate(false) when close button is clicked', () => {
     render(<VisualSlate {...baseProps} />);
     const closeBtn = screen.getByLabelText('Close Slate');
-    (closeBtn as HTMLElement).click();
+    closeBtn.click();
     expect(baseProps.setIsVisualSlate).toHaveBeenCalledWith(false);
   });
 

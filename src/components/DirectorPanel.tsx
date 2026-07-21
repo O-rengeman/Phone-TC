@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLTC } from '../LTCSyncContext';
 import { useMediaStreams } from '../hooks/useMediaStreams';
 import { VideoRenderer } from './VideoRenderer';
@@ -50,6 +50,13 @@ export function DirectorPanel({
 
   const mediaStreams = useMediaStreams();
 
+  // Use a state-based timestamp to avoid calling Date.now() during render
+  const [now, setNow] = useState<number>(0);
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const clientEntries = useMemo(() => Object.entries(clients), [clients]);
   const camCount = clientEntries.length;
 
@@ -72,8 +79,8 @@ export function DirectorPanel({
   );
 
   const offlineCount = useMemo(
-    () => Object.values(clients).filter((stats) => Date.now() - stats.lastSeen > 30000).length,
-    [clients]
+    () => Object.values(clients).filter((stats) => now - stats.lastSeen > 30000).length,
+    [clients, now]
   );
 
   const signalCount = useMemo(
@@ -232,7 +239,7 @@ export function DirectorPanel({
                 </div>
               ) : (
                 clientEntries.map(([id, stats], idx) => {
-                  const isOffline = Date.now() - stats.lastSeen > 30000;
+                  const isOffline = now - stats.lastSeen > 30000;
                   const defaultLabel = `CAM${idx + 1}`;
                   const label = cameraLabels[id] || defaultLabel;
 
@@ -396,7 +403,7 @@ export function DirectorPanel({
                   <span className="creator-no-inputs">カメラ待機中</span>
                 ) : (
                   clientEntries.slice(0, 9).map(([id, stats], idx) => {
-                    const isOffline = Date.now() - stats.lastSeen > 30000;
+                    const isOffline = now - stats.lastSeen > 30000;
                     const isActive = effectivePreviewSourceId === id;
                     return (
                       <button
@@ -425,7 +432,7 @@ export function DirectorPanel({
                     <span className="bus-empty">NO INPUTS</span>
                   ) : (
                     clientEntries.map(([id, stats], idx) => {
-                      const isOffline = Date.now() - stats.lastSeen > 30000;
+                      const isOffline = now - stats.lastSeen > 30000;
                       const isActive = effectivePgmSourceId === id;
                       return (
                         <button
@@ -451,7 +458,7 @@ export function DirectorPanel({
                     <span className="bus-empty">NO INPUTS</span>
                   ) : (
                     clientEntries.map(([id, stats], idx) => {
-                      const isOffline = Date.now() - stats.lastSeen > 30000;
+                      const isOffline = now - stats.lastSeen > 30000;
                       const isActive = effectivePreviewSourceId === id;
                       return (
                         <button
