@@ -18,6 +18,7 @@ import { FloatingPip } from './components/FloatingPip';
 import { HeaderBar } from './components/HeaderBar';
 import { RecordingFooter } from './components/RecordingFooter';
 import { AdvancedControlsPanel } from './components/AdvancedControlsPanel';
+import { CreatorReadyRail } from './components/CreatorReadyRail';
 import { MarkerList } from './components/MarkerList';
 import { ClientList } from './components/ClientList';
 import { getAutoSwitcherAssignment, resolveReturnFeed } from './utils/switcherRouting';
@@ -300,10 +301,10 @@ function MainApp() {
             {lang === 'ja' ? '収録' : 'Record'}
           </button>
           <button className={activeTab === 'setup' ? 'active' : ''} onClick={() => { setActiveTab('setup'); setDetailLevel('expanded'); }}>
-            {lang === 'ja' ? 'マーカー・Tally' : 'Markers & Tally'}
+            {lang === 'ja' ? '現場ツール' : 'Shoot Tools'}
           </button>
           <button className={activeTab === 'monitor' ? 'active' : ''} onClick={() => { setActiveTab('monitor'); setDetailLevel('expanded'); }}>
-            {lang === 'ja' ? '同期・接続' : 'Sync & Connect'}
+            {lang === 'ja' ? '接続' : 'Connect'}
           </button>
         </nav>
         <div className="disclosure-switch" aria-label="Information level">
@@ -311,10 +312,10 @@ function MainApp() {
             {lang === 'ja' ? '基本' : 'Basic'}
           </button>
           <button className={detailLevel === 'expanded' ? 'active' : ''} onClick={() => setDetailLevel('expanded')}>
-            {lang === 'ja' ? '詳細' : 'Details'}
+            {lang === 'ja' ? '撮影設定' : 'Shoot setup'}
           </button>
           <button className={detailLevel === 'advanced' ? 'active' : ''} onClick={() => setDetailLevel('advanced')}>
-            {lang === 'ja' ? '上級' : 'Advanced'}
+            Pro
           </button>
         </div>
       </div>
@@ -324,6 +325,20 @@ function MainApp() {
         {/* デスクトップは全タブ常時表示、モバイルは activeTab で切り替え */}
         {activeTab === 'record' && (
           <div className="tab-pane record-pane">
+            {detailLevel !== 'basic' && (
+              <CreatorReadyRail
+                isRunning={isRunning}
+                isPreparing={isPreparing}
+                fpsLabel={FPS_OPTIONS[fpsIndex].label}
+                syncMode={syncMode}
+                syncLatency={syncStatus?.latency ?? null}
+                cameraCount={Object.keys(clients).length}
+                outputMode={outputMode}
+                outputOffset={outputOffset}
+                lang={lang}
+                onOpenPro={() => setDetailLevel('advanced')}
+              />
+            )}
             <VideoPlayer />
 
             {p2pRole === 'client' && (
@@ -361,7 +376,7 @@ function MainApp() {
             )}
 
             {detailLevel !== 'basic' && (
-              <>
+              <div className="creator-setup-grid">
                 <div className="control-section">
                   <label className="section-label">{tr('label.frameRate')}</label>
                   <div className="fps-grid-compact">
@@ -396,13 +411,18 @@ function MainApp() {
                   </div>
                 </div>
 
-              </>
+              </div>
             )}
           </div>
         )}
 
         {activeTab === 'monitor' && (
           <div className="tab-pane monitor-pane">
+            <div className="workspace-page-header">
+              <span>{lang === 'ja' ? '接続と同期' : 'Connect & Sync'}</span>
+              <strong>{lang === 'ja' ? 'すべてのカメラを同じ時間軸へ' : 'Keep every camera on the same timeline'}</strong>
+              <p>{lang === 'ja' ? '同期方式を選び、スマートフォンやサブカメラを接続します。' : 'Choose a sync source, then connect phones and secondary cameras.'}</p>
+            </div>
             <div className="control-section">
               <label className="section-label">{tr('label.syncMethod')}</label>
               <div className="sync-toggle-pro">
@@ -452,31 +472,16 @@ function MainApp() {
 
             <ConnectionManager />
 
-            {(
-              <div className="control-section">
-                <label className="section-label">{tr('label.frameRate')}</label>
-                <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '8px' }}>
-                  59.94p 撮影時は 29.97 を、50p 撮影時は 25 を選択してください。
-                </div>
-                <div className="fps-grid-compact">
-                  {FPS_OPTIONS.map((opt, i) => (
-                    <button 
-                      key={opt.label} 
-                      className={`btn-pill ${fpsIndex === i ? 'active' : ''}`}
-                      onClick={() => setFpsIndex(i)}
-                      disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
         {activeTab === 'setup' && (
           <div className="tab-pane setup-pane">
+            <div className="workspace-page-header">
+              <span>{lang === 'ja' ? '現場ツール' : 'Shoot Tools'}</span>
+              <strong>{lang === 'ja' ? '良いテイクを残し、出演者へ合図する' : 'Mark the best takes and cue your talent'}</strong>
+              <p>{lang === 'ja' ? 'マーカー、Tally、編集用メタデータを撮影中にすばやく操作できます。' : 'Reach markers, tally cues, and edit metadata without slowing the shoot.'}</p>
+            </div>
             <section className="tool-section-shell tool-section-shell-tally">
               <div className="tool-section-head">
                 <label className="section-label">{tr('label.tally')}</label>
@@ -492,14 +497,6 @@ function MainApp() {
                 </div>
               </div>
               <div className="control-section tally-section">
-                {isHost && (
-                  <button
-                    className="tally-open-btn btn-director-switcher"
-                    onClick={() => { setTallyOpen(false); setIsVisualSlate(false); setDirectorPanelOpen(true); }}
-                  >
-                    DIRECTOR SWITCHER PANEL
-                  </button>
-                )}
                 <div className="tally-state-row">
                   {(['live', 'preview', 'off'] as TallyState[]).map(s => (
                     <button
@@ -515,45 +512,6 @@ function MainApp() {
                 <button className="tally-open-btn" onClick={() => { setDirectorPanelOpen(false); setIsVisualSlate(false); setTallyOpen(true); }}>{tr('tally.fullscreen')}</button>
               </div>
             </section>
-
-            {isHost && Object.keys(clients).length > 0 && (
-              <section className="tool-section-shell clients-list-section">
-                <div className="tool-section-head">
-                  <label className="section-label">CONNECTED CLIENTS ({Object.keys(clients).length})</label>
-                </div>
-                <div className="clients-grid">
-                  {Object.entries(clients).map(([id, stats]) => {
-                    const isOffline = nowTick - stats.lastSeen > 30000;
-                    return (
-                      <div key={id} className={`client-card ${isOffline ? 'offline' : ''}`}>
-                        <div className="client-id">{id}</div>
-                        <div className="client-stats">
-                          <span className="stat">RTT: {stats.rtt.toFixed(0)}ms</span>
-                          <span className={`stat ${stats.drift >= 0.5 ? 'drift-warn' : ''}`}>
-                            δ: {stats.drift.toFixed(2)}s
-                          </span>
-                        </div>
-                        <div className="client-tally-controls">
-                          {(['live', 'preview', 'off'] as TallyState[]).map(s => {
-                             const isActive = tallyPayload?.assignments?.[id] === s;
-                             return (
-                               <button
-                                 key={s}
-                                 className={`tally-state-btn mini ${isActive ? 'active' : ''}`}
-                                 style={isActive ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
-                                 onClick={() => handleClientTallyChange(id, s)}
-                               >
-                                 {tr(tallyLabelKey(s))}
-                               </button>
-                             );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
 
             <section className="tool-section-shell tool-section-shell-meta">
               <div className="tools-grid-pro tools-grid-meta">
@@ -582,28 +540,6 @@ function MainApp() {
                     placeholder="001"
                   />
                 </div>
-                {!isMobile && (
-                  <>
-
-
-                    <div className="tool-card span-2">
-                      <label className="section-label">{tr('label.outputMode')}</label>
-                      <div className="sync-toggle-pro">
-                        <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')}>STEREO TC</button>
-                        <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')}>L-TC / R-AUDIO</button>
-                      </div>
-                    </div>
-
-                    <div className="tool-card span-2">
-                      <label className="section-label">TC OFFSET (FRAMES)</label>
-                      <div className="offset-control">
-                        <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} />
-                        <span className="offset-value">{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
-                      </div>
-                    </div>
-
-                  </>
-                )}
               </div>
             </section>
             
