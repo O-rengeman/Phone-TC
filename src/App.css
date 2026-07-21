@@ -1828,17 +1828,17 @@ input[type="range"] {
    the generous paddings/gaps across the dashboard.
    ============================================================ */
 
-/* Give the center more room; trim the side rails. */
+/* Give both control rails enough room for labels and dense production controls. */
 .desktop-dashboard {
-  grid-template-columns: minmax(220px, 280px) 1fr minmax(220px, 310px);
+  grid-template-columns: 300px minmax(0, 1fr) 330px;
 }
 .desktop-dashboard .sync-pane { padding: 16px 14px; }
 .desktop-dashboard .tools-pane { padding: 16px 14px; }
 
-/* 1280px+ ではより広いサイドパネル */
+/* 1280px+ scales the rails with the display while preserving the center monitor. */
 @media (min-width: 1280px) {
   .desktop-dashboard {
-    grid-template-columns: 280px 1fr 310px;
+    grid-template-columns: clamp(320px, 23vw, 380px) minmax(0, 1fr) clamp(340px, 25vw, 420px);
   }
 }
 
