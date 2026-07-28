@@ -202,6 +202,42 @@ describe('WebRTCMediaService transceiver direction (bug 2 regression)', () => {
     expect(createdPeerConnections[1].transceivers[0].sender.replaceTrack).toHaveBeenCalledWith(track);
   });
 
+  it('setPgmStream reports a failed switch so the director can be told', async () => {
+    const service = new WebRTCMediaService(makeFakePeerSync(), 'ME', true);
+    const onPgmSwitchError = vi.fn();
+    service.onPgmSwitchError = onPgmSwitchError;
+    await service.handleSignalingMessage(offerMsg('CLIENT1'));
+    const sender = createdPeerConnections[0].transceivers[0].sender;
+    const failure = new Error('replaceTrack failed');
+    sender.replaceTrack.mockRejectedValueOnce(failure);
+
+    await service.setPgmStream(makeFakeStream(makeFakeTrack()));
+
+    expect(onPgmSwitchError).toHaveBeenCalledWith('CLIENT1', failure);
+  });
+
+  it('setPgmStream keeps switching the remaining peers after one fails', async () => {
+    const service = new WebRTCMediaService(makeFakePeerSync(), 'ME', true);
+    await service.handleSignalingMessage(offerMsg('CLIENT1'));
+    await service.handleSignalingMessage(offerMsg('CLIENT2'));
+    createdPeerConnections[0].transceivers[0].sender.replaceTrack
+      .mockRejectedValueOnce(new Error('replaceTrack failed'));
+
+    const track = makeFakeTrack();
+    await service.setPgmStream(makeFakeStream(track));
+
+    expect(createdPeerConnections[1].transceivers[0].sender.replaceTrack).toHaveBeenCalledWith(track);
+  });
+
+  it('setPgmStream still works when no error handler is attached', async () => {
+    const service = new WebRTCMediaService(makeFakePeerSync(), 'ME', true);
+    await service.handleSignalingMessage(offerMsg('CLIENT1'));
+    createdPeerConnections[0].transceivers[0].sender.replaceTrack
+      .mockRejectedValueOnce(new Error('replaceTrack failed'));
+
+    await expect(service.setPgmStream(makeFakeStream(makeFakeTrack()))).resolves.toBeUndefined();
+  });
+
   it('setPgmStream is a no-op on a client (non-master) instance', async () => {
     const service = new WebRTCMediaService(makeFakePeerSync(), 'ME', false);
     await service.handleSignalingMessage(offerMsg('MASTER'));

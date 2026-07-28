@@ -61,6 +61,14 @@ export class WebRTCMediaService {
   // Callbacks
   public onRemoteStream?: (event: WebRTCStreamEvent) => void;
   public onStreamClosed?: (peerId: string) => void;
+  /**
+   * Raised when a PGM return-feed switch could not be applied to a peer.
+   * The switcher UI has already moved to the new source at this point, so
+   * without surfacing this the director sees the console reporting the cut
+   * they asked for while the camera operator's return monitor still shows the
+   * old feed — and nothing on screen explains the mismatch.
+   */
+  public onPgmSwitchError?: (peerId: string, err: unknown) => void;
 
   private peerSync: PeerSync;
   private isMaster: boolean;
@@ -143,6 +151,7 @@ export class WebRTCMediaService {
         debug(`[WebRTC] Replaced PGM track for peer ${peerId}`);
       } catch (err) {
         console.error(`[WebRTC] Failed to replace track for ${peerId}`, err);
+        this.onPgmSwitchError?.(peerId, err);
       }
     }
   }

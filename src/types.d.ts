@@ -1,3 +1,12 @@
+// Build-time configuration read by src/utils/iceServers.ts. Declared here so
+// a typo in the variable name is a compile error rather than a silent
+// undefined at runtime. See .env.example for what these mean.
+interface ImportMetaEnv {
+  readonly VITE_TURN_URLS?: string;
+  readonly VITE_TURN_USERNAME?: string;
+  readonly VITE_TURN_CREDENTIAL?: string;
+}
+
 // Minimal type definitions for `smpte-timecode` (ships no types of its own).
 // Covers only the members this project uses; see node_modules/smpte-timecode.
 declare module 'smpte-timecode' {

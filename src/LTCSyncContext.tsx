@@ -18,6 +18,7 @@ import { debug } from './utils/log';
 import { FPS_OPTIONS } from './constants';
 import { useBatteryMonitor } from './hooks/useBatteryMonitor';
 import { useWakeLock } from './hooks/useWakeLock';
+import { useAudioContextRecovery } from './hooks/useAudioContextRecovery';
 import { useMarkers } from './hooks/useMarkers';
 import { useNetworkSync } from './hooks/useNetworkSync';
 import { useP2P } from './hooks/useP2P';
@@ -317,6 +318,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   useWakeLock(isRunning);
+  useAudioContextRecovery(audioCtxRef, isRunning);
 
   const engineRef = useRef<LtcEngine | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
@@ -422,6 +424,10 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       mediaStreamActions.removeStream(pId);
     };
 
+    service.onPgmSwitchError = () => {
+      addToast(translate('toast.pgmSwitchFailed', langRef.current), 'error');
+    };
+
     signalingHandlerRef.current = (msg: SyncMessage) => {
       void mediaServiceRef.current?.handleSignalingMessage(msg);
     };
@@ -436,7 +442,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       mediaStreamActions.clearStreams();
       signalingHandlerRef.current = null;
     };
-  }, [isHost, p2pRole, targetId, peerId, peerSyncRef, signalingHandlerRef]);
+  }, [isHost, p2pRole, targetId, peerId, peerSyncRef, signalingHandlerRef, addToast, langRef]);
 
   // Client-only: start the camera and connect to the master once targetId is
   // complete, not on every keystroke while
@@ -456,18 +462,18 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       if (!cancelled && mediaServiceRef.current === service) {
         void service.connectToPeer(targetId).catch((err: unknown) => {
           console.error('[WebRTC] Failed to connect return monitor', err);
-          addToast('RETURN MONITOR CONNECTION FAILED', 'error');
+          addToast(translate('toast.returnMonitorFailed', langRef.current), 'error');
         });
       }
     }).catch((err: unknown) => {
       console.error('[WebRTC] Camera permission or startup failed', err);
-      addToast('CAMERA ACCESS REQUIRED FOR VIDEO MONITORING', 'error');
+      addToast(translate('toast.cameraDenied', langRef.current), 'error');
     });
 
     return () => {
       cancelled = true;
     };
-  }, [p2pRole, targetId, mediaServiceRef, addToast]);
+  }, [p2pRole, targetId, mediaServiceRef, addToast, langRef]);
 
   useEffect(() => {
     const initMobile = async () => {
