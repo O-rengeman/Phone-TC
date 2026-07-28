@@ -36,11 +36,11 @@ function readStoredTab(): string | null {
  * and transport permanently on screen and the rest of the controls behind
  * tabs.
  *
- * The frame is a three-row grid (readout / tabs / pane) whose middle row is
- * the only flexible one, and every row is `min-height: 0`. That is what makes
- * the "never scrolls" rule structural rather than a matter of tuning
- * paddings: a pane physically cannot push the layout taller than the window,
- * so overflow is contained inside whichever panel opted into it.
+ * The frame is a two-row grid (readout / stage) whose second row is the only
+ * flexible one, and every row is `min-height: 0`. That is what makes the
+ * "never scrolls" rule structural rather than a matter of tuning paddings: a
+ * pane physically cannot push the layout taller than the window, so overflow
+ * is contained inside whichever panel opted into it.
  */
 export function DesktopShell({ switcher, onOutputModeChange }: DesktopShellProps) {
   const {
@@ -83,10 +83,14 @@ export function DesktopShell({ switcher, onOutputModeChange }: DesktopShellProps
 
   return (
     <div className="dt-shell">
+      {/* Vitals and tabs share the readout row rather than stacking below it:
+          the tab strip was a full-width band carrying five words, and giving
+          that height back to the timecode buys far more than it costs. */}
       <div className="dt-readout">
         <div className="dt-readout-tc">
           <VideoPlayer />
         </div>
+        <div className="dt-readout-right">
         <div className="dt-readout-side">
           <div className="dt-readout-stat">
             <span className="dt-stat-label">STATE</span>
@@ -121,22 +125,23 @@ export function DesktopShell({ switcher, onOutputModeChange }: DesktopShellProps
             </strong>
           </div>
         </div>
-      </div>
 
-      <nav className="dt-tabs" aria-label="Console sections">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            type="button"
-            className={`dt-tab ${activeTab === tab.id ? 'active' : ''}`}
-            onClick={() => selectTab(tab.id)}
-            aria-current={activeTab === tab.id ? 'page' : undefined}
-          >
-            <span className="dt-tab-key">{tab.hotkey}</span>
-            {tr(tab.labelKey)}
-          </button>
-        ))}
-      </nav>
+        <nav className="dt-tabs" aria-label="Console sections">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`dt-tab ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => selectTab(tab.id)}
+              aria-current={activeTab === tab.id ? 'page' : undefined}
+            >
+              <span className="dt-tab-key">{tab.hotkey}</span>
+              {tr(tab.labelKey)}
+            </button>
+          ))}
+        </nav>
+        </div>
+      </div>
 
       <main className="dt-stage">
         {activeTab === 'timecode' && <TimecodePane onOutputModeChange={onOutputModeChange} />}

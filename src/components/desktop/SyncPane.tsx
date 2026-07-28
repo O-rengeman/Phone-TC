@@ -25,6 +25,7 @@ export function SyncPane() {
 
   return (
     <div className="dt-pane dt-pane-sync">
+      <div className="dt-col">
       <DesktopPanel
         title={tr('label.syncMethod')}
         aside={syncMode === 'network' ? (
@@ -78,6 +79,7 @@ export function SyncPane() {
       <DesktopPanel title={tr('dt.session')} className="dt-panel-session" scroll>
         <ConnectionManager />
       </DesktopPanel>
+      </div>
 
       <DesktopPanel
         title={tr('dt.clients')}

@@ -27,12 +27,12 @@
 
 /* ── Frame ────────────────────────────────────────────────────────────── */
 
-/* The only flexible row is the stage; readout and tabs are intrinsic. This
-   grid, plus min-height:0 on the stage, is what guarantees no page scroll. */
+/* The only flexible row is the stage; the readout is intrinsic. This grid,
+   plus min-height:0 on the stage, is what guarantees no page scroll. */
 .desktop-view .dt-shell {
   flex: 1;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
   background:
@@ -52,9 +52,12 @@
   min-height: 0;
 }
 
+/* The timecode is read from across a room, so it gets the height freed by
+   folding the tab strip into this row. Its font is height-driven (see
+   VideoPlayer), so every pixel here is legibility. */
 .desktop-view .dt-readout-tc {
   min-width: 0;
-  height: clamp(88px, 19vh, 210px);
+  height: clamp(104px, 24vh, 268px);
 }
 
 /* VideoPlayer's own card chrome is redundant inside the readout strip.
@@ -89,10 +92,22 @@
   font-size: var(--dt-label);
 }
 
+.desktop-view .dt-readout-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: clamp(8px, 1.4vh, 18px);
+  height: 100%;
+  min-width: 0;
+}
+
 .desktop-view .dt-readout-side {
   display: flex;
   align-items: stretch;
+  justify-content: flex-end;
   gap: clamp(10px, 1.2vw, 22px);
+  flex: 1;
+  min-height: 0;
 }
 
 .desktop-view .dt-readout-stat {
@@ -140,36 +155,36 @@
 
 .desktop-view .dt-tabs {
   display: flex;
-  gap: 2px;
-  padding: 0 clamp(16px, 2vw, 40px);
-  border-bottom: 1px solid var(--dt-line);
-  background: rgba(0, 0, 0, 0.5);
+  gap: 4px;
+  flex: none;
+  justify-content: flex-end;
 }
 
 .desktop-view .dt-tab {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: clamp(8px, 1.3vh, 15px) clamp(14px, 1.6vw, 30px);
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
+  gap: 7px;
+  padding: clamp(6px, 0.9vh, 11px) clamp(11px, 1.1vw, 20px);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--dt-line);
+  border-radius: var(--radius-sm);
   color: var(--text-muted);
   font-family: var(--font-main);
   font-size: var(--dt-title);
   font-weight: 800;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-.desktop-view .dt-tab:hover { color: var(--text); background: var(--dt-surface); }
+.desktop-view .dt-tab:hover { color: var(--text); border-color: rgba(255, 255, 255, 0.28); }
 
 .desktop-view .dt-tab.active {
-  color: var(--text-bright);
-  border-bottom-color: var(--primary);
-  background: var(--dt-surface);
+  color: #000;
+  background: var(--primary);
+  border-color: var(--primary);
 }
 
 .desktop-view .dt-tab-key {
@@ -186,8 +201,8 @@
 }
 
 .desktop-view .dt-tab.active .dt-tab-key {
-  border-color: rgba(255, 255, 255, 0.35);
-  color: var(--text-bright);
+  border-color: rgba(0, 0, 0, 0.35);
+  color: #000;
 }
 
 /* ── Stage & panes ────────────────────────────────────────────────────── */
@@ -205,22 +220,49 @@
   gap: var(--dt-gap);
 }
 
-/* Four setup panels read best as one row of columns on a 16:9 screen. */
+/* Setup controls are short forms. Stretched across four full-height columns
+   they were ~75% empty, so they pack into a 2x2 block sized to its content
+   and sit at the top of the stage instead of being pulled apart to fill it. */
 .desktop-view .dt-pane-timecode {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: min-content;
+  align-content: start;
+  max-width: clamp(720px, 62vw, 1180px);
 }
 
-/* Sync mode and session side by side, cameras filling the rest.
-   Both rows are proportional rather than `auto`: with an intrinsic top row,
-   the session form's natural height ate the entire pane at 720p and left the
-   camera list with zero height. */
+/* A client's return feed is the exception: it is a video, so it takes the
+   column beside the settings and uses the full height. */
+.desktop-view .dt-pane-timecode.has-return {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 1.1fr);
+  max-width: none;
+}
+
+.desktop-view .dt-pane-timecode.has-return > .dt-panel-return {
+  grid-column: 3;
+  grid-row: 1 / -1;
+  align-self: stretch;
+}
+
+/* The camera table is the only panel here that grows with the shoot, so it
+   takes the full stage height while the sparse controls stack beside it at
+   their natural size. */
 .desktop-view .dt-pane-sync {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(320px, 27vw) minmax(0, 1fr);
 }
 
-.desktop-view .dt-pane-sync > .dt-panel:nth-child(3) {
-  grid-column: 1 / -1;
+/* On a 720p console the control column is the tight one, so it gets wider
+   rather than taller: at this width START SOURCE and START TC sit on one
+   row, which is exactly the ~90px that otherwise forced a scrollbar. The
+   camera table still has over 800px left to work with. */
+@media (max-height: 820px) {
+  .desktop-view .dt-pane-sync {
+    grid-template-columns: minmax(430px, 36vw) minmax(0, 1fr);
+  }
+
+  /* Last ~20px: the control column is the only place on the console where
+     padding decides whether a scrollbar appears. */
+  .desktop-view .dt-pane-sync > .dt-col .dt-panel-body { padding: 8px 10px; gap: 6px; }
+  .desktop-view .dt-pane-sync > .dt-col .dt-panel-head { padding: 5px 10px; }
 }
 
 .desktop-view .dt-pane-tally {
@@ -240,6 +282,18 @@
   grid-auto-rows: min-content;
   gap: var(--dt-gap);
   min-height: 0;
+}
+
+/* Both control panels here are fixed-size forms, so they sit at their natural
+   height at the top of the column. Stretching the session form to fill the
+   column left a ~250px void inside a bordered panel, which reads as a broken
+   layout; leftover space below the panels reads as background. The scroll is
+   a safety net for short viewports, not the normal case. */
+.desktop-view .dt-pane-sync > .dt-col {
+  grid-auto-rows: min-content;
+  align-content: start;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* ── Panel primitive ──────────────────────────────────────────────────── */
@@ -681,7 +735,10 @@
 
 /* ── Empty states ─────────────────────────────────────────────────────── */
 
+/* Fills its panel and centres, so a list that is legitimately empty looks
+   like a waiting state rather than a panel that failed to render. */
 .desktop-view .dt-empty {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -719,10 +776,32 @@
 .desktop-view .dt-panel-session .dt-panel-body { gap: 8px; }
 .desktop-view .dt-panel-session .control-section { gap: 6px; margin: 0; }
 .desktop-view .dt-panel-session .section-label { font-size: var(--dt-label); }
-.desktop-view .dt-panel-session .p2p-panel-pro,
-.desktop-view .dt-panel-session .p2p-master-box { gap: 8px; }
+.desktop-view .dt-panel-session .p2p-panel-pro { gap: 8px; }
+
+/* START SOURCE and START TC are one decision, and stacking them cost ~90px —
+   enough to push this column into a scrollbar at 720p. Side by side they fit,
+   and wrapping keeps it correct when START TC is hidden for network start. */
+.desktop-view .dt-panel-session .p2p-master-box {
+  display: flex;
+  /* App.css lays this out as a column; the direction must be stated
+     explicitly or the wrap below just stacks the items taller. */
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.desktop-view .dt-panel-session .p2p-master-box > .id-display-row { flex: 1 0 100%; }
+.desktop-view .dt-panel-session .p2p-master-box > .control-section,
+.desktop-view .dt-panel-session .p2p-master-box > .start-tc-input { flex: 1 1 150px; min-width: 0; }
+/* min-height, not height: at 720p a fixed 29px box clipped the descenders on
+   "MANUAL TC" / "NETWORK TIME". */
 .desktop-view .dt-panel-session .p2p-init-pro button,
-.desktop-view .dt-panel-session .sync-toggle-pro button { height: var(--dt-control-h); font-size: var(--dt-text); }
+.desktop-view .dt-panel-session .sync-toggle-pro button {
+  min-height: var(--dt-control-h);
+  height: auto;
+  font-size: var(--dt-text);
+}
 .desktop-view .dt-panel-session .id-display { font-size: clamp(13px, 1.7vh, 19px); }
 .desktop-view .dt-panel-session .dev-panel { display: none; }
 
@@ -745,4 +824,14 @@
 .desktop-view .dt-pane-switcher .dt-embedded-switcher .atem-workspace-layout {
   min-height: 0;
   overflow: hidden;
+}
+
+/* The switcher was drawn for a fullscreen overlay, so on a 720p console its
+   multiview is taller than the tab. Its own sections scroll rather than clip:
+   a camera the director cannot scroll to is a camera they cannot cut to. */
+.desktop-view .dt-pane-switcher .dt-embedded-switcher .atem-multiview-board,
+.desktop-view .dt-pane-switcher .dt-embedded-switcher .creator-camera-section {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
