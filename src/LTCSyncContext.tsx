@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Timecode from 'smpte-timecode';
+import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 
@@ -476,12 +477,20 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   }, [p2pRole, targetId, mediaServiceRef, addToast, langRef]);
 
   useEffect(() => {
+    // StatusBar and ScreenOrientation are native-only. Calling them in a
+    // browser throws on every load and buries real problems under plugin
+    // warnings, so ask the platform first rather than catching afterwards.
+    if (!Capacitor.isNativePlatform()) {
+      debug('Skipping native StatusBar/Orientation setup (web environment)');
+      return;
+    }
+
     const initMobile = async () => {
       try {
         await StatusBar.setStyle({ style: Style.Dark });
         await ScreenOrientation.lock({ orientation: 'portrait' });
-      } catch {
-        debug('StatusBar/Orientation unavailable (non-native environment)');
+      } catch (err) {
+        debug('StatusBar/Orientation setup failed', err);
       }
     };
     void initMobile();
