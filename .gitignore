@@ -14,6 +14,11 @@ dist-ssr
 coverage
 *.local
 
+# Secrets / local configuration (API keys, custom TURN credentials)
+.env
+.env.*
+!.env.example
+
 # FUSE leftover files (created when a file is deleted while still open)
 *.fuse_hidden*
 
