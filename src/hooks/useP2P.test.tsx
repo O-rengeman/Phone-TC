@@ -148,6 +148,73 @@ describe('useP2P — thin state-transition coverage', () => {
     expect(addToast).toHaveBeenCalledWith('MASTER LOST — CLIENT STOPPED', 'error');
   });
 
+  it('re-links a dropped client connection without operator input', async () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useP2P(makeParams({ p2pRole: 'client' })));
+    await act(async () => { await result.current.setupP2PClient(); });
+    act(() => result.current.setTargetId('MASTERID'));
+    connect.mockClear();
+
+    act(() => result.current.setP2pStatus('CONNECTION CLOSED'));
+    act(() => { vi.advanceTimersByTime(2000); });
+
+    expect(connect).toHaveBeenCalledWith('MASTERID');
+    expect(result.current.p2pStatus).toBe('RECONNECTING...');
+  });
+
+  it('spaces successive re-link attempts further apart', async () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useP2P(makeParams({ p2pRole: 'client' })));
+    await act(async () => { await result.current.setupP2PClient(); });
+    act(() => result.current.setTargetId('MASTERID'));
+    connect.mockClear();
+
+    // First attempt: base delay of 1.5s (±20% jitter).
+    act(() => result.current.setP2pStatus('CONNECTION CLOSED'));
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(connect).toHaveBeenCalledTimes(1);
+
+    // The re-link failed and the connection closed again — the next attempt
+    // must wait ~3s rather than another 1.5s.
+    act(() => result.current.setP2pStatus('CONNECTION CLOSED'));
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(connect).toHaveBeenCalledTimes(1);
+
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(connect).toHaveBeenCalledTimes(2);
+  });
+
+  it('resets the re-link backoff after the connection comes back', async () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useP2P(makeParams({ p2pRole: 'client' })));
+    await act(async () => { await result.current.setupP2PClient(); });
+    act(() => result.current.setTargetId('MASTERID'));
+    connect.mockClear();
+
+    act(() => result.current.setP2pStatus('CONNECTION CLOSED'));
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(connect).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.setP2pStatus('CONNECTED TO MASTERID'));
+
+    // A later drop starts from the base delay again, not the grown one.
+    act(() => result.current.setP2pStatus('CONNECTION CLOSED'));
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(connect).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not attempt to re-link before a master id has been entered', async () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useP2P(makeParams({ p2pRole: 'client' })));
+    await act(async () => { await result.current.setupP2PClient(); });
+    connect.mockClear();
+
+    act(() => result.current.setP2pStatus('CONNECTION CLOSED'));
+    act(() => { vi.advanceTimersByTime(60_000); });
+
+    expect(connect).not.toHaveBeenCalled();
+  });
+
   it('times out on stale master contact even when no heartbeat was recorded yet', () => {
     vi.useFakeTimers();
     const onMasterHeartbeatTimeout = vi.fn();

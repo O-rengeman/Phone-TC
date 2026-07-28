@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { PeerSync } from './PeerSync';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { PeerSync, PEER_ID_RETRY_LIMIT, SIGNALING_RECONNECT_LIMIT } from './PeerSync';
 import type { SyncMessage } from './PeerSync';
 import type { Peer } from 'peerjs';
 
@@ -32,6 +32,10 @@ class FakePeer {
   lastConn: ReturnType<typeof makeConn> | null = null;
   connectCalls: Array<{ id: string; options?: { label?: string; reliable?: boolean } }> = [];
   destroyed = false;
+  // Mirrors real PeerJS: `disconnected` flips true when the signaling socket
+  // drops, and reconnect() re-dials it with the same id.
+  disconnected = false;
+  reconnectCalls = 0;
   on(event: string, cb: Handler) { (this.handlers[event] ||= []).push(cb); }
   emit(event: string, ...args: unknown[]) { (this.handlers[event] || []).forEach(h => h(...args)); }
   connect(id: string, options?: { label?: string; reliable?: boolean }) {
@@ -41,6 +45,7 @@ class FakePeer {
     this.lastConn = makeConn({ peer: id, label: options?.label, open: false });
     return this.lastConn;
   }
+  reconnect() { this.reconnectCalls += 1; }
   destroy() { this.destroyed = true; }
 }
 
@@ -343,6 +348,181 @@ describe('PeerSync signaling channel', () => {
 
     ps.destroy();
     expect(conn.close).toHaveBeenCalled();
+  });
+});
+
+/**
+ * Builds a PeerSync whose factory hands out a fresh FakePeer per call, so the
+ * id-collision retry path (which recreates the Peer) is observable.
+ */
+function setupWithPeerQueue() {
+  const peers: FakePeer[] = [];
+  const statuses: string[] = [];
+  const ps = new PeerSync(
+    () => {},
+    (status) => statuses.push(status),
+    () => {
+      const fake = new FakePeer();
+      peers.push(fake);
+      return fake as unknown as Peer;
+    },
+  );
+  return { ps, peers, statuses };
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('PeerSync short-id collisions', () => {
+  it('redraws a fresh id and retries when the signaling server reports the id is taken', async () => {
+    const { ps, peers } = setupWithPeerQueue();
+    const ready = ps.initialize();
+
+    peers[0].emit('error', { type: 'unavailable-id' });
+    expect(peers).toHaveLength(2);
+    expect(peers[0].destroyed).toBe(true);
+
+    peers[1].emit('open', 'WXYZ');
+    await expect(ready).resolves.toBe('WXYZ');
+  });
+
+  it('does not surface a collision as an error status while retries remain', async () => {
+    const { ps, peers, statuses } = setupWithPeerQueue();
+    const ready = ps.initialize();
+
+    peers[0].emit('error', { type: 'unavailable-id' });
+    peers[1].emit('open', 'WXYZ');
+    await ready;
+
+    expect(statuses.some(s => s.includes('ERROR'))).toBe(false);
+  });
+
+  it('gives up and rejects once the redraw limit is exhausted', async () => {
+    const { ps, peers } = setupWithPeerQueue();
+    const ready = ps.initialize();
+
+    for (let i = 0; i <= PEER_ID_RETRY_LIMIT; i++) {
+      peers[i].emit('error', { type: 'unavailable-id' });
+    }
+
+    await expect(ready).rejects.toMatchObject({ type: 'unavailable-id' });
+    expect(peers).toHaveLength(PEER_ID_RETRY_LIMIT + 1);
+  });
+
+  it('does not redraw the id for a collision reported after the peer is already open', async () => {
+    const { ps, peers, statuses } = setupWithPeerQueue();
+    const ready = ps.initialize();
+    peers[0].emit('open', 'ABCD');
+    await ready;
+
+    peers[0].emit('error', { type: 'unavailable-id' });
+
+    expect(peers).toHaveLength(1);
+    expect(statuses.some(s => s.includes('ERROR'))).toBe(true);
+  });
+});
+
+describe('PeerSync signaling reconnect', () => {
+  it('re-dials the signaling socket after it drops', async () => {
+    vi.useFakeTimers();
+    const { ps, fake, statuses } = await setupOpenPeer();
+
+    fake.disconnected = true;
+    fake.emit('disconnected');
+    expect(statuses).toContain('RECONNECTING...');
+    expect(fake.reconnectCalls).toBe(0);
+
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(fake.reconnectCalls).toBe(1);
+    void ps;
+  });
+
+  it('backs off exponentially instead of hammering at a fixed interval', async () => {
+    vi.useFakeTimers();
+    const { fake } = await setupOpenPeer();
+
+    fake.disconnected = true;
+    fake.emit('disconnected');
+
+    // Base delay is 1s (±jitter), so a 2s window covers exactly one attempt;
+    // the second is scheduled ~2s later and must not fire inside it.
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(fake.reconnectCalls).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fake.reconnectCalls).toBe(2);
+  });
+
+  it('stops re-dialling and reports the loss once the attempt limit is reached', async () => {
+    vi.useFakeTimers();
+    const { fake, statuses } = await setupOpenPeer();
+
+    fake.disconnected = true;
+    fake.emit('disconnected');
+    await vi.advanceTimersByTimeAsync(600_000);
+
+    expect(fake.reconnectCalls).toBe(SIGNALING_RECONNECT_LIMIT);
+    expect(statuses).toContain('ERROR: SIGNALING LOST');
+  });
+
+  it('resets the backoff once the socket comes back', async () => {
+    vi.useFakeTimers();
+    const { fake } = await setupOpenPeer();
+
+    fake.disconnected = true;
+    fake.emit('disconnected');
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(fake.reconnectCalls).toBe(1);
+
+    // A successful re-dial emits 'open' again, which cancels the pending
+    // retry so the connection isn't torn at by a stale timer.
+    fake.disconnected = false;
+    fake.emit('open', 'ABCD');
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(fake.reconnectCalls).toBe(1);
+
+    // ...and the next drop starts again from the base delay.
+    fake.disconnected = true;
+    fake.emit('disconnected');
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(fake.reconnectCalls).toBe(2);
+  });
+
+  it('skips the re-dial if the socket recovered on its own before the timer fired', async () => {
+    vi.useFakeTimers();
+    const { fake } = await setupOpenPeer();
+
+    fake.disconnected = true;
+    fake.emit('disconnected');
+    fake.disconnected = false;
+
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(fake.reconnectCalls).toBe(0);
+  });
+
+  it('destroy() cancels a pending reconnect', async () => {
+    vi.useFakeTimers();
+    const { ps, fake } = await setupOpenPeer();
+
+    fake.disconnected = true;
+    fake.emit('disconnected');
+    ps.destroy();
+
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(fake.reconnectCalls).toBe(0);
+  });
+
+  it('ignores a disconnect that arrives after destroy()', async () => {
+    vi.useFakeTimers();
+    const { ps, fake } = await setupOpenPeer();
+
+    ps.destroy();
+    fake.disconnected = true;
+    fake.emit('disconnected');
+
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(fake.reconnectCalls).toBe(0);
   });
 });
 

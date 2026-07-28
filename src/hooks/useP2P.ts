@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PeerSync } from '../utils/PeerSync';
 import type { SyncMessage } from '../utils/PeerSync';
+import { computeBackoffDelay } from '../utils/backoff';
 import { t as translate } from '../utils/i18n';
 import type { Lang } from '../utils/i18n';
 import type { SyncMode } from '../LTCSyncContext';
@@ -9,7 +10,11 @@ type ToastLevel = 'info' | 'warn' | 'error';
 type P2PRole = 'master' | 'client' | null;
 type ClientStats = Record<string, { rtt: number; drift: number; lastSeen: number }>;
 
-const RECONNECT_DELAY_MS = 5000;
+// Client re-link pacing. The first retry is quick because the common case on
+// set is a momentary drop (the operator walked behind a wall), while a phone
+// that is genuinely off-network backs off towards the 30s ceiling instead of
+// retrying every 5s for the rest of the shoot.
+const CLIENT_RECONNECT_BACKOFF = { baseDelayMs: 1500, maxDelayMs: 30000 };
 const MASTER_HEARTBEAT_TIMEOUT_MS = 3000;
 const HEARTBEAT_WATCH_INTERVAL_MS = 500;
 
@@ -91,6 +96,7 @@ export function useP2P({
   const lastHeartbeatTimeRef = useRef<number>(0);
   const lastMasterContactTimeRef = useRef<number>(0);
   const masterTimeoutHandledRef = useRef(false);
+  const reconnectAttemptRef = useRef(0);
 
   useEffect(() => {
     lastSyncTimeRef.current = Date.now();
@@ -204,6 +210,14 @@ export function useP2P({
     return () => clearInterval(timer);
   }, [p2pRole, isRunning, isPaused, onMasterHeartbeatTimeout, addToast, langRef]);
 
+  // A healthy link clears the backoff, so a drop later in the shoot retries
+  // promptly instead of inheriting the delay the previous outage grew to.
+  useEffect(() => {
+    if (p2pStatus.startsWith('CONNECTED')) {
+      reconnectAttemptRef.current = 0;
+    }
+  }, [p2pStatus]);
+
   // Emergency Mode: Auto-reconnect & notify when disconnected during playback
   useEffect(() => {
     if (p2pRole === 'client' && p2pStatus.includes('CLOSED') && targetId) {
@@ -211,12 +225,15 @@ export function useP2P({
         addToast(translate('toast.p2pDisconnectedEmergency', langRef.current), 'error');
       }
 
+      const delay = computeBackoffDelay(reconnectAttemptRef.current, CLIENT_RECONNECT_BACKOFF);
+      reconnectAttemptRef.current += 1;
+
       const reconnectTimer = setTimeout(() => {
         if (peerSyncRef.current && targetId) {
           setP2pStatus('RECONNECTING...');
           peerSyncRef.current.connect(targetId);
         }
-      }, RECONNECT_DELAY_MS);
+      }, delay);
       return () => clearTimeout(reconnectTimer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
