@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LTCSyncProvider, useLTC } from './LTCSyncContext';
 import { FPS_OPTIONS } from './constants';
 import { VideoPlayer } from './VideoPlayer';
@@ -19,6 +19,7 @@ import { HeaderBar } from './components/HeaderBar';
 import { FooterControls } from './components/FooterControls';
 import { MarkerList } from './components/MarkerList';
 import { ClientList } from './components/ClientList';
+import { DesktopShell } from './components/desktop/DesktopShell';
 import { getAutoSwitcherAssignment, resolveReturnFeed } from './utils/switcherRouting';
 import './App.css';
 
@@ -274,6 +275,25 @@ function MainApp() {
     }
   }, [effectivePgmSourceId, effectivePreviewSourceId, handleSwitcherBusChange, playHapticFeedback, setIsVideoEnabled]);
 
+  // Bundled once so the desktop SWITCHER tab and the fullscreen DIR overlay
+  // are driven by exactly the same handlers.
+  const switcherControls = useMemo(() => ({
+    effectivePgmSourceId,
+    effectivePreviewSourceId,
+    isTransitioning,
+    transitionProgress,
+    isAutoTransitioning,
+    handleSelectPreview,
+    handleSelectProgram,
+    handleCut,
+    handleAuto,
+    handleTBarChange,
+  }), [
+    effectivePgmSourceId, effectivePreviewSourceId, isTransitioning, transitionProgress,
+    isAutoTransitioning, handleSelectPreview, handleSelectProgram, handleCut, handleAuto,
+    handleTBarChange,
+  ]);
+
   return (
     <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
       <HeaderBar
@@ -304,8 +324,20 @@ function MainApp() {
         </nav>
       )}
 
-      <main className={isMobile ? 'tab-content' : 'desktop-dashboard'}>
-        {(isMobile ? activeTab === 'main' : true) && (
+      {!isMobile && (
+        <DesktopShell
+          switcher={switcherControls}
+          onOutputModeChange={handleOutputModeChange}
+        />
+      )}
+
+      {p2pRole === 'client' && pipEnabled && returnStream && (
+        <FloatingPip stream={returnStream} onClose={() => setPipEnabled(false)} />
+      )}
+
+      {isMobile && (
+      <main className="tab-content">
+        {activeTab === 'main' && (
           <div className="tab-pane main-pane">
             <VideoPlayer />
 
@@ -324,10 +356,6 @@ function MainApp() {
               />
             )}
 
-            {p2pRole === 'client' && pipEnabled && returnStream && (
-              <FloatingPip stream={returnStream} onClose={() => setPipEnabled(false)} />
-            )}
-
             {syncMode === 'network' && (
               <div className="main-sync-bar">
                 <div className="msb-info">
@@ -343,48 +371,41 @@ function MainApp() {
               </div>
             )}
 
-            {isMobile && (
-              <>
-                <div className="control-section">
-                  <label className="section-label">{tr('label.frameRate')}</label>
-                  <div className="fps-grid-compact">
-                    {FPS_OPTIONS.map((opt, i) => (
-                      <button 
-                        key={opt.label} 
-                        className={`btn-pill ${fpsIndex === i ? 'active' : ''}`}
-                        onClick={() => setFpsIndex(i)}
-                        disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+            <div className="control-section">
+              <label className="section-label">{tr('label.frameRate')}</label>
+              <div className="fps-grid-compact">
+                {FPS_OPTIONS.map((opt, i) => (
+                  <button
+                    key={opt.label}
+                    className={`btn-pill ${fpsIndex === i ? 'active' : ''}`}
+                    onClick={() => setFpsIndex(i)}
+                    disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
+            <div className="control-section">
+              <label className="section-label">{tr('label.outputMode')}</label>
+              <div className="sync-toggle-pro">
+                <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')}>STEREO TC</button>
+                <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')}>L-TC / R-AUDIO</button>
+              </div>
+            </div>
 
-
-                <div className="control-section">
-                  <label className="section-label">{tr('label.outputMode')}</label>
-                  <div className="sync-toggle-pro">
-                    <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')}>STEREO TC</button>
-                    <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')}>L-TC / R-AUDIO</button>
-                  </div>
-                </div>
-
-                <div className="control-section">
-                  <label className="section-label">TC OFFSET (FRAMES)</label>
-                  <div className="offset-control">
-                    <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} />
-                    <span className="offset-value">{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
-                  </div>
-                </div>
-
-              </>
-            )}
+            <div className="control-section">
+              <label className="section-label">TC OFFSET (FRAMES)</label>
+              <div className="offset-control">
+                <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} />
+                <span className="offset-value">{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
+              </div>
+            </div>
           </div>
         )}
 
-        {(isMobile ? activeTab === 'sync' : true) && (
+        {activeTab === 'sync' && (
           <div className="tab-pane sync-pane">
             <div className="control-section">
               <label className="section-label">{tr('label.syncMethod')}</label>
@@ -434,31 +455,10 @@ function MainApp() {
             )}
 
             <ConnectionManager />
-
-            {!isMobile && (
-              <div className="control-section">
-                <label className="section-label">{tr('label.frameRate')}</label>
-                <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '8px' }}>
-                  59.94p 撮影時は 29.97 を、50p 撮影時は 25 を選択してください。
-                </div>
-                <div className="fps-grid-compact">
-                  {FPS_OPTIONS.map((opt, i) => (
-                    <button 
-                      key={opt.label} 
-                      className={`btn-pill ${fpsIndex === i ? 'active' : ''}`}
-                      onClick={() => setFpsIndex(i)}
-                      disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
-        {(isMobile ? activeTab === 'tools' : true) && (
+        {activeTab === 'tools' && (
           <div className="tab-pane tools-pane">
             <section className="tool-section-shell tool-section-shell-tally">
               <div className="tool-section-head">
@@ -565,28 +565,6 @@ function MainApp() {
                     placeholder="001"
                   />
                 </div>
-                {!isMobile && (
-                  <>
-
-
-                    <div className="tool-card span-2">
-                      <label className="section-label">{tr('label.outputMode')}</label>
-                      <div className="sync-toggle-pro">
-                        <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')}>STEREO TC</button>
-                        <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')}>L-TC / R-AUDIO</button>
-                      </div>
-                    </div>
-
-                    <div className="tool-card span-2">
-                      <label className="section-label">TC OFFSET (FRAMES)</label>
-                      <div className="offset-control">
-                        <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} />
-                        <span className="offset-value">{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
-                      </div>
-                    </div>
-
-                  </>
-                )}
               </div>
             </section>
             
@@ -614,6 +592,7 @@ function MainApp() {
           </div>
         )}
       </main>
+      )}
 
       {markerFlash && (
         <div className={`marker-flash ${markerFlash.color.toLowerCase()}`}>
@@ -668,20 +647,7 @@ function MainApp() {
         />
       )}
 
-      {directorPanelOpen && (
-        <DirectorPanel
-          effectivePgmSourceId={effectivePgmSourceId}
-          effectivePreviewSourceId={effectivePreviewSourceId}
-          isTransitioning={isTransitioning}
-          transitionProgress={transitionProgress}
-          isAutoTransitioning={isAutoTransitioning}
-          handleSelectPreview={handleSelectPreview}
-          handleSelectProgram={handleSelectProgram}
-          handleCut={handleCut}
-          handleAuto={handleAuto}
-          handleTBarChange={handleTBarChange}
-        />
-      )}
+      {directorPanelOpen && <DirectorPanel {...switcherControls} />}
 
       {isVisualSlate && (
         <VisualSlate
