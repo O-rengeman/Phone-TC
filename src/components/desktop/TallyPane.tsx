@@ -1,7 +1,7 @@
 import { useLTC } from '../../LTCSyncContext';
 import { tallyLabelKey, TALLY_COLORS } from '../../utils/tally';
 import type { TallyState } from '../../utils/tally';
-import { DesktopPanel } from './DesktopPanel';
+import { DesktopPanel, DesktopSection } from './DesktopPanel';
 
 const TALLY_STATES: TallyState[] = ['live', 'preview', 'off'];
 const OFFLINE_AFTER_MS = 30000;
@@ -32,15 +32,17 @@ export function TallyPane() {
 
   return (
     <div className="dt-pane dt-pane-tally">
-      <div className="dt-col">
-        <DesktopPanel
-          title={tr('label.tally')}
-          aside={
-            <button type="button" className="dt-btn-sm" onClick={openFullscreen}>
-              {tr('dt.fullscreen')}
-            </button>
-          }
-        >
+      <DesktopPanel
+        title={tr('dt.control')}
+        className="dt-panel-control"
+        aside={
+          <button type="button" className="dt-btn-sm" onClick={openFullscreen}>
+            {tr('dt.fullscreen')}
+          </button>
+        }
+        scroll
+      >
+        <DesktopSection title={tr('label.tally')}>
           <div className="dt-tally-row">
             {TALLY_STATES.map(state => (
               <button
@@ -62,9 +64,9 @@ export function TallyPane() {
             />
             <span>Torch LED</span>
           </label>
-        </DesktopPanel>
+        </DesktopSection>
 
-        <DesktopPanel title={tr('dt.appearance')}>
+        <DesktopSection title={tr('dt.appearance')}>
           <div className="dt-field">
             <span className="dt-field-label">STYLE</span>
             <div className="dt-segment">
@@ -103,13 +105,10 @@ export function TallyPane() {
               ))}
             </div>
           </div>
-        </DesktopPanel>
+        </DesktopSection>
 
-        {/* The log lives with the controls rather than in a column of its own:
-            it is a record of what the operator just did, and giving it a third
-            of the console made the camera grid narrower than it needed to be. */}
         {isHost && tallyActionLog.length > 0 && (
-          <DesktopPanel title={tr('director.actionLog')} className="dt-panel-log" scroll>
+          <DesktopSection title={tr('director.actionLog')}>
             <ul className="dt-log">
               {tallyActionLog.map((entry, i) => (
                 <li key={i}>
@@ -119,9 +118,9 @@ export function TallyPane() {
                 </li>
               ))}
             </ul>
-          </DesktopPanel>
+          </DesktopSection>
         )}
-      </div>
+      </DesktopPanel>
 
       <DesktopPanel
         title={tr('dt.clients')}
@@ -186,7 +185,6 @@ export function TallyPane() {
           </div>
         )}
       </DesktopPanel>
-
     </div>
   );
 }

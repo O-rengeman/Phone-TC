@@ -2,7 +2,7 @@ import { useLTC } from '../../LTCSyncContext';
 import type { SyncMode } from '../../LTCSyncContext';
 import { formatSyncAge } from '../../utils/DriftMonitor';
 import { ConnectionManager } from '../../ConnectionManager';
-import { DesktopPanel } from './DesktopPanel';
+import { DesktopPanel, DesktopSection } from './DesktopPanel';
 
 const SYNC_MODES: SyncMode[] = ['system', 'network', 'p2p', 'freerun'];
 const OFFLINE_AFTER_MS = 30000;
@@ -25,61 +25,57 @@ export function SyncPane() {
 
   return (
     <div className="dt-pane dt-pane-sync">
-      <div className="dt-col">
-      <DesktopPanel
-        title={tr('label.syncMethod')}
-        aside={syncMode === 'network' ? (
-          <button
-            type="button"
-            className="dt-btn-sm"
-            onClick={() => void handleManualResync()}
-            disabled={isResyncing}
-          >
-            {isResyncing ? tr('sync.resyncing') : tr('sync.resync')}
-          </button>
-        ) : undefined}
-      >
-        <div className="dt-segment dt-segment-4">
-          {SYNC_MODES.map(mode => (
+      <DesktopPanel title={tr('dt.control')} className="dt-panel-control" scroll>
+        <DesktopSection title={tr('label.syncMethod')}>
+          <div className="dt-segment dt-segment-4">
+            {SYNC_MODES.map(mode => (
+              <button
+                key={mode}
+                type="button"
+                className={syncMode === mode ? 'active' : ''}
+                onClick={() => setSyncMode(mode)}
+                disabled={isRunning || (mode === 'p2p' && !p2pRole)}
+              >
+                {mode === 'freerun' ? tr('mode.freerun') : mode.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          <div className="dt-stat-row">
+            <div className="dt-stat">
+              <span className="dt-stat-label">LATENCY</span>
+              <strong>{syncStatus ? `${syncStatus.latency.toFixed(1)}ms` : '—'}</strong>
+            </div>
+            <div className="dt-stat">
+              <span className="dt-stat-label">OFFSET</span>
+              <strong>{syncStatus ? `${syncStatus.offset.toFixed(1)}ms` : '—'}</strong>
+            </div>
+            <div className="dt-stat">
+              <span className="dt-stat-label">{tr('drift.lastSync')}</span>
+              <strong>{driftStatus?.hasSync ? formatSyncAge(driftStatus.msSinceSync) : '—'}</strong>
+            </div>
+          </div>
+
+          {syncMode === 'network' && (
             <button
-              key={mode}
               type="button"
-              className={syncMode === mode ? 'active' : ''}
-              onClick={() => setSyncMode(mode)}
-              disabled={isRunning || (mode === 'p2p' && !p2pRole)}
+              className="dt-btn"
+              onClick={() => void handleManualResync()}
+              disabled={isResyncing}
             >
-              {mode === 'freerun' ? tr('mode.freerun') : mode.toUpperCase()}
+              {isResyncing ? tr('sync.resyncing') : tr('sync.resync')}
             </button>
-          ))}
-        </div>
+          )}
 
-        <div className="dt-stat-row">
-          <div className="dt-stat">
-            <span className="dt-stat-label">LATENCY</span>
-            <strong>{syncStatus ? `${syncStatus.latency.toFixed(1)}ms` : '—'}</strong>
-          </div>
-          <div className="dt-stat">
-            <span className="dt-stat-label">OFFSET</span>
-            <strong>{syncStatus ? `${syncStatus.offset.toFixed(1)}ms` : '—'}</strong>
-          </div>
-          <div className="dt-stat">
-            <span className="dt-stat-label">{tr('drift.lastSync')}</span>
-            <strong>{driftStatus?.hasSync ? formatSyncAge(driftStatus.msSinceSync) : '—'}</strong>
-          </div>
-        </div>
+          {driftStatus?.hasSync && driftStatus.msSinceSync >= 3600000 && (
+            <p className="dt-warn">⚠️ {tr('drift.rejam')}</p>
+          )}
+        </DesktopSection>
 
-        {driftStatus?.hasSync && driftStatus.msSinceSync >= 3600000 && (
-          <p className="dt-warn">⚠️ {tr('drift.rejam')}</p>
-        )}
+        <DesktopSection title={tr('dt.session')}>
+          <ConnectionManager />
+        </DesktopSection>
       </DesktopPanel>
-
-      {/* Scrolls internally as a last resort: the session form is the one
-          panel whose height depends on connection state rather than on a
-          fixed set of controls. */}
-      <DesktopPanel title={tr('dt.session')} className="dt-panel-session" scroll>
-        <ConnectionManager />
-      </DesktopPanel>
-      </div>
 
       <DesktopPanel
         title={tr('dt.clients')}

@@ -1,5 +1,5 @@
 import { useLTC } from '../../LTCSyncContext';
-import { DesktopPanel } from './DesktopPanel';
+import { DesktopPanel, DesktopSection } from './DesktopPanel';
 
 /**
  * The take log: markers laid down during a shot, the metadata that ends up in
@@ -19,8 +19,8 @@ export function MarkersPane() {
 
   return (
     <div className="dt-pane dt-pane-markers">
-      <div className="dt-col">
-        <DesktopPanel title={tr('dt.metadata')}>
+      <DesktopPanel title={tr('dt.control')} className="dt-panel-control" scroll>
+        <DesktopSection title={tr('dt.metadata')}>
           <div className="dt-field">
             <span className="dt-field-label">{tr('label.defaultReel')}</span>
             <input
@@ -60,9 +60,9 @@ export function MarkersPane() {
               </button>
             </div>
           </div>
-        </DesktopPanel>
+        </DesktopSection>
 
-        <DesktopPanel title="EXPORT">
+        <DesktopSection title="EXPORT">
           <div className="dt-export-row">
             <button type="button" className="dt-btn" onClick={exportToEDL} disabled={markers.length === 0}>
               EDL
@@ -72,8 +72,9 @@ export function MarkersPane() {
             </button>
           </div>
           <p className="dt-hint">リール名とシーン名は書き出しファイルに含まれます。</p>
-        </DesktopPanel>
-      </div>
+        </DesktopSection>
+      </DesktopPanel>
+
       <DesktopPanel
         title={tr('label.loggedTakes')}
         aside={<span className="dt-count">{markers.length}</span>}

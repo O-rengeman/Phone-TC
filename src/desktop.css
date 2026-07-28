@@ -259,10 +259,10 @@
    slightly denser padding rather than the column getting wider, so the three
    columns stay equal. */
 @media (max-height: 820px) {
-  .desktop-view .dt-pane-sync > .dt-col .dt-panel-body,
-  .desktop-view .dt-pane-tally > .dt-col .dt-panel-body { padding: 8px 10px; gap: 6px; }
-  .desktop-view .dt-pane-sync > .dt-col .dt-panel-head,
-  .desktop-view .dt-pane-tally > .dt-col .dt-panel-head { padding: 5px 10px; }
+  .desktop-view .dt-panel-control .dt-panel-body { padding: 8px 10px; gap: 6px; }
+  .desktop-view .dt-panel-control .dt-panel-head { padding: 5px 10px; }
+  .desktop-view .dt-panel-control .dt-section { gap: 6px; }
+  .desktop-view .dt-panel-control .dt-section + .dt-section { padding-top: 6px; }
 }
 
 /* The switcher is one instrument and cannot be split across columns. */
@@ -270,24 +270,33 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-.desktop-view .dt-col {
-  display: grid;
-  grid-auto-rows: min-content;
-  gap: var(--dt-gap);
-  min-height: 0;
+/* Titled blocks inside a panel. These replace what used to be separate
+   stacked panels: the grid gives each slot exactly one box, so groupings are
+   expressed with a rule and a heading rather than another border. */
+.desktop-view .dt-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-/* The controls column on every tab: fixed-size forms sitting at their natural
-   height at the top. Stretching them to fill the column left voids inside
-   bordered panels, which read as a broken layout; leftover space below the
-   panels reads as background. The scroll is a safety net for short viewports,
-   not the normal case. */
-.desktop-view .dt-pane-sync > .dt-col,
-.desktop-view .dt-pane-tally > .dt-col {
-  grid-auto-rows: min-content;
+.desktop-view .dt-section + .dt-section {
+  padding-top: var(--dt-gap);
+  border-top: 1px solid var(--dt-line-soft);
+}
+
+.desktop-view .dt-section-title {
+  margin: 0;
+  font-size: var(--dt-label);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The controls panel holds several sections, so it is the one that may need
+   to scroll internally on a short viewport. */
+.desktop-view .dt-panel-control .dt-panel-body {
   align-content: start;
-  overflow-y: auto;
-  overflow-x: hidden;
 }
 
 /* ── Panel primitive ──────────────────────────────────────────────────── */
@@ -491,6 +500,7 @@
 
 .desktop-view .dt-inline { display: flex; gap: 6px; align-items: center; }
 .desktop-view .dt-inline .dt-input { flex: 1; }
+.desktop-view .dt-inline-spread { justify-content: space-between; }
 
 .desktop-view .dt-range { width: 100%; accent-color: #fff; }
 
@@ -767,15 +777,15 @@
 
 /* ConnectionManager is shared with the mobile layout, so rather than changing
    its markup, its spacing is compacted here to fit a console row. */
-.desktop-view .dt-panel-session .dt-panel-body { gap: 8px; }
-.desktop-view .dt-panel-session .control-section { gap: 6px; margin: 0; }
-.desktop-view .dt-panel-session .section-label { font-size: var(--dt-label); }
-.desktop-view .dt-panel-session .p2p-panel-pro { gap: 8px; }
+.desktop-view .dt-panel-control .dt-panel-body { gap: 8px; }
+.desktop-view .dt-panel-control .control-section { gap: 6px; margin: 0; }
+.desktop-view .dt-panel-control .section-label { font-size: var(--dt-label); }
+.desktop-view .dt-panel-control .p2p-panel-pro { gap: 8px; }
 
 /* START SOURCE and START TC are one decision, and stacking them cost ~90px —
    enough to push this column into a scrollbar at 720p. Side by side they fit,
    and wrapping keeps it correct when START TC is hidden for network start. */
-.desktop-view .dt-panel-session .p2p-master-box {
+.desktop-view .dt-panel-control .p2p-master-box {
   display: flex;
   /* App.css lays this out as a column; the direction must be stated
      explicitly or the wrap below just stacks the items taller. */
@@ -785,19 +795,19 @@
   gap: 8px;
 }
 
-.desktop-view .dt-panel-session .p2p-master-box > .id-display-row { flex: 1 0 100%; }
-.desktop-view .dt-panel-session .p2p-master-box > .control-section,
-.desktop-view .dt-panel-session .p2p-master-box > .start-tc-input { flex: 1 1 150px; min-width: 0; }
+.desktop-view .dt-panel-control .p2p-master-box > .id-display-row { flex: 1 0 100%; }
+.desktop-view .dt-panel-control .p2p-master-box > .control-section,
+.desktop-view .dt-panel-control .p2p-master-box > .start-tc-input { flex: 1 1 150px; min-width: 0; }
 /* min-height, not height: at 720p a fixed 29px box clipped the descenders on
    "MANUAL TC" / "NETWORK TIME". */
-.desktop-view .dt-panel-session .p2p-init-pro button,
-.desktop-view .dt-panel-session .sync-toggle-pro button {
+.desktop-view .dt-panel-control .p2p-init-pro button,
+.desktop-view .dt-panel-control .sync-toggle-pro button {
   min-height: var(--dt-control-h);
   height: auto;
   font-size: var(--dt-text);
 }
-.desktop-view .dt-panel-session .id-display { font-size: clamp(13px, 1.7vh, 19px); }
-.desktop-view .dt-panel-session .dev-panel { display: none; }
+.desktop-view .dt-panel-control .id-display { font-size: clamp(13px, 1.7vh, 19px); }
+.desktop-view .dt-panel-control .dev-panel { display: none; }
 
 /* ── Embedded switcher ────────────────────────────────────────────────── */
 

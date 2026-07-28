@@ -1,5 +1,26 @@
 import type { ReactNode } from 'react';
 
+interface DesktopSectionProps {
+  title: string;
+  children: ReactNode;
+}
+
+/**
+ * A titled block inside a panel.
+ *
+ * The console gives each grid slot exactly one panel, so groups that used to
+ * be separate stacked panels live here instead — same visual grouping, but
+ * the boxes stay one per slot and therefore all the same size.
+ */
+export function DesktopSection({ title, children }: DesktopSectionProps) {
+  return (
+    <section className="dt-section">
+      <h3 className="dt-section-title">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
 interface DesktopPanelProps {
   title: string;
   /** Optional right-aligned status text or control in the panel header. */
