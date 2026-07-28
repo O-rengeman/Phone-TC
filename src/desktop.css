@@ -213,66 +213,59 @@
   padding: var(--dt-gap) clamp(16px, 2vw, 40px);
 }
 
+/*
+ * One grid for every tab: three equal columns.
+ *
+ * Each tab used to invent its own split (2 equal / 27-73 / 22-44-31 / 75-25),
+ * so the console rearranged itself under the operator every time they changed
+ * section and nothing could be found by muscle memory. The rule now is fixed
+ * and holds everywhere:
+ *
+ *   column 1      — the controls you operate
+ *   columns 2-3   — the live picture: whatever grows with the shoot
+ *
+ * Anything that needs room takes the middle and right columns together (see
+ * .dt-panel-grow below); nothing is ever a different width from its
+ * neighbour on another tab.
+ */
 .desktop-view .dt-pane {
   height: 100%;
   min-height: 0;
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--dt-gap);
 }
 
-/* Setup controls are short forms. Stretched across four full-height columns
-   they were ~75% empty, so they pack into a 2x2 block sized to its content
-   and sit at the top of the stage instead of being pulled apart to fill it. */
+/* The single expression of "needs more size": the middle and right columns. */
+.desktop-view .dt-pane > .dt-panel-grow {
+  grid-column: 2 / -1;
+}
+
+/* Setup controls are short forms, so they sit at their natural height across
+   the three columns rather than being stretched to fill the stage. */
 .desktop-view .dt-pane-timecode {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-auto-rows: min-content;
   align-content: start;
-  max-width: clamp(720px, 62vw, 1180px);
 }
 
-/* A client's return feed is the exception: it is a video, so it takes the
-   column beside the settings and uses the full height. */
-.desktop-view .dt-pane-timecode.has-return {
-  grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 1.1fr);
-  max-width: none;
+/* A client's return feed is a picture, not a control, so it follows the same
+   rule as every other live surface and takes the middle and right columns. */
+.desktop-view .dt-pane-timecode > .dt-panel-return {
+  grid-column: 2 / -1;
+  grid-row: 2;
 }
 
-.desktop-view .dt-pane-timecode.has-return > .dt-panel-return {
-  grid-column: 3;
-  grid-row: 1 / -1;
-  align-self: stretch;
-}
-
-/* The camera table is the only panel here that grows with the shoot, so it
-   takes the full stage height while the sparse controls stack beside it at
-   their natural size. */
-.desktop-view .dt-pane-sync {
-  grid-template-columns: minmax(320px, 27vw) minmax(0, 1fr);
-}
-
-/* On a 720p console the control column is the tight one, so it gets wider
-   rather than taller: at this width START SOURCE and START TC sit on one
-   row, which is exactly the ~90px that otherwise forced a scrollbar. The
-   camera table still has over 800px left to work with. */
+/* On a 720p console the control column is the tight one. Its panels get
+   slightly denser padding rather than the column getting wider, so the three
+   columns stay equal. */
 @media (max-height: 820px) {
-  .desktop-view .dt-pane-sync {
-    grid-template-columns: minmax(430px, 36vw) minmax(0, 1fr);
-  }
-
-  /* Last ~20px: the control column is the only place on the console where
-     padding decides whether a scrollbar appears. */
-  .desktop-view .dt-pane-sync > .dt-col .dt-panel-body { padding: 8px 10px; gap: 6px; }
-  .desktop-view .dt-pane-sync > .dt-col .dt-panel-head { padding: 5px 10px; }
+  .desktop-view .dt-pane-sync > .dt-col .dt-panel-body,
+  .desktop-view .dt-pane-tally > .dt-col .dt-panel-body { padding: 8px 10px; gap: 6px; }
+  .desktop-view .dt-pane-sync > .dt-col .dt-panel-head,
+  .desktop-view .dt-pane-tally > .dt-col .dt-panel-head { padding: 5px 10px; }
 }
 
-.desktop-view .dt-pane-tally {
-  grid-template-columns: minmax(260px, 22vw) minmax(0, 1fr) minmax(0, 0.7fr);
-}
-
-.desktop-view .dt-pane-markers {
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 24vw);
-}
-
+/* The switcher is one instrument and cannot be split across columns. */
 .desktop-view .dt-pane-switcher {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -284,12 +277,13 @@
   min-height: 0;
 }
 
-/* Both control panels here are fixed-size forms, so they sit at their natural
-   height at the top of the column. Stretching the session form to fill the
-   column left a ~250px void inside a bordered panel, which reads as a broken
-   layout; leftover space below the panels reads as background. The scroll is
-   a safety net for short viewports, not the normal case. */
-.desktop-view .dt-pane-sync > .dt-col {
+/* The controls column on every tab: fixed-size forms sitting at their natural
+   height at the top. Stretching them to fill the column left voids inside
+   bordered panels, which read as a broken layout; leftover space below the
+   panels reads as background. The scroll is a safety net for short viewports,
+   not the normal case. */
+.desktop-view .dt-pane-sync > .dt-col,
+.desktop-view .dt-pane-tally > .dt-col {
   grid-auto-rows: min-content;
   align-content: start;
   overflow-y: auto;

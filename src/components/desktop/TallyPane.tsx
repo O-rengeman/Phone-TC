@@ -104,6 +104,23 @@ export function TallyPane() {
             </div>
           </div>
         </DesktopPanel>
+
+        {/* The log lives with the controls rather than in a column of its own:
+            it is a record of what the operator just did, and giving it a third
+            of the console made the camera grid narrower than it needed to be. */}
+        {isHost && tallyActionLog.length > 0 && (
+          <DesktopPanel title={tr('director.actionLog')} className="dt-panel-log" scroll>
+            <ul className="dt-log">
+              {tallyActionLog.map((entry, i) => (
+                <li key={i}>
+                  <span className={`dt-log-state state-${entry.state}`}>{tr(tallyLabelKey(entry.state as TallyState))}</span>
+                  <span>{entry.cam}</span>
+                  <span className="dt-mono">{entry.time}</span>
+                </li>
+              ))}
+            </ul>
+          </DesktopPanel>
+        )}
       </div>
 
       <DesktopPanel
@@ -170,19 +187,6 @@ export function TallyPane() {
         )}
       </DesktopPanel>
 
-      {isHost && tallyActionLog.length > 0 && (
-        <DesktopPanel title={tr('director.actionLog')} className="dt-panel-log" scroll>
-          <ul className="dt-log">
-            {tallyActionLog.map((entry, i) => (
-              <li key={i}>
-                <span className={`dt-log-state state-${entry.state}`}>{tr(tallyLabelKey(entry.state as TallyState))}</span>
-                <span>{entry.cam}</span>
-                <span className="dt-mono">{entry.time}</span>
-              </li>
-            ))}
-          </ul>
-        </DesktopPanel>
-      )}
     </div>
   );
 }

@@ -5,6 +5,9 @@ import { DesktopPanel } from './DesktopPanel';
  * The take log: markers laid down during a shot, the metadata that ends up in
  * the exported EDL/ALE, and the export actions themselves. Kept off the
  * timecode tab because it is reviewed between takes, not during one.
+ *
+ * Controls come first in the markup so they land in the left column like
+ * every other tab, which also puts them first in keyboard tab order.
  */
 export function MarkersPane() {
   const {
@@ -16,6 +19,61 @@ export function MarkersPane() {
 
   return (
     <div className="dt-pane dt-pane-markers">
+      <div className="dt-col">
+        <DesktopPanel title={tr('dt.metadata')}>
+          <div className="dt-field">
+            <span className="dt-field-label">{tr('label.defaultReel')}</span>
+            <input
+              className="dt-input"
+              value={defaultReelName}
+              onChange={e => setDefaultReelName(e.target.value.toUpperCase())}
+              maxLength={8}
+              placeholder="A001"
+            />
+          </div>
+          <div className="dt-field">
+            <span className="dt-field-label">{tr('label.defaultScene')}</span>
+            <input
+              className="dt-input"
+              value={sceneName}
+              onChange={e => setSceneName(e.target.value.toUpperCase())}
+              maxLength={8}
+              placeholder="001"
+            />
+          </div>
+          <div className="dt-field">
+            <span className="dt-field-label">{tr('label.userBits')}</span>
+            <div className="dt-inline">
+              <input
+                className="dt-input dt-input-mono"
+                value={userBits}
+                onChange={e => setUserBits(e.target.value.toUpperCase().replace(/[^0-9A-F]/g, ''))}
+                maxLength={8}
+                disabled={autoUserBits}
+              />
+              <button
+                type="button"
+                className={`dt-chip ${autoUserBits ? 'active' : ''}`}
+                onClick={() => setAutoUserBits(!autoUserBits)}
+              >
+                {tr('btn.auto')}
+              </button>
+            </div>
+          </div>
+        </DesktopPanel>
+
+        <DesktopPanel title="EXPORT">
+          <div className="dt-export-row">
+            <button type="button" className="dt-btn" onClick={exportToEDL} disabled={markers.length === 0}>
+              EDL
+            </button>
+            <button type="button" className="dt-btn" onClick={exportToALE} disabled={markers.length === 0}>
+              ALE
+            </button>
+          </div>
+          <p className="dt-hint">リール名とシーン名は書き出しファイルに含まれます。</p>
+        </DesktopPanel>
+      </div>
       <DesktopPanel
         title={tr('label.loggedTakes')}
         aside={<span className="dt-count">{markers.length}</span>}
@@ -74,62 +132,6 @@ export function MarkersPane() {
           </table>
         )}
       </DesktopPanel>
-
-      <div className="dt-col">
-        <DesktopPanel title={tr('dt.metadata')}>
-          <div className="dt-field">
-            <span className="dt-field-label">{tr('label.defaultReel')}</span>
-            <input
-              className="dt-input"
-              value={defaultReelName}
-              onChange={e => setDefaultReelName(e.target.value.toUpperCase())}
-              maxLength={8}
-              placeholder="A001"
-            />
-          </div>
-          <div className="dt-field">
-            <span className="dt-field-label">{tr('label.defaultScene')}</span>
-            <input
-              className="dt-input"
-              value={sceneName}
-              onChange={e => setSceneName(e.target.value.toUpperCase())}
-              maxLength={8}
-              placeholder="001"
-            />
-          </div>
-          <div className="dt-field">
-            <span className="dt-field-label">{tr('label.userBits')}</span>
-            <div className="dt-inline">
-              <input
-                className="dt-input dt-input-mono"
-                value={userBits}
-                onChange={e => setUserBits(e.target.value.toUpperCase().replace(/[^0-9A-F]/g, ''))}
-                maxLength={8}
-                disabled={autoUserBits}
-              />
-              <button
-                type="button"
-                className={`dt-chip ${autoUserBits ? 'active' : ''}`}
-                onClick={() => setAutoUserBits(!autoUserBits)}
-              >
-                {tr('btn.auto')}
-              </button>
-            </div>
-          </div>
-        </DesktopPanel>
-
-        <DesktopPanel title="EXPORT">
-          <div className="dt-export-row">
-            <button type="button" className="dt-btn" onClick={exportToEDL} disabled={markers.length === 0}>
-              EDL
-            </button>
-            <button type="button" className="dt-btn" onClick={exportToALE} disabled={markers.length === 0}>
-              ALE
-            </button>
-          </div>
-          <p className="dt-hint">リール名とシーン名は書き出しファイルに含まれます。</p>
-        </DesktopPanel>
-      </div>
     </div>
   );
 }
