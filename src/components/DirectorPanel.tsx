@@ -8,7 +8,7 @@ import type { TallyState } from '../utils/tally';
 import Timecode from 'smpte-timecode';
 import '../App.css';
 
-interface DirectorPanelProps {
+export interface DirectorPanelProps {
   effectivePgmSourceId: string | null;
   effectivePreviewSourceId: string | null;
   isTransitioning: boolean;
@@ -19,6 +19,14 @@ interface DirectorPanelProps {
   handleCut: () => void;
   handleAuto: () => void;
   handleTBarChange: (value: number) => void;
+  /**
+   * Renders inside the desktop console's SWITCHER tab rather than as a
+   * fullscreen overlay: the chassis fills its container instead of the
+   * viewport, and the close button is dropped since a tab has nothing to
+   * close back to. Same component either way, so the switcher logic and
+   * shortcuts have exactly one implementation.
+   */
+  embedded?: boolean;
 }
 
 export function DirectorPanel({
@@ -32,6 +40,7 @@ export function DirectorPanel({
   handleCut,
   handleAuto,
   handleTBarChange,
+  embedded = false,
 }: DirectorPanelProps) {
   const {
     directorTime,
@@ -138,7 +147,7 @@ export function DirectorPanel({
   }, [clients, handleAuto, handleCut, handleSelectPreview]);
 
   return (
-    <div className="director-tally-overlay atem-chassis creator-switcher apple-director-switcher">
+    <div className={`director-tally-overlay atem-chassis creator-switcher apple-director-switcher${embedded ? ' dt-embedded-switcher' : ''}`}>
       <div className="director-tally-header apple-director-header">
         <div className="director-title-group">
           <div className="director-title">
@@ -163,13 +172,15 @@ export function DirectorPanel({
             {isVideoEnabled ? '映像 ON' : '映像 OFF'}
           </button>
           <div className="director-tc-large">{directorTime}</div>
-          <button
-            className="director-close-btn"
-            onClick={() => { playHapticFeedback(); setDirectorPanelOpen(false); }}
-            aria-label="Close switcher"
-          >
-            ×
-          </button>
+          {!embedded && (
+            <button
+              className="director-close-btn"
+              onClick={() => { playHapticFeedback(); setDirectorPanelOpen(false); }}
+              aria-label="Close switcher"
+            >
+              ×
+            </button>
+          )}
         </div>
       </div>
 
