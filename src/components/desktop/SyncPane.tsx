@@ -25,7 +25,7 @@ export function SyncPane() {
 
   return (
     <div className="dt-pane dt-pane-sync">
-      <DesktopPanel title={tr('dt.control')} className="dt-panel-control" scroll>
+      <DesktopPanel title={tr('dt.control')} help="sync" className="dt-panel-control" scroll>
         <DesktopSection title={tr('label.syncMethod')}>
           <div className="dt-segment dt-segment-4">
             {SYNC_MODES.map(mode => (

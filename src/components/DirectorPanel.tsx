@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLTC } from '../LTCSyncContext';
 import { useMediaStreams } from '../hooks/useMediaStreams';
 import { VideoRenderer } from './VideoRenderer';
+import { HelpButton } from './HelpButton';
 import { FPS_OPTIONS } from '../constants';
 import { tallyLabelKey } from '../utils/tally';
 import type { TallyState } from '../utils/tally';
@@ -164,6 +165,7 @@ export function DirectorPanel({
             DIRECTOR SWITCHER
             <span className="creator-mode-badge">Creator View</span>
             {obsControlled && <span className="creator-mode-badge obs-badge">OBS</span>}
+            <HelpButton topic="switcher" tr={tr} />
           </div>
           <div className="director-subtitle">
             {obsControlled ? 'OBSのシーン切り替えに追従中' : <>カメラを選ぶ <b>→</b> TAKEで切り替え</>}

@@ -17,6 +17,7 @@ import { useMediaStreams } from './hooks/useMediaStreams';
 import { useObsTally } from './hooks/useObsTally';
 import { FloatingPip } from './components/FloatingPip';
 import { HeaderBar } from './components/HeaderBar';
+import { HelpButton } from './components/HelpButton';
 import { FooterControls } from './components/FooterControls';
 import { MarkerList } from './components/MarkerList';
 import { ClientList } from './components/ClientList';
@@ -387,7 +388,10 @@ function MainApp() {
             )}
 
             <div className="control-section">
-              <label className="section-label">{tr('label.frameRate')}</label>
+              <label className="section-label">
+                {tr('label.frameRate')}
+                <HelpButton topic="timecode" tr={tr} variant="inline" />
+              </label>
               <div className="fps-grid-compact">
                 {FPS_OPTIONS.map((opt, i) => (
                   <button
@@ -423,7 +427,10 @@ function MainApp() {
         {activeTab === 'sync' && (
           <div className="tab-pane sync-pane">
             <div className="control-section">
-              <label className="section-label">{tr('label.syncMethod')}</label>
+              <label className="section-label">
+                {tr('label.syncMethod')}
+                <HelpButton topic="sync" tr={tr} variant="inline" />
+              </label>
               <div className="sync-toggle-pro">
                 {(['system', 'network', 'p2p', 'freerun'] as SyncMode[]).map((m) => (
                   <button 
@@ -477,7 +484,10 @@ function MainApp() {
           <div className="tab-pane tools-pane">
             <section className="tool-section-shell tool-section-shell-tally">
               <div className="tool-section-head">
-                <label className="section-label">{tr('label.tally')}</label>
+                <label className="section-label">
+                  {tr('label.tally')}
+                  <HelpButton topic="tally" tr={tr} variant="inline" />
+                </label>
                 <div className="tally-options">
                   <label className="toggle-label">
                     <input

@@ -1,5 +1,9 @@
 import type { ReactNode } from 'react';
 
+import { useLTC } from '../../LTCSyncContext';
+import { HelpButton } from '../HelpButton';
+import type { HelpTopicId } from '../../utils/helpTopics';
+
 interface DesktopSectionProps {
   title: string;
   children: ReactNode;
@@ -23,6 +27,12 @@ export function DesktopSection({ title, children }: DesktopSectionProps) {
 
 interface DesktopPanelProps {
   title: string;
+  /**
+   * Puts a "?" next to the title that opens step-by-step instructions for this
+   * feature. Set it on the panel an operator would look at first on each tab,
+   * not on every panel — a console covered in question marks reads as noise.
+   */
+  help?: HelpTopicId;
   /** Optional right-aligned status text or control in the panel header. */
   aside?: ReactNode;
   /** Lets one panel in a pane absorb the leftover height. */
@@ -43,7 +53,11 @@ interface DesktopPanelProps {
  * keeps the five panes visually identical and stops each new section from
  * inventing its own spacing.
  */
-export function DesktopPanel({ title, aside, grow, scroll, className, children }: DesktopPanelProps) {
+export function DesktopPanel({ title, help, aside, grow, scroll, className, children }: DesktopPanelProps) {
+  // The only reason this presentational primitive touches the context: the
+  // help sheet needs a translator, and threading one through every pane's
+  // panel would be five identical props for one shared concern.
+  const { tr } = useLTC();
   const classes = [
     'dt-panel',
     grow ? 'dt-panel-grow' : '',
@@ -53,7 +67,10 @@ export function DesktopPanel({ title, aside, grow, scroll, className, children }
   return (
     <section className={classes}>
       <header className="dt-panel-head">
-        <h2 className="dt-panel-title">{title}</h2>
+        <h2 className="dt-panel-title">
+          {title}
+          {help && <HelpButton topic={help} tr={tr} />}
+        </h2>
         {aside && <div className="dt-panel-aside">{aside}</div>}
       </header>
       <div className={`dt-panel-body ${scroll ? 'dt-scroll' : ''}`}>

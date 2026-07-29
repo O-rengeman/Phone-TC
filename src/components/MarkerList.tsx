@@ -1,3 +1,4 @@
+import { HelpButton } from './HelpButton';
 import type { Marker } from '../utils/export';
 
 interface MarkerListProps {
@@ -39,7 +40,10 @@ export function MarkerList({
 
       <section className="tool-section-shell marker-section-pro">
         <div className="marker-header">
-          <label>{tr('label.loggedTakes')}</label>
+          <label>
+            {tr('label.loggedTakes')}
+            <HelpButton topic="markers" tr={tr} variant="inline" />
+          </label>
           <div className="export-group">
             <button className="btn-export-pro" onClick={exportToEDL} disabled={markers.length === 0}>EDL</button>
             <button className="btn-export-pro" onClick={exportToALE} disabled={markers.length === 0}>ALE</button>

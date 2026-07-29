@@ -326,11 +326,23 @@
 
 .desktop-view .dt-panel-title {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
   font-size: var(--dt-label);
   font-weight: 800;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-muted);
+}
+
+/* The console's labels are far smaller than the mobile ones, so the shared
+   em-relative "?" would come out illegible here. */
+.desktop-view .dt-panel-title .fhelp-btn {
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  letter-spacing: 0;
 }
 
 .desktop-view .dt-panel-aside {

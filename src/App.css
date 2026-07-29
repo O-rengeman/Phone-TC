@@ -1661,6 +1661,165 @@ input[type="range"] {
   cursor: pointer;
 }
 
+/* ── Per-feature help ("?" next to a feature, sheet on top) ───────────── */
+
+/* Sits inline with a title, so it must not add height to the row it is in —
+   hence the fixed square and the `em`-relative sizing off the label. */
+.fhelp-btn {
+  flex: none;
+  width: 1.45em;
+  height: 1.45em;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.fhelp-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.fhelp-btn-inline { margin-left: 7px; }
+
+.fhelp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-guide) + 1);
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: toast-in 0.18s ease;
+}
+
+.fhelp-sheet {
+  width: 100%;
+  max-width: 560px;
+  max-height: 86dvh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px 20px;
+  text-align: left;
+}
+
+.fhelp-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.fhelp-eyebrow {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 1.6px;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+
+.fhelp-title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 900;
+  line-height: 1.35;
+  color: var(--text-bright);
+}
+
+.fhelp-x {
+  flex: none;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.fhelp-summary {
+  margin: 0 0 16px;
+  font-size: 0.78rem;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+.fhelp-steps {
+  margin: 0 0 14px;
+  padding-left: 1.5em;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.fhelp-steps li {
+  font-size: 0.83rem;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+/* The control chips are the point of the sheet: a step saying "press TAKE" is
+   only followable if the reader can tell which words name the button. */
+.fhelp-ctl {
+  display: inline-block;
+  margin: 0 1px;
+  padding: 1px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--panel-elevated);
+  color: var(--text-bright);
+  font-weight: 800;
+  font-size: 0.94em;
+  white-space: nowrap;
+}
+
+.fhelp-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.fhelp-tip {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  background: var(--panel-elevated);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--primary);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+}
+
+.fhelp-done {
+  width: 100%;
+  padding: 13px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: #000;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
 /* ── MAIN-screen sync bar (status + one-tap re-sync) ── */
 .main-sync-bar {
   display: flex;

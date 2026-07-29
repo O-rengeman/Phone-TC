@@ -40,6 +40,7 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
     <div className={`dt-pane dt-pane-timecode${isClient ? ' has-return' : ''}`}>
       <DesktopPanel
         title={tr('label.frameRate')}
+        help="timecode"
         aside={locked ? <span className="dt-lock">{followsMaster ? 'FOLLOWING MASTER' : 'RUNNING'}</span> : undefined}
       >
         <div className="dt-fps-grid">

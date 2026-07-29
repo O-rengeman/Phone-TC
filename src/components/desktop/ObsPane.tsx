@@ -58,6 +58,7 @@ export function ObsPane({ obs }: { obs: ObsControls }) {
     <div className="dt-pane dt-pane-obs">
       <DesktopPanel
         title={tr('obs.connection')}
+        help="obs"
         className="dt-panel-control"
         aside={<span className="dt-chip"><span className={`dt-dot ${dotClass}`} />{tr(statusKey)}</span>}
         scroll

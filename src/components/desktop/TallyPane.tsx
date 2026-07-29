@@ -34,6 +34,7 @@ export function TallyPane() {
     <div className="dt-pane dt-pane-tally">
       <DesktopPanel
         title={tr('dt.control')}
+        help="tally"
         className="dt-panel-control"
         aside={
           <button type="button" className="dt-btn-sm" onClick={openFullscreen}>

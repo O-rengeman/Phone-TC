@@ -19,7 +19,7 @@ export function MarkersPane() {
 
   return (
     <div className="dt-pane dt-pane-markers">
-      <DesktopPanel title={tr('dt.control')} className="dt-panel-control" scroll>
+      <DesktopPanel title={tr('dt.control')} help="markers" className="dt-panel-control" scroll>
         <DesktopSection title={tr('dt.metadata')}>
           <div className="dt-field">
             <span className="dt-field-label">{tr('label.defaultReel')}</span>
