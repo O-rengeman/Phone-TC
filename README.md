@@ -12,6 +12,8 @@ shoots where a hardware timecode generator isn't available.
 - Time sync via NTP-style time servers, or direct device-to-device P2P (PeerJS)
 - Tally system: a P2P master can drive per-camera or all-camera tally state on clients,
   including native torch (flashlight) control
+- OBS link: the desktop console can follow OBS's program/preview scenes over
+  obs-websocket 5.x and drive tally from them (map each OBS scene to a camera)
 - Take/marker logging with scene, take, and comment fields; EDL and ALE export
 - Battery monitoring, wake lock, and native background-audio support (iOS/Android via
   Capacitor plugins)
@@ -60,5 +62,7 @@ architecture.
 - [docs/BACKGROUND_DESIGN.md](docs/BACKGROUND_DESIGN.md) — background audio / native
   bridge architecture (iOS `AVAudioSession`, Android foreground service)
 - [docs/TALLY_DESIGN.md](docs/TALLY_DESIGN.md) — tally state machine and P2P message flow
+- [docs/OBS_DESIGN.md](docs/OBS_DESIGN.md) — OBS link: obs-websocket client, scene →
+  camera mapping, and how it feeds the existing switcher path
 - [docs/TALLY_PLAN.md](docs/TALLY_PLAN.md) — tally feature implementation roadmap
 - [Log/](Log/) — dated work logs from past development sessions

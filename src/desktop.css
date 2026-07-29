@@ -839,3 +839,17 @@
   overflow-y: auto;
   overflow-x: hidden;
 }
+
+/* ── OBS link ─────────────────────────────────────────────────────────── */
+
+/* Two short forms and a scene table: the settings column sits at its natural
+   height like the timecode pane rather than being stretched to the stage. */
+.desktop-view .dt-pane-obs { grid-auto-rows: minmax(0, 1fr); }
+
+.desktop-view .dt-table-obs select { width: 100%; }
+.desktop-view .dt-table-obs td:first-child { width: 40%; white-space: normal; }
+
+/* The scene that is actually on air has to be findable at a glance from
+   across the room, which a row of small text is not. */
+.desktop-view .dt-table-obs tr.obs-row-program td { color: #ff5a5a; font-weight: 700; }
+.desktop-view .dt-table-obs tr.obs-row-preview td { color: #35d07f; }

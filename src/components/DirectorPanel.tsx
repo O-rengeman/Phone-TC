@@ -27,6 +27,13 @@ export interface DirectorPanelProps {
    * shortcuts have exactly one implementation.
    */
   embedded?: boolean;
+  /**
+   * OBS is linked and owns the buses. The panel stays a live readout of what
+   * OBS is doing, but its own controls are locked out: leaving them clickable
+   * would let a director "cut" and see nothing happen, since the next OBS
+   * event overwrites the buses immediately.
+   */
+  obsControlled?: boolean;
 }
 
 export function DirectorPanel({
@@ -41,6 +48,7 @@ export function DirectorPanel({
   handleAuto,
   handleTBarChange,
   embedded = false,
+  obsControlled = false,
 }: DirectorPanelProps) {
   const {
     directorTime,
@@ -114,6 +122,7 @@ export function DirectorPanel({
   // Keyboard shortcuts
   useEffect(() => {
     const handleCreatorShortcut = (event: KeyboardEvent) => {
+      if (obsControlled) return;
       const target = event.target as HTMLElement | null;
       if (
         target?.isContentEditable ||
@@ -144,18 +153,21 @@ export function DirectorPanel({
 
     window.addEventListener('keydown', handleCreatorShortcut);
     return () => window.removeEventListener('keydown', handleCreatorShortcut);
-  }, [clients, handleAuto, handleCut, handleSelectPreview]);
+  }, [clients, handleAuto, handleCut, handleSelectPreview, obsControlled]);
 
   return (
-    <div className={`director-tally-overlay atem-chassis creator-switcher apple-director-switcher${embedded ? ' dt-embedded-switcher' : ''}`}>
+    <div className={`director-tally-overlay atem-chassis creator-switcher apple-director-switcher${embedded ? ' dt-embedded-switcher' : ''}${obsControlled ? ' obs-locked' : ''}`}>
       <div className="director-tally-header apple-director-header">
         <div className="director-title-group">
           <div className="director-title">
             <span className="creator-live-mark" />
             DIRECTOR SWITCHER
             <span className="creator-mode-badge">Creator View</span>
+            {obsControlled && <span className="creator-mode-badge obs-badge">OBS</span>}
           </div>
-          <div className="director-subtitle">カメラを選ぶ <b>→</b> TAKEで切り替え</div>
+          <div className="director-subtitle">
+            {obsControlled ? 'OBSのシーン切り替えに追従中' : <>カメラを選ぶ <b>→</b> TAKEで切り替え</>}
+          </div>
         </div>
         <div className="director-header-right">
           <div className={`creator-signal-summary ${signalCount > 0 ? 'ready' : ''}`}>
@@ -277,8 +289,8 @@ export function DirectorPanel({
                     <div
                       key={id}
                       className={`atem-mv-card status-${cardTallyState} ${isOffline ? 'offline' : ''}`}
-                      onClick={() => !isOffline && handleSelectPreview(id)}
-                      title="NEXTに設定"
+                      onClick={() => !isOffline && !obsControlled && handleSelectPreview(id)}
+                      title={obsControlled ? 'OBS制御中' : 'NEXTに設定'}
                     >
                       {isOffline && <div className="director-offline-overlay">OFFLINE</div>}
                       <div className="input-card-state-rail">

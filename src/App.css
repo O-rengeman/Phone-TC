@@ -5873,6 +5873,25 @@ input[type="range"] {
   letter-spacing: 0.12em;
 }
 
+.creator-mode-badge.obs-badge {
+  border-color: rgba(90, 200, 255, 0.35);
+  background: rgba(90, 200, 255, 0.12);
+  color: #9ad9ff;
+}
+
+/* OBS owns the buses while it is linked, so the panel's own controls are
+   inert. They are dimmed and click-blocked rather than removed: the director
+   still needs the bus lamps as a readout of what OBS is doing. */
+.creator-switcher.obs-locked .input-card-actions,
+.creator-switcher.obs-locked .creator-quick-buttons,
+.creator-switcher.obs-locked .creator-take-actions,
+.creator-switcher.obs-locked .transition-actions,
+.creator-switcher.obs-locked .tbar-chassis,
+.creator-switcher.obs-locked .atem-bus-row .bus-buttons {
+  pointer-events: none;
+  opacity: 0.4;
+}
+
 .creator-switcher .director-subtitle {
   color: var(--creator-muted);
   font-size: 0.6rem;

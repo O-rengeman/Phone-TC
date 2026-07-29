@@ -22,7 +22,7 @@ describe('visibleDesktopTabs', () => {
 
   it('keeps the declared order', () => {
     expect(visibleDesktopTabs(true).map(tab => tab.id))
-      .toEqual(['timecode', 'sync', 'switcher', 'tally', 'markers']);
+      .toEqual(['timecode', 'sync', 'switcher', 'tally', 'obs', 'markers']);
   });
 
   it('assigns every tab a unique hotkey', () => {
@@ -68,12 +68,17 @@ describe('resolveDesktopTab', () => {
 describe('desktopTabForHotkey', () => {
   it('maps a digit to its tab', () => {
     expect(desktopTabForHotkey('1', false)).toBe('timecode');
-    expect(desktopTabForHotkey('5', false)).toBe('markers');
+    expect(desktopTabForHotkey('6', false)).toBe('markers');
   });
 
   it('maps the switcher digit only for the host', () => {
     expect(desktopTabForHotkey('3', true)).toBe('switcher');
     expect(desktopTabForHotkey('3', false)).toBeNull();
+  });
+
+  it('maps the OBS digit only for the host', () => {
+    expect(desktopTabForHotkey('5', true)).toBe('obs');
+    expect(desktopTabForHotkey('5', false)).toBeNull();
   });
 
   it('returns null for a digit that addresses no tab', () => {

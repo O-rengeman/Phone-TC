@@ -14,6 +14,7 @@ import { TallyOverlay } from './components/TallyOverlay';
 import { VisualSlate } from './components/VisualSlate';
 import { GuideOverlay } from './components/GuideOverlay';
 import { useMediaStreams } from './hooks/useMediaStreams';
+import { useObsTally } from './hooks/useObsTally';
 import { FloatingPip } from './components/FloatingPip';
 import { HeaderBar } from './components/HeaderBar';
 import { FooterControls } from './components/FooterControls';
@@ -126,9 +127,21 @@ function MainApp() {
   const autoTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const returnFeed = resolveReturnFeed(targetId, mediaStreams);
   const returnStream = returnFeed.stream;
-  const { programId: effectivePgmSourceId, previewId: effectivePreviewSourceId } = isHost
-    ? getAutoSwitcherAssignment(Object.keys(clients), pgmSourceId, previewSourceId)
-    : { programId: pgmSourceId, previewId: previewSourceId };
+  const clientIds = useMemo(() => Object.keys(clients), [clients]);
+  const obs = useObsTally({ isHost, clientIds });
+  // While OBS is linked it *is* the switcher, so it feeds the same program and
+  // preview state the built-in buses write and everything downstream — the
+  // tally broadcast, the action log, the PGM return feed — is unchanged.
+  //
+  // It deliberately bypasses getAutoSwitcherAssignment's fallback: a scene with
+  // no camera behind it (titles, a slate, a screen share) must leave every lamp
+  // dark. Auto-picking "some camera" there would light a red lamp on an
+  // operator who is not on air, which is the one failure a tally must not have.
+  const { programId: effectivePgmSourceId, previewId: effectivePreviewSourceId } = obs.obsControlActive
+    ? obs.obsAssignment
+    : isHost
+      ? getAutoSwitcherAssignment(Object.keys(clients), pgmSourceId, previewSourceId)
+      : { programId: pgmSourceId, previewId: previewSourceId };
 
   const handleOutputModeChange = (mode: 'stereo' | 'mono-l') => {
     setOutputMode(mode);
@@ -288,10 +301,11 @@ function MainApp() {
     handleCut,
     handleAuto,
     handleTBarChange,
+    obsControlled: obs.obsControlActive,
   }), [
     effectivePgmSourceId, effectivePreviewSourceId, isTransitioning, transitionProgress,
     isAutoTransitioning, handleSelectPreview, handleSelectProgram, handleCut, handleAuto,
-    handleTBarChange,
+    handleTBarChange, obs.obsControlActive,
   ]);
 
   return (
@@ -327,6 +341,7 @@ function MainApp() {
       {!isMobile && (
         <DesktopShell
           switcher={switcherControls}
+          obs={obs}
           onOutputModeChange={handleOutputModeChange}
         />
       )}
