@@ -19,22 +19,16 @@ describe('t', () => {
   });
 
   it('has Japanese parity for every English key', () => {
-    // Guard against forgetting a translation: every en key resolves to a
-    // non-identical, non-empty ja string (except intentionally-shared tokens).
-    const shared = new Set<string>(); // none expected currently
-    const enKeys = Object.keys(
-      // re-derive by probing a representative set
-      {
-        'tab.main': 1, 'status.ready': 1, 'label.frameRate': 1, 'btn.start': 1,
-        'drift.accuracy': 1, 'sync.network': 1, 'guide.title': 1, 'slate.close': 1,
-        'toast.resynced': 1,
-      },
-    );
-    for (const k of enKeys) {
+    const testKeys = [
+      'tab.main', 'status.ready', 'label.frameRate', 'btn.start',
+      'hdr.ariaTally', 'hdr.ariaDirector', 'dir.subtitleObs', 'dir.pickCam',
+      'dt.hint.fps', 'dt.hint.offset', 'dt.hint.startTc', 'dt.hint.syncClients',
+    ];
+    for (const k of testKeys) {
       const enV = t(k, 'en');
       const jaV = t(k, 'ja');
       expect(jaV).toBeTruthy();
-      if (!shared.has(k)) expect(jaV).not.toBe(enV);
+      expect(jaV).not.toBe(enV);
     }
   });
 });

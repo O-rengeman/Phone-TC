@@ -24,6 +24,13 @@ export default defineConfig([
     },
     rules: {
       'no-console': ['error', { allow: ['warn', 'error'] }],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'JSXText[value=/[\\u3040-\\u30ff\\u4e00-\\u9faf]/]',
+          message: '画面文言は i18n.ts に置き tr() 経由で参照してください',
+        },
+      ],
     },
   },
   {

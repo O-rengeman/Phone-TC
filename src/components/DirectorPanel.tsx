@@ -168,7 +168,7 @@ export function DirectorPanel({
             <HelpButton topic="switcher" tr={tr} />
           </div>
           <div className="director-subtitle">
-            {obsControlled ? 'OBSのシーン切り替えに追従中' : <>カメラを選ぶ <b>→</b> TAKEで切り替え</>}
+            {obsControlled ? tr('dir.subtitleObs') : tr('dir.subtitleManual')}
           </div>
         </div>
         <div className="director-header-right">
@@ -183,7 +183,7 @@ export function DirectorPanel({
             className={`dir-video-toggle ${isVideoEnabled ? 'active' : ''}`}
             onClick={() => { playHapticFeedback(); toggleVideoMonitoring(); }}
           >
-            {isVideoEnabled ? '映像 ON' : '映像 OFF'}
+            {isVideoEnabled ? tr('dir.videoOn') : tr('dir.videoOff')}
           </button>
           <div className="director-tc-large">{directorTime}</div>
           {!embedded && (
@@ -205,7 +205,7 @@ export function DirectorPanel({
             {/* PROGRAMモニター */}
             <div className={`atem-monitor program-monitor ${effectivePgmSourceId ? 'has-source' : ''}`}>
               <div className="atem-monitor-head">
-                <span><i className="creator-monitor-dot" />ON AIR <small>現在の映像</small></span>
+                <span><i className="creator-monitor-dot" />ON AIR <small>{tr('dir.curVideo')}</small></span>
                 <strong className="source-label">{programLabel}</strong>
               </div>
               <div className="atem-monitor-screen">
@@ -220,8 +220,8 @@ export function DirectorPanel({
                   </div>
                 ) : (
                   <div className="atem-monitor-placeholder">
-                    <span>{isVideoEnabled ? 'ON AIR未選択' : '映像モニターOFF'}</span>
-                    <small>{effectivePgmSourceId ? 'カメラ映像を待っています' : '下のカメラからNEXTを選択してください'}</small>
+                    <span>{isVideoEnabled ? tr('dir.pgmEmpty') : tr('dir.videoMonOff')}</span>
+                    <small>{effectivePgmSourceId ? tr('dir.awaitingCam') : tr('dir.selectNextHint')}</small>
                   </div>
                 )}
               </div>
@@ -230,7 +230,7 @@ export function DirectorPanel({
             {/* PREVIEWモニター */}
             <div className={`atem-monitor preview-monitor ${effectivePreviewSourceId ? 'has-source' : ''}`}>
               <div className="atem-monitor-head">
-                <span><i className="creator-monitor-dot" />NEXT <small>次に出す映像</small></span>
+                <span><i className="creator-monitor-dot" />NEXT <small>{tr('dir.nextVideo')}</small></span>
                 <strong className="source-label">{previewLabel}</strong>
               </div>
               <div className="atem-monitor-screen">
@@ -238,8 +238,8 @@ export function DirectorPanel({
                   <VideoRenderer stream={previewStream} muted={true} className="atem-monitor-video" />
                 ) : (
                   <div className="atem-monitor-placeholder">
-                    <span>{isVideoEnabled ? 'NEXT未選択' : '映像モニターOFF'}</span>
-                    <small>{effectivePreviewSourceId ? 'カメラ映像を待っています' : '下のカメラをクリックして選択'}</small>
+                    <span>{isVideoEnabled ? tr('dir.pvwEmpty') : tr('dir.videoMonOff')}</span>
+                    <small>{effectivePreviewSourceId ? tr('dir.awaitingCam') : tr('dir.clickCamHint')}</small>
                   </div>
                 )}
               </div>
@@ -251,16 +251,16 @@ export function DirectorPanel({
             <div className="creator-section-heading">
               <div>
                 <small>CAMERA SOURCES</small>
-                <strong>カメラを選ぶ</strong>
+                <strong>{tr('dir.pickCam')}</strong>
               </div>
-              <span>クリックするとNEXTにセットされます</span>
+              <span>{tr('dir.clickSetNext')}</span>
             </div>
             <div className="atem-mv-inputs-grid">
               {camCount === 0 ? (
                 <div className="director-no-clients">
                   <div className="director-no-clients-icon">＋</div>
-                  <div>カメラを接続してください</div>
-                  <div className="director-no-clients-sub">クライアントが接続されると、ここに映像が並びます</div>
+                  <div>{tr('dir.noCams')}</div>
+                  <div className="director-no-clients-sub">{tr('dir.noCamsSub')}</div>
                 </div>
               ) : (
                 clientEntries.map(([id, stats], idx) => {
@@ -292,7 +292,7 @@ export function DirectorPanel({
                       key={id}
                       className={`atem-mv-card status-${cardTallyState} ${isOffline ? 'offline' : ''}`}
                       onClick={() => !isOffline && !obsControlled && handleSelectPreview(id)}
-                      title={obsControlled ? 'OBS制御中' : 'NEXTに設定'}
+                      title={obsControlled ? tr('dir.obsLocked') : tr('dir.setNext')}
                     >
                       {isOffline && <div className="director-offline-overlay">OFFLINE</div>}
                       <div className="input-card-state-rail">
@@ -335,7 +335,7 @@ export function DirectorPanel({
                       <div className="input-card-footer">
                         <div className="input-card-footer-meta">
                           <span className="input-card-footer-label">STATUS</span>
-                          <strong>{isPgmActive ? '配信中' : isPvwActive ? '次に出す' : '待機'}</strong>
+                          <strong>{isPgmActive ? tr('dir.statusOnAir') : isPvwActive ? tr('dir.statusNext') : tr('dir.statusStandby')}</strong>
                         </div>
                         <div className="input-card-actions" onClick={e => e.stopPropagation()}>
                           <button
@@ -344,7 +344,7 @@ export function DirectorPanel({
                             onClick={() => handleSelectPreview(id)}
                             disabled={isOffline}
                           >
-                            {isPvwActive ? 'NEXT選択中' : 'NEXTにする'}
+                            {isPvwActive ? tr('dir.pvwSelected') : tr('dir.makeNext')}
                           </button>
                         </div>
                       </div>
@@ -362,10 +362,10 @@ export function DirectorPanel({
             <div className="creator-control-header">
               <div>
                 <small>TAKE CONTROL</small>
-                <strong>映像を切り替える</strong>
+                <strong>{tr('dir.switchVideo')}</strong>
               </div>
               <span className={effectivePreviewSourceId ? 'ready' : ''}>
-                {effectivePreviewSourceId ? 'READY' : 'NEXTを選択'}
+                {effectivePreviewSourceId ? 'READY' : tr('dir.selectNext')}
               </span>
             </div>
 
@@ -389,7 +389,7 @@ export function DirectorPanel({
               >
                 <span className="creator-action-icon">↯</span>
                 <span>
-                  <small>瞬時に切り替え</small>
+                  <small>{tr('dir.instantCut')}</small>
                   <strong>TAKE</strong>
                 </span>
                 <kbd>SPACE</kbd>
@@ -401,7 +401,7 @@ export function DirectorPanel({
               >
                 <span className="creator-action-icon">◐</span>
                 <span>
-                  <small>0.5秒でなめらかに</small>
+                  <small>{tr('dir.smoothMix')}</small>
                   <strong>MIX</strong>
                 </span>
                 <kbd>ENTER</kbd>
@@ -410,7 +410,7 @@ export function DirectorPanel({
 
             <div className="creator-transition-progress" aria-label={`Transition ${transitionProgress}%`}>
               <div className="creator-progress-meta">
-                <span>{isAutoTransitioning ? '切り替え中' : 'TRANSITION'}</span>
+                <span>{isAutoTransitioning ? tr('dir.switching') : 'TRANSITION'}</span>
                 <strong>{transitionProgress}%</strong>
               </div>
               <div className="creator-progress-track">
@@ -421,11 +421,11 @@ export function DirectorPanel({
             <div className="creator-quick-select">
               <div className="creator-quick-select-head">
                 <span>QUICK SELECT</span>
-                <small>数字キーでも選択できます</small>
+                <small>{tr('dir.numKeyHint')}</small>
               </div>
               <div className="creator-quick-buttons">
                 {clientEntries.length === 0 ? (
-                  <span className="creator-no-inputs">カメラ待機中</span>
+                  <span className="creator-no-inputs">{tr('dir.camsWaiting')}</span>
                 ) : (
                   clientEntries.slice(0, 9).map(([id, stats], idx) => {
                     const isOffline = now - stats.lastSeen > 30000;
@@ -436,7 +436,7 @@ export function DirectorPanel({
                         className={isActive ? 'active' : ''}
                         onClick={() => handleSelectPreview(id)}
                         disabled={isOffline}
-                        aria-label={`${cameraLabels[id] || `CAM${idx + 1}`}をNEXTに設定`}
+                        aria-label={tr('dir.ariaSetNext', { cam: cameraLabels[id] || `CAM${idx + 1}` })}
                       >
                         <kbd>{idx + 1}</kbd>
                         <span>{cameraLabels[id] || `CAM${idx + 1}`}</span>
@@ -551,7 +551,7 @@ export function DirectorPanel({
               <span><small>NEXT</small>{previewLabel}</span>
               <span><small>CAMERAS</small>{liveCount} LIVE / {previewCount} NEXT</span>
               <span className={offlineCount > 0 ? 'warn' : ''}><small>OFFLINE</small>{offlineCount}</span>
-              <span className={effectivePgmSourceId ? 'online' : 'warn'}><small>RETURN</small>{effectivePgmSourceId ? '送出中' : '待機'}</span>
+              <span className={effectivePgmSourceId ? 'online' : 'warn'}><small>RETURN</small>{effectivePgmSourceId ? tr('dir.feedSending') : tr('dir.feedIdle')}</span>
             </div>
 
             {tallyActionLog.length > 0 && (

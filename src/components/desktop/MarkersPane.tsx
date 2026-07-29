@@ -71,7 +71,7 @@ export function MarkersPane() {
               ALE
             </button>
           </div>
-          <p className="dt-hint">リール名とシーン名は書き出しファイルに含まれます。</p>
+          <p className="dt-hint">{tr('dt.hint.reelScene')}</p>
         </DesktopSection>
       </DesktopPanel>
 
@@ -84,7 +84,7 @@ export function MarkersPane() {
         {markers.length === 0 ? (
           <div className="dt-empty">
             <strong>{tr('markers.none')}</strong>
-            <span>下部の R / B / G / Y ボタンで打刻します。</span>
+            <span>{tr('dt.hint.markKeys')}</span>
           </div>
         ) : (
           <table className="dt-table dt-table-markers">

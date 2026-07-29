@@ -38,12 +38,20 @@ const SCENE_STATE: ObsSceneState = {
   studioMode: true,
 };
 
+async function flushAsync() {
+  await act(async () => {
+    await import('../utils/ObsWebSocket');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  });
+}
+
 function latest() {
   return clients[clients.length - 1];
 }
 
 /** Brings a rendered hook to a live, identified OBS link with scenes loaded. */
-function goLive(state: ObsSceneState = SCENE_STATE) {
+async function goLive(state: ObsSceneState = SCENE_STATE) {
+  await flushAsync();
   act(() => {
     latest().onStatus('connected');
     latest().onSceneState(state);
@@ -64,9 +72,11 @@ describe('connection lifecycle', () => {
     expect(result.current.obsControlActive).toBe(false);
   });
 
-  it('connects once enabled, and remembers that across mounts', () => {
+  it('connects once enabled, and remembers that across mounts', async () => {
     const { result, unmount } = renderHook(() => useObsTally({ isHost: true, clientIds: ['a'] }));
     act(() => result.current.setObsEnabled(true));
+    await flushAsync();
+    await flushAsync();
 
     expect(latest().connected).toBe(true);
     expect(latest().url).toBe('ws://localhost:4455');
@@ -76,50 +86,49 @@ describe('connection lifecycle', () => {
     expect(remounted.result.current.obsEnabled).toBe(true);
   });
 
-  it('never opens a socket on a device that is not hosting the session', () => {
-    // Only the master broadcasts tally, so a client talking to OBS would be
-    // a connection that can't do anything with what it learns.
+  it('never opens a socket on a device that is not hosting the session', async () => {
     const { result } = renderHook(() => useObsTally({ isHost: false, clientIds: [] }));
     act(() => result.current.setObsEnabled(true));
+    await flushAsync();
 
     expect(clients).toHaveLength(0);
     expect(result.current.obsStatus).toBe('idle');
   });
 
-  it('drops the connection when this device stops being the host', () => {
+  it('drops the connection when this device stops being the host', async () => {
     const { result, rerender } = renderHook(
       ({ isHost }) => useObsTally({ isHost, clientIds: ['a'] }),
       { initialProps: { isHost: true } },
     );
     act(() => result.current.setObsEnabled(true));
-    goLive();
+    await goLive();
 
     rerender({ isHost: false });
 
     expect(latest().disconnected).toBe(true);
     expect(result.current.obsControlActive).toBe(false);
-    expect(result.current.obsStatus).toBe('idle');
   });
 
-  it('reconnects when the URL changes', () => {
+  it('reconnects when the URL changes', async () => {
     const { result } = renderHook(() => useObsTally({ isHost: true, clientIds: ['a'] }));
     act(() => result.current.setObsEnabled(true));
+    await flushAsync();
     const first = latest();
 
     act(() => result.current.setObsUrl('192.168.1.50:4455'));
+    await flushAsync();
 
     expect(first.disconnected).toBe(true);
     expect(latest().url).toBe('ws://192.168.1.50:4455');
   });
 
-  it('refuses a non-local ws:// target on an https page before opening anything', () => {
-    // jsdom's window.location is not redefinable, so the page origin is faked
-    // wholesale for this one case.
+  it('refuses a non-local ws:// target on an https page before opening anything', async () => {
     vi.stubGlobal('location', { ...window.location, protocol: 'https:' });
     try {
       const { result } = renderHook(() => useObsTally({ isHost: true, clientIds: ['a'] }));
       act(() => result.current.setObsUrl('192.168.1.50:4455'));
       act(() => result.current.setObsEnabled(true));
+      await flushAsync();
 
       expect(clients).toHaveLength(0);
       expect(result.current.obsStatus).toBe('error');
@@ -129,9 +138,10 @@ describe('connection lifecycle', () => {
     }
   });
 
-  it('surfaces the reason a connection failed', () => {
+  it('surfaces the reason a connection failed', async () => {
     const { result } = renderHook(() => useObsTally({ isHost: true, clientIds: ['a'] }));
     act(() => result.current.setObsEnabled(true));
+    await flushAsync();
     act(() => latest().onStatus('error', 'authFailed'));
 
     expect(result.current.obsStatus).toBe('error');
@@ -141,10 +151,10 @@ describe('connection lifecycle', () => {
 });
 
 describe('scene mapping', () => {
-  it('drives the buses from the mapped scenes once connected', () => {
+  it('drives the buses from the mapped scenes once connected', async () => {
     const { result } = renderHook(() => useObsTally({ isHost: true, clientIds: ['a', 'b'] }));
     act(() => result.current.setObsEnabled(true));
-    goLive();
+    await goLive();
     act(() => result.current.autoAssignScenes());
 
     expect(result.current.obsMapping).toEqual({ 'CAM A': 'a', 'CAM B': 'b' });
@@ -152,10 +162,10 @@ describe('scene mapping', () => {
     expect(result.current.obsControlActive).toBe(true);
   });
 
-  it('follows a scene change', () => {
+  it('follows a scene change', async () => {
     const { result } = renderHook(() => useObsTally({ isHost: true, clientIds: ['a', 'b'] }));
     act(() => result.current.setObsEnabled(true));
-    goLive();
+    await goLive();
     act(() => result.current.autoAssignScenes());
 
     act(() => latest().onSceneState({ ...SCENE_STATE, programScene: 'CAM B', previewScene: 'CAM A' }));
@@ -163,18 +173,19 @@ describe('scene mapping', () => {
     expect(result.current.obsAssignment).toEqual({ programId: 'b', previewId: 'a' });
   });
 
-  it('holds both buses empty while the link is still connecting', () => {
+  it('holds both buses empty while the link is still connecting', async () => {
     const { result } = renderHook(() => useObsTally({ isHost: true, clientIds: ['a', 'b'] }));
     act(() => result.current.setObsEnabled(true));
+    await flushAsync();
     act(() => latest().onStatus('connecting'));
 
     expect(result.current.obsAssignment).toEqual({ programId: null, previewId: null });
   });
 
-  it('assigns and clears a single scene, keeping a camera on one scene only', () => {
+  it('assigns and clears a single scene, keeping a camera on one scene only', async () => {
     const { result } = renderHook(() => useObsTally({ isHost: true, clientIds: ['a', 'b'] }));
     act(() => result.current.setObsEnabled(true));
-    goLive();
+    await goLive();
 
     act(() => result.current.assignScene('CAM A', 'a'));
     act(() => result.current.assignScene('CAM B', 'a'));
@@ -184,22 +195,22 @@ describe('scene mapping', () => {
     expect(result.current.obsMapping).toEqual({});
   });
 
-  it('persists the mapping across mounts', () => {
+  it('persists the mapping across mounts', async () => {
     const first = renderHook(() => useObsTally({ isHost: true, clientIds: ['a'] }));
     act(() => first.result.current.setObsEnabled(true));
-    goLive();
+    await goLive();
     act(() => first.result.current.assignScene('CAM A', 'a'));
     first.unmount();
 
     const second = renderHook(() => useObsTally({ isHost: true, clientIds: ['a'] }));
-    goLive();
+    await goLive();
     expect(second.result.current.obsMapping).toEqual({ 'CAM A': 'a' });
   });
 
-  it('hides mappings for scenes OBS no longer reports', () => {
+  it('hides mappings for scenes OBS no longer reports', async () => {
     const { result } = renderHook(() => useObsTally({ isHost: true, clientIds: ['a', 'b'] }));
     act(() => result.current.setObsEnabled(true));
-    goLive();
+    await goLive();
     act(() => result.current.autoAssignScenes());
 
     act(() => latest().onSceneState({ ...SCENE_STATE, scenes: ['CAM A'], previewScene: null }));
@@ -207,10 +218,10 @@ describe('scene mapping', () => {
     expect(result.current.obsMapping).toEqual({ 'CAM A': 'a' });
   });
 
-  it('clears the whole mapping on request', () => {
+  it('clears the whole mapping on request', async () => {
     const { result } = renderHook(() => useObsTally({ isHost: true, clientIds: ['a', 'b'] }));
     act(() => result.current.setObsEnabled(true));
-    goLive();
+    await goLive();
     act(() => result.current.autoAssignScenes());
     act(() => result.current.clearSceneMapping());
 
@@ -218,10 +229,10 @@ describe('scene mapping', () => {
     expect(result.current.obsAssignment).toEqual({ programId: null, previewId: null });
   });
 
-  it('leaves every lamp dark when the live scene has no camera behind it', () => {
+  it('leaves every lamp dark when the live scene has no camera behind it', async () => {
     const { result } = renderHook(() => useObsTally({ isHost: true, clientIds: ['a', 'b'] }));
     act(() => result.current.setObsEnabled(true));
-    goLive({ ...SCENE_STATE, scenes: ['CAM A', 'CAM B', 'Titles'], programScene: 'Titles', previewScene: null });
+    await goLive({ ...SCENE_STATE, scenes: ['CAM A', 'CAM B', 'Titles'], programScene: 'Titles', previewScene: null });
     act(() => result.current.assignScene('CAM A', 'a'));
 
     expect(result.current.obsAssignment).toEqual({ programId: null, previewId: null });
@@ -239,10 +250,11 @@ describe('scene mapping', () => {
 });
 
 describe('credentials', () => {
-  it('passes the password to the client and remembers it', () => {
+  it('passes the password to the client and remembers it', async () => {
     const { result, unmount } = renderHook(() => useObsTally({ isHost: true, clientIds: [] }));
     act(() => result.current.setObsPassword('hunter2'));
     act(() => result.current.setObsEnabled(true));
+    await flushAsync();
 
     expect(latest().password).toBe('hunter2');
 

@@ -122,7 +122,7 @@ export function SyncPane() {
           </table>
         )}
         {!isHost && p2pRole === 'client' && (
-          <p className="dt-hint">接続中のカメラ一覧はマスター端末に表示されます。</p>
+          <p className="dt-hint">{tr('dt.hint.syncClients')}</p>
         )}
       </DesktopPanel>
     </div>

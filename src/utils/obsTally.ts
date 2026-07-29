@@ -16,7 +16,21 @@ export interface ObsBusAssignment {
   previewId: string | null;
 }
 
+export interface ObsSceneState {
+  scenes: string[];
+  programScene: string | null;
+  previewScene: string | null;
+  studioMode: boolean;
+}
+
 export const OBS_DEFAULT_URL = 'ws://localhost:4455';
+
+export const EMPTY_OBS_SCENE_STATE: ObsSceneState = {
+  scenes: [],
+  programScene: null,
+  previewScene: null,
+  studioMode: false,
+};
 
 /**
  * Which cameras OBS's current program/preview scenes address.

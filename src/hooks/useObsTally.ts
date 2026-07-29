@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { ObsWebSocketClient, EMPTY_OBS_SCENE_STATE } from '../utils/ObsWebSocket';
-import type { ObsErrorCode, ObsSceneState, ObsStatus } from '../utils/ObsWebSocket';
+import type { ObsWebSocketClient, ObsErrorCode, ObsSceneState, ObsStatus } from '../utils/ObsWebSocket';
 import {
+  EMPTY_OBS_SCENE_STATE,
   OBS_DEFAULT_URL,
   autoMapObsScenes,
   normalizeObsUrl,
@@ -82,6 +82,11 @@ interface UseObsTallyParams {
  * existing broadcast, action log, and PGM return path rather than adding a
  * second way for a camera to go live.
  */
+async function getObsClientClass() {
+  const mod = await import('../utils/ObsWebSocket');
+  return mod.ObsWebSocketClient;
+}
+
 export function useObsTally({ isHost, clientIds }: UseObsTallyParams): ObsControls {
   const [obsEnabled, setEnabledState] = useState(() => readStored(STORAGE_ENABLED) === 'true');
   const [obsUrl, setUrlState] = useState(() => readStored(STORAGE_URL) || OBS_DEFAULT_URL);
@@ -136,21 +141,28 @@ export function useObsTally({ isHost, clientIds }: UseObsTallyParams): ObsContro
     if (!linkActive) return;
 
     let live = true;
-    const client = new ObsWebSocketClient({
-      url: obsUrl,
-      password: obsPassword,
-      onStatus: (status, error) => {
-        if (!live) return;
-        setSocketStatus(status);
-        setSocketError(error ?? null);
-      },
-      onSceneState: state => { if (live) setSocketScene(state); },
+    let clientInstance: ObsWebSocketClient | null = null;
+
+    void getObsClientClass().then((ClientClass) => {
+      if (!live) return;
+      clientInstance = new ClientClass({
+        url: obsUrl,
+        password: obsPassword,
+        onStatus: (status, error) => {
+          if (!live) return;
+          setSocketStatus(status);
+          setSocketError(error ?? null);
+        },
+        onSceneState: state => { if (live) setSocketScene(state); },
+      });
+      clientInstance.connect();
     });
-    client.connect();
 
     return () => {
       live = false;
-      client.disconnect();
+      if (clientInstance) {
+        clientInstance.disconnect();
+      }
       setSocketStatus('idle');
       setSocketError(null);
       setSocketScene(EMPTY_OBS_SCENE_STATE);

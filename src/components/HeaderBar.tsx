@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { FPS_OPTIONS } from '../constants';
 import type { TallyState } from '../utils/tally';
 
@@ -40,6 +41,19 @@ export function HeaderBar({
   setTallyOpen: setTallyOpenState,
   tr,
 }: HeaderBarProps) {
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   return (
     <header>
       <div className="logo-area">
@@ -48,6 +62,11 @@ export function HeaderBar({
       </div>
       <div className="header-right">
         <div className="hdr-status">
+          {!isOnline && (
+            <div className="offline-chip" style={{ background: '#d32f2f', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>
+              OFFLINE
+            </div>
+          )}
           <div className={`status-pill ${isRunning ? 'live' : isPreparing ? 'prep' : 'idle'}`}>
             <span className="status-dot" />
             {isRunning ? tr('status.live') : isPreparing ? tr('status.syncing') : tr('status.ready')}
@@ -72,7 +91,7 @@ export function HeaderBar({
             type="button"
             className={`hdr-tally-btn ${tallyOpen ? 'active' : ''}`}
             onClick={() => { setDirectorPanelOpen(false); setIsVisualSlate(false); setTallyOpenState((v: boolean) => !v); }}
-            aria-label="タリーランプを開く"
+            aria-label={tr('hdr.ariaTally')}
             title="TALLY"
           >
             <span 
@@ -88,7 +107,7 @@ export function HeaderBar({
               type="button"
               className="hdr-director-btn"
               onClick={() => { setTallyOpenState(false); setIsVisualSlate(false); setDirectorPanelOpen(true); }}
-              aria-label="ディレクターパネルを開く"
+              aria-label={tr('hdr.ariaDirector')}
               title="DIRECTOR"
             >
               DIR

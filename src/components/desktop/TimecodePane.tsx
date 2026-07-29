@@ -56,7 +56,7 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
             </button>
           ))}
         </div>
-        <p className="dt-hint">59.94p 撮影時は 29.97 を、50p 撮影時は 25 を選択してください。</p>
+        <p className="dt-hint">{tr('dt.hint.fps')}</p>
       </DesktopPanel>
 
       <DesktopPanel title={tr('dt.output')}>
@@ -121,7 +121,7 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
           <div className="dt-range-scale">
             <span>-10</span><span>0</span><span>+10</span>
           </div>
-          <p className="dt-hint">カメラとの微差をフレーム単位で補正します。</p>
+          <p className="dt-hint">{tr('dt.hint.offset')}</p>
         </DesktopSection>
 
         <DesktopSection title={tr('dt.metadata')}>
@@ -141,7 +141,7 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
             <span className="dt-field-label">{tr('label.userBits')}</span>
             <span className="dt-readout">{userBits}{autoUserBits ? ' · AUTO' : ''}</span>
           </div>
-          <p className="dt-hint">開始TCは FREE RUN 時のみ編集できます。</p>
+          <p className="dt-hint">{tr('dt.hint.startTc')}</p>
         </DesktopSection>
       </DesktopPanel>
 

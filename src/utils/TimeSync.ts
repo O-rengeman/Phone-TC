@@ -10,14 +10,14 @@ const TIME_SERVERS = [
   'https://worldtimeapi.org/api/ip',
   'https://worldtimeapi.org/api/timezone/Etc/UTC',
   'https://timeapi.io/api/Time/current/zone?timeZone=UTC',
-  'http://worldclockapi.com/api/json/utc/now',
 ];
 
 const NTP_CACHE_KEY = 'ltc-ntp-cache';
 const NTP_CACHE_TTL_MS = 3600000; // 1 hour
 const FETCH_TIMEOUT_MS = 6000; // Abort a stuck time-server request after 6s
+const TOTAL_SYNC_TIMEOUT_MS = 12000; // Total budget for all servers combined
 
-// worldtimeapi.org uses `datetime`, timeapi.io uses `dateTime`, worldclockapi.com uses `currentDateTime`
+// worldtimeapi.org uses `datetime`, timeapi.io uses `dateTime`
 interface TimeServerResponse {
   dateTime?: string;
   datetime?: string;
@@ -33,12 +33,17 @@ interface CachedTimeSync {
 export class TimeSync {
   public static async sync(samplesPerServer: number = 2): Promise<TimeSyncResult> {
     let bestSample: TimeSyncResult | null = null;
+    const deadline = Date.now() + TOTAL_SYNC_TIMEOUT_MS;
 
     for (const server of TIME_SERVERS) {
+      if (Date.now() >= deadline) break;
       debug(`Attempting sync with ${server}...`);
       for (let i = 0; i < samplesPerServer; i++) {
+        if (Date.now() >= deadline) break;
+        const remainingTime = Math.max(100, deadline - Date.now());
+        const timeoutMs = Math.min(FETCH_TIMEOUT_MS, remainingTime);
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         try {
           const start = performance.now();
           const response = await fetch(`${server}${server.includes('?') ? '&' : '?'}nocache=${Date.now()}`, {

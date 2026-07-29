@@ -146,7 +146,7 @@ export function TallyPane() {
         {!isHost ? (
           <div className="dt-empty">
             <strong>{tr('dt.hostOnly')}</strong>
-            <span>タリーの割り当てはマスター端末から行います。</span>
+            <span>{tr('dt.hint.tallyHost')}</span>
           </div>
         ) : clientEntries.length === 0 ? (
           <div className="dt-empty">

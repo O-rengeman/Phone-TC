@@ -47,19 +47,11 @@ export type ObsErrorCode =
   | 'mixedContent'
   | 'unknown';
 
-export interface ObsSceneState {
-  scenes: string[];
-  programScene: string | null;
-  previewScene: string | null;
-  studioMode: boolean;
-}
+import type { ObsSceneState } from './obsTally';
+import { EMPTY_OBS_SCENE_STATE } from './obsTally';
 
-export const EMPTY_OBS_SCENE_STATE: ObsSceneState = {
-  scenes: [],
-  programScene: null,
-  previewScene: null,
-  studioMode: false,
-};
+export type { ObsSceneState };
+export { EMPTY_OBS_SCENE_STATE };
 
 export interface ObsWebSocketOptions {
   url: string;

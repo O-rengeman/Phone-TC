@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
 import { LTCSyncProvider, useLTC } from './LTCSyncContext';
 import { FPS_OPTIONS } from './constants';
 import { VideoPlayer } from './VideoPlayer';
@@ -9,9 +9,7 @@ import type { SyncMode } from './LTCSyncContext';
 import { formatSyncAge } from './utils/DriftMonitor';
 import { Toaster, toast } from 'react-hot-toast';
 import { ReturnMonitor } from './components/ReturnMonitor';
-import { DirectorPanel } from './components/DirectorPanel';
 import { TallyOverlay } from './components/TallyOverlay';
-import { VisualSlate } from './components/VisualSlate';
 import { GuideOverlay } from './components/GuideOverlay';
 import { useMediaStreams } from './hooks/useMediaStreams';
 import { useObsTally } from './hooks/useObsTally';
@@ -21,9 +19,13 @@ import { HelpButton } from './components/HelpButton';
 import { FooterControls } from './components/FooterControls';
 import { MarkerList } from './components/MarkerList';
 import { ClientList } from './components/ClientList';
-import { DesktopShell } from './components/desktop/DesktopShell';
+import { PwaRegister } from './components/PwaRegister';
 import { getAutoSwitcherAssignment, resolveReturnFeed } from './utils/switcherRouting';
 import './App.css';
+
+const DesktopShell = lazy(() => import('./components/desktop/DesktopShell').then(m => ({ default: m.DesktopShell })));
+const DirectorPanel = lazy(() => import('./components/DirectorPanel').then(m => ({ default: m.DirectorPanel })));
+const VisualSlate = lazy(() => import('./components/VisualSlate').then(m => ({ default: m.VisualSlate })));
 
 function MainApp() {
   const {
@@ -311,6 +313,7 @@ function MainApp() {
 
   return (
     <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
+      <PwaRegister />
       <HeaderBar
         isRunning={isRunning}
         isPreparing={isPreparing}
@@ -340,11 +343,13 @@ function MainApp() {
       )}
 
       {!isMobile && (
-        <DesktopShell
-          switcher={switcherControls}
-          obs={obs}
-          onOutputModeChange={handleOutputModeChange}
-        />
+        <Suspense fallback={<div className="desktop-view-placeholder" style={{ minHeight: '100vh', background: '#0a0a0c' }} />}>
+          <DesktopShell
+            switcher={switcherControls}
+            obs={obs}
+            onOutputModeChange={handleOutputModeChange}
+          />
+        </Suspense>
       )}
 
       {p2pRole === 'client' && pipEnabled && returnStream && (
@@ -672,21 +677,27 @@ function MainApp() {
         />
       )}
 
-      {directorPanelOpen && <DirectorPanel {...switcherControls} />}
+      {directorPanelOpen && (
+        <Suspense fallback={null}>
+          <DirectorPanel {...switcherControls} />
+        </Suspense>
+      )}
 
       {isVisualSlate && (
-        <VisualSlate
-          slateTime={slateTime}
-          isSlateFlashing={isSlateFlashing}
-          handleSlateClick={handleSlateClick}
-          defaultReelName={defaultReelName}
-          sceneName={sceneName}
-          markers={markers}
-          fpsIndex={fpsIndex}
-          userBits={userBits}
-          tr={tr}
-          setIsVisualSlate={setIsVisualSlate}
-        />
+        <Suspense fallback={null}>
+          <VisualSlate
+            slateTime={slateTime}
+            isSlateFlashing={isSlateFlashing}
+            handleSlateClick={handleSlateClick}
+            defaultReelName={defaultReelName}
+            sceneName={sceneName}
+            markers={markers}
+            fpsIndex={fpsIndex}
+            userBits={userBits}
+            tr={tr}
+            setIsVisualSlate={setIsVisualSlate}
+          />
+        </Suspense>
       )}
 
       <GuideOverlay showGuide={showGuide} setShowGuide={setShowGuide} tr={tr} />

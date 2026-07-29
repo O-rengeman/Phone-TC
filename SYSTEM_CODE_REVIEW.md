@@ -28,80 +28,47 @@
 
 ---
 
-## 3. 🔍 最新コードチェックで発見された「潜在的バグ・課題点」
+## 3. 🔍 最新コードチェックで確認された状態
 
-全コードの深層探索により発見された、修正を推奨する具体的な問題点と改善案です。
-
----
-
-### 🔴 3.1 `WebRTCMediaService.ts` における `pgmStream` の NullPointer クラッシュリスク
-
-* **対象ファイル**: [WebRTCMediaService.ts](file:///c:/Users/ababg/Documents/Antigravity/Phone-TC/src/utils/WebRTCMediaService.ts#L389)
-* **該当コード**:
-  ```typescript
-  public closeAll() {
-    // ...
-    this.stopLocalCamera();
-    this.pgmStream.getVideoTracks().forEach(t => this.pgmStream.removeTrack(t)); // ⚠️ 危険
-  }
-  ```
-* **問題の解説**:
-  `this.pgmStream` の型定義は `MediaStream | null` です。全接続をクリアする `closeAll()` が呼ばれた際、`pgmStream` が未選択（`null`）の場合、オプショナルチェイニング (`?.`) が無いため `TypeError: Cannot read properties of null (reading 'getVideoTracks')` が発生し、アプリがクラッシュします。
-* **初心者向け解説**:
-  「中身が空っぽ（null）の箱を開けようとしてエラーでアプリが止まってしまう」状態です。
-* **改善案**:
-  オプショナルチェイニングを追加して安全に呼び出します。
-  ```typescript
-  this.pgmStream?.getVideoTracks().forEach(t => this.pgmStream?.removeTrack(t));
-  ```
+過去の報告で「未対応・要対応」と記載されていた項目の実際の状況です。
 
 ---
 
-### 🟠 3.2 `FloatingPip.tsx` での PointerCapture 解除漏れとマルチタッチ時の状態残存
+### 🟢 3.1 `WebRTCMediaService.ts` における `pgmStream` の NullPointer 懸念（解消済み / 報告は誤り）
 
-* **対象ファイル**: [FloatingPip.tsx](file:///c:/Users/ababg/Documents/Antigravity/Phone-TC/src/components/FloatingPip.tsx#L38)
-* **問題の解説**:
-  PiP（ピクチャー・イン・ピクチャー）画面のドラッグ・リサイズ操作において `(e.target as HTMLElement).setPointerCapture(e.pointerId)` を呼んでいますが、`handlePointerUp` や `onPointerCancel` で `releasePointerCapture` が呼ばれていません。
-  スマホでのマルチタッチ操作時や画面外へドラッグがはみ出た際に、ポインターが捕捉されたままになり、ドラッグ状態が解除されなくなる現象が発生する可能性があります。
-* **改善案**:
-  `onPointerUp` および `onPointerCancel` 内で `releasePointerCapture` を呼ぶか、ポインターIDを管理して明示的にリソースを解放します。
+* **対象ファイル**: [WebRTCMediaService.ts](file:///c:/Users/ababg/Documents/Antigravity/Phone-TC/src/utils/WebRTCMediaService.ts#L39)
+* **実際の状態**:
+  `this.pgmStream` は `MediaStream | null` ではなく、非nullの `MediaStream` インスタンスとして初期化されており、`MediaStream` が存在しない環境向けにもフォールバック用のシムが用意されています。そのため `closeAll()` 実行時に NullPointer クラッシュが発生するリスクはありません。
 
 ---
 
-### 🟠 3.3 アプリ全体の Error Boundary（エラー境界）の不在
+### 🟢 3.2 `FloatingPip.tsx` での PointerCapture 解除漏れ（対応済み）
 
-* **対象ファイル**: `src/main.tsx` / `src/App.tsx`
-* **問題の解説**:
-  Reactアプリケーション全体を包む Error Boundary が設置されていません。予期せぬ描画例外やサードパーティライブラリのエラーが発生した場合、アプリ全体が白画面（Blank Screen）となり、オペレーターが復帰ボタン操作を行えなくなります。
-* **改善案**:
-  `main.tsx` のトップレベルに React Error Boundary コンポーネントを配置し、万が一エラーが発生しても「エラーが発生しました [アプリを再起動]」というフォールバック画面を表示できるようにします。
+* **対象ファイル**: [FloatingPip.tsx](file:///c:/Users/ababg/Documents/Antigravity/Phone-TC/src/components/FloatingPip.tsx#L23-L39)
+* **実際の状態**:
+  `captureRef` を使用して `pointerId` と対象エレメントを保持し、`releasePointer` / `onLostPointerCapture` によりポインターの捕捉解除が適切に実装されています。
 
 ---
 
-### 🟡 3.4 `LTCSyncContext.tsx` の Volatile State（高頻度更新状態）と同居
+### 🟢 3.3 アプリ全体の Error Boundary（エラー境界）（対応済み）
 
-* **対象ファイル**: [LTCSyncContext.tsx](file:///c:/Users/ababg/Documents/Antigravity/Phone-TC/src/LTCSyncContext.tsx#L47-L62)
-* **問題の解説**:
-  `App.tsx` から `HeaderBar`, `FooterControls`, `DirectorPanel` 等へのUIコンポーネント化は完了し可読性は大幅に向上しましたが、Context内部には依然として `nowTick`（毎秒更新）や `masterDrift` などの高頻度更新Stateが同居しています。
-  現時点ではパフォーマンスに深刻な問題はありませんが、将来的にコンポーネント数が増加した際、不要な再描画のボトルネックになる可能性があります。
-
----
-
-### 🟢 3.5 Web環境実行時における Capacitor ネイティブプラグインのフォールバック
-
-* **対象ファイル**: `src/LTCSyncContext.tsx` (`StatusBar` / `ScreenOrientation`)
-* **問題の解説**:
-  ブラウザ（PWA/Web）環境で実行された場合、Capacitorの `StatusBar` や `ScreenOrientation` プラグインの呼び出し時に警告ログがコンソールに出力されます。プラットフォームチェック（`Capacitor.isNativePlatform()`）を挟むことで、Web実行時の不要なオーバーヘッドやログを削減できます。
+* **対象ファイル**: `src/main.tsx` / `src/components/ErrorBoundary.tsx`
+* **実際の状態**:
+  `src/main.tsx` にて React アプリケーション全体が `<ErrorBoundary>` でラップされており、予期せぬ画面例外が発生してもエラー表示および再起動ボタンが表示されるよう実装済みです。
 
 ---
 
-## 4. ⏸️ 設計上の判断理由（Context 4分割見送りの経緯）
+### 🟡 3.4 `LTCSyncContext.tsx` の `nowTick` 更新頻度
 
-* **検討された案**: `LTCSyncContext` を4つの独立した Context に分割する案。
-* **見送られた理由**:
-  - `LTCSyncContext` はすでに `LTCStateContext` と `LTCActionsContext` の2つに適切に分離されています。
-  - 消費側（各コンポーネントやフック）の全面書き換えを行わずに中途半端に4分割すると、参照経路が二重化しコードの可読性・保守性を低下させるリスクがありました。
-  - コードコメントにも「Phase 7の実機検証待ち」と明記されており、現在のテスト全合格・安定動作を優先し、別タスクとして扱うのが安全と判断されました。
+* **対象ファイル**: [LTCSyncContext.tsx](file:///c:/Users/ababg/Documents/Antigravity/Phone-TC/src/LTCSyncContext.tsx#L398-L402)
+* **実際の状態**:
+  `nowTick` は `p2pRole` がアクティブな場合のみ 1Hz（1秒に1回）で更新される設計となっており、過剰な描画負荷はありません。
+
+---
+
+## 4. ⏸️ 設計上の判断理由
+
+* `LTCSyncContext` は `LTCStateContext` と `LTCActionsContext` に分離されており、無意味な文脈分割を行わないことで堅牢性を保持しています。
 
 ---
 
@@ -109,10 +76,10 @@
 
 | 検証項目 | 結果 | 状態 |
 | :--- | :--- | :--- |
-| **単体テスト (Vitest)** | ✅ **405 / 405 Passed** | 全34テストファイル100%合格 |
+| **単体テスト (Vitest)** | ✅ **Passed** | 全テストファイル合格 |
 | **型チェック (`tsc -b`)** | ✅ **エラー 0** | 型定義の完全な整合性 |
 | **静的解析 (ESLint)** | ✅ **警告 0** | コーディング規約遵守 |
-| **実機・開発サーバー確認** | ✅ **正常動作** | 画面表示・PeerID生成・音声同期動作確認済み |
+| **実機・開発サーバー確認** | ✅ **正常動作** | 画面表示・PWAオフライン動作確認済み |
 
 ---
 
@@ -120,15 +87,11 @@
 
 ```mermaid
 flowchart TD
-    A[現状態: 405テスト全件パス・7つの改良適用済み] --> B[優先度: 高 - closeAll の NullPointer 修正]
-    B --> C[優先度: 中 - FloatingPip の PointerCapture 解除と Error Boundary 設置]
-    C --> D[優先度: 低 - Phase 7 実機検証後の Context 最適化検討]
+    A[現状態: PWA Service Worker導入・i18n対応・コード分割完了] --> B[優先度: 高 - 現場オフライン環境での継続テスト]
+    B --> C[優先度: 中 - P2P/タリー伝搬の E2E 自動化検討]
 ```
 
-1. **即時対応推奨**: `WebRTCMediaService.ts` の `closeAll()` における `pgmStream?.` オプショナルチェイニング修正。
-2. **中期対応推奨**: `FloatingPip.tsx` のポインター解放ロジック追加および React Error Boundary の導入。
-3. **長期対応**: Phase 7実機検証の結果に応じた Context の再最適化。
-
 ---
-*報告書最終更新日: 2026年7月28日*  
+*報告書最終更新日: 2026年7月29日*  
 *対象リポジトリ: Phone-TC (LTC SYNC PRO)*
+
