@@ -16,19 +16,24 @@ if (-not (Test-Path -LiteralPath $sourcePath)) {
 $sourceImage = [System.Drawing.Bitmap]::FromFile($sourcePath)
 
 try {
+    $cropSize = [Math]::Min($sourceImage.Width, $sourceImage.Height)
+    $cropX = [int][Math]::Floor(($sourceImage.Width - $cropSize) / 2)
+    $cropY = [int][Math]::Floor(($sourceImage.Height - $cropSize) / 2)
+    $cropRect = [System.Drawing.Rectangle]::new($cropX, $cropY, $cropSize, $cropSize)
+
     if ($sourceImage.Width -ne $sourceImage.Height) {
-        throw "The icon source must be square. Actual size: $($sourceImage.Width)x$($sourceImage.Height)"
+        Write-Host "Warning: The icon source is not square ($($sourceImage.Width)x$($sourceImage.Height)). Auto-cropping center ${cropSize}x${cropSize}."
     }
 
     $cornerAlpha = @(
-        $sourceImage.GetPixel(0, 0).A
-        $sourceImage.GetPixel($sourceImage.Width - 1, 0).A
-        $sourceImage.GetPixel(0, $sourceImage.Height - 1).A
-        $sourceImage.GetPixel($sourceImage.Width - 1, $sourceImage.Height - 1).A
+        $sourceImage.GetPixel($cropX, $cropY).A
+        $sourceImage.GetPixel($cropX + $cropSize - 1, $cropY).A
+        $sourceImage.GetPixel($cropX, $cropY + $cropSize - 1).A
+        $sourceImage.GetPixel($cropX + $cropSize - 1, $cropY + $cropSize - 1).A
     )
 
     if (($cornerAlpha | Measure-Object -Maximum).Maximum -ne 0) {
-        throw "The icon source corners must be fully transparent."
+        Write-Host "Notice: The icon source corners are not fully transparent."
     }
 
     function New-ScaledTransparentBitmap {
@@ -52,7 +57,8 @@ try {
             $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
             $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
             $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
-            $graphics.DrawImage($Image, 0, 0, $Size, $Size)
+            $destRect = [System.Drawing.Rectangle]::new(0, 0, $Size, $Size)
+            $graphics.DrawImage($Image, $destRect, $cropRect, [System.Drawing.GraphicsUnit]::Pixel)
         }
         finally {
             $graphics.Dispose()
@@ -207,6 +213,8 @@ try {
     Save-TransparentPng -Image $sourceImage -Size 1024 -RelativePath "public/app-icon.png"
     Save-TransparentPng -Image $sourceImage -Size 512 -RelativePath "public/app-icon-512.png"
     Save-TransparentPng -Image $sourceImage -Size 192 -RelativePath "public/app-icon-192.png"
+    Save-TransparentPng -Image $sourceImage -Size 180 -RelativePath "public/apple-touch-icon.png"
+    Save-TransparentPng -Image $sourceImage -Size 1024 -RelativePath "ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
 
     $androidSizes = @{
         "mdpi" = 48

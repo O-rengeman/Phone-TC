@@ -9,55 +9,55 @@
   "theme_color": "#000000",
   "icons": [
     {
-      "src": "/ltc-sync-icon-20260729-44.png?v=source-alpha-v4",
+      "src": "/ltc-sync-icon-20260729-44.png?v=20260729.5",
       "sizes": "44x44",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/ltc-sync-icon-20260729-71.png?v=source-alpha-v4",
+      "src": "/ltc-sync-icon-20260729-71.png?v=20260729.5",
       "sizes": "71x71",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/ltc-sync-icon-20260729-150.png?v=source-alpha-v4",
+      "src": "/ltc-sync-icon-20260729-150.png?v=20260729.5",
       "sizes": "150x150",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/ltc-sync-icon-20260729-192.png?v=source-alpha-v4",
+      "src": "/ltc-sync-icon-20260729-192.png?v=20260729.5",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/ltc-sync-icon-20260729-256.png?v=source-alpha-v4",
+      "src": "/ltc-sync-icon-20260729-256.png?v=20260729.5",
       "sizes": "256x256",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/ltc-sync-icon-20260729-310.png?v=source-alpha-v4",
+      "src": "/ltc-sync-icon-20260729-310.png?v=20260729.5",
       "sizes": "310x310",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/ltc-sync-icon-20260729-384.png?v=source-alpha-v4",
+      "src": "/ltc-sync-icon-20260729-384.png?v=20260729.5",
       "sizes": "384x384",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/ltc-sync-icon-20260729-512.png?v=source-alpha-v4",
+      "src": "/ltc-sync-icon-20260729-512.png?v=20260729.5",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/ltc-sync-icon-20260729-1024.png?v=source-alpha-v4",
+      "src": "/ltc-sync-icon-20260729-1024.png?v=20260729.5",
       "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any"
