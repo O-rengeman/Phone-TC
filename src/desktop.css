@@ -1,0 +1,867 @@
+/*
+ * Desktop console (16:9), loaded only by DesktopShell.
+ *
+ * Every class here is prefixed `dt-` and every rule is scoped under
+ * `.desktop-view`, so this file cannot reach the mobile layout in App.css.
+ *
+ * Sizing is expressed in vh rather than px: the console is designed against a
+ * 1920x1080 monitor but has to hold its proportions on a 1280x720 laptop
+ * without either overflowing or leaving half the screen empty. Each value is
+ * clamped so text stays legible at the small end and stops growing at the
+ * large end.
+ */
+
+.desktop-view {
+  --dt-gap: clamp(8px, 1.1vh, 16px);
+  --dt-pad: clamp(10px, 1.5vh, 20px);
+  --dt-radius: 10px;
+  --dt-label: clamp(9px, 1.05vh, 12px);
+  --dt-text: clamp(11px, 1.35vh, 15px);
+  --dt-title: clamp(12px, 1.5vh, 16px);
+  --dt-control-h: clamp(28px, 4vh, 44px);
+  --dt-line: rgba(255, 255, 255, 0.1);
+  --dt-line-soft: rgba(255, 255, 255, 0.05);
+  --dt-surface: rgba(255, 255, 255, 0.022);
+  --dt-surface-hi: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Frame ────────────────────────────────────────────────────────────── */
+
+/* The only flexible row is the stage; the readout is intrinsic. This grid,
+   plus min-height:0 on the stage, is what guarantees no page scroll. */
+.desktop-view .dt-shell {
+  flex: 1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.045) 0%, transparent 62%),
+    #040404;
+}
+
+/* ── Persistent readout: timecode + session vitals ────────────────────── */
+
+.desktop-view .dt-readout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(16px, 2.4vw, 48px);
+  padding: clamp(6px, 1.2vh, 18px) clamp(16px, 2vw, 40px);
+  border-bottom: 1px solid var(--dt-line);
+  min-height: 0;
+}
+
+/* The timecode is read from across a room, so it gets the height freed by
+   folding the tab strip into this row. Its font is height-driven (see
+   VideoPlayer), so every pixel here is legibility. */
+.desktop-view .dt-readout-tc {
+  min-width: 0;
+  height: clamp(104px, 24vh, 268px);
+}
+
+/* VideoPlayer's own card chrome is redundant inside the readout strip.
+   The min-height reset matters: the card carries a 200px floor from App.css
+   for the mobile layout, which at 720p is taller than the readout row and
+   pushed the timecode canvas down over the tab bar. */
+.desktop-view .dt-readout-tc .timecode-card-pro {
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.desktop-view .dt-readout-tc .time-canvas {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.desktop-view .dt-readout-tc .info-strip-pro {
+  margin: 0;
+  justify-content: center;
+  gap: clamp(10px, 1.4vw, 24px);
+  font-size: var(--dt-label);
+}
+
+.desktop-view .dt-readout-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: clamp(8px, 1.4vh, 18px);
+  height: 100%;
+  min-width: 0;
+}
+
+.desktop-view .dt-readout-side {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: clamp(10px, 1.2vw, 22px);
+  flex: 1;
+  min-height: 0;
+}
+
+.desktop-view .dt-readout-stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 clamp(8px, 0.9vw, 18px);
+  border-left: 1px solid var(--dt-line-soft);
+  min-width: clamp(72px, 7vw, 132px);
+}
+
+.desktop-view .dt-readout-stat:first-child {
+  border-left: none;
+}
+
+.desktop-view .dt-readout-stat strong {
+  font-size: clamp(13px, 1.75vh, 20px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-bright);
+  white-space: nowrap;
+}
+
+.desktop-view .dt-readout-stat strong.live { color: #ff3b71; }
+.desktop-view .dt-readout-stat strong.prep { color: #f5a623; }
+.desktop-view .dt-readout-stat strong.warn { color: #f5a623; }
+
+.desktop-view .dt-readout-link {
+  font-size: clamp(11px, 1.4vh, 16px) !important;
+  max-width: clamp(90px, 9vw, 170px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.desktop-view .dt-stat-label {
+  font-size: var(--dt-label);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+/* ── Tab bar ──────────────────────────────────────────────────────────── */
+
+.desktop-view .dt-tabs {
+  display: flex;
+  gap: 4px;
+  flex: none;
+  justify-content: flex-end;
+}
+
+.desktop-view .dt-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: clamp(6px, 0.9vh, 11px) clamp(11px, 1.1vw, 20px);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--dt-line);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-family: var(--font-main);
+  font-size: var(--dt-title);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.desktop-view .dt-tab:hover { color: var(--text); border-color: rgba(255, 255, 255, 0.28); }
+
+.desktop-view .dt-tab.active {
+  color: #000;
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.desktop-view .dt-tab-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(15px, 2vh, 20px);
+  height: clamp(15px, 2vh, 20px);
+  border: 1px solid var(--dt-line);
+  border-radius: 4px;
+  font-size: var(--dt-label);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.desktop-view .dt-tab.active .dt-tab-key {
+  border-color: rgba(0, 0, 0, 0.35);
+  color: #000;
+}
+
+/* ── Stage & panes ────────────────────────────────────────────────────── */
+
+.desktop-view .dt-stage {
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--dt-gap) clamp(16px, 2vw, 40px);
+}
+
+/*
+ * One grid for every tab: three equal columns.
+ *
+ * Each tab used to invent its own split (2 equal / 27-73 / 22-44-31 / 75-25),
+ * so the console rearranged itself under the operator every time they changed
+ * section and nothing could be found by muscle memory. The rule now is fixed
+ * and holds everywhere:
+ *
+ *   column 1      — the controls you operate
+ *   columns 2-3   — the live picture: whatever grows with the shoot
+ *
+ * Anything that needs room takes the middle and right columns together (see
+ * .dt-panel-grow below); nothing is ever a different width from its
+ * neighbour on another tab.
+ */
+.desktop-view .dt-pane {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--dt-gap);
+}
+
+/* The single expression of "needs more size": the middle and right columns. */
+.desktop-view .dt-pane > .dt-panel-grow {
+  grid-column: 2 / -1;
+}
+
+/* Setup controls are short forms, so they sit at their natural height across
+   the three columns rather than being stretched to fill the stage. */
+.desktop-view .dt-pane-timecode {
+  grid-auto-rows: min-content;
+  align-content: start;
+}
+
+/* A client's return feed is a picture, not a control, so it follows the same
+   rule as every other live surface and takes the middle and right columns. */
+.desktop-view .dt-pane-timecode > .dt-panel-return {
+  grid-column: 2 / -1;
+  grid-row: 2;
+}
+
+/* On a 720p console the control column is the tight one. Its panels get
+   slightly denser padding rather than the column getting wider, so the three
+   columns stay equal. */
+@media (max-height: 820px) {
+  .desktop-view .dt-panel-control .dt-panel-body { padding: 8px 10px; gap: 6px; }
+  .desktop-view .dt-panel-control .dt-panel-head { padding: 5px 10px; }
+  .desktop-view .dt-panel-control .dt-section { gap: 6px; }
+  .desktop-view .dt-panel-control .dt-section + .dt-section { padding-top: 6px; }
+}
+
+/* The switcher is one instrument and cannot be split across columns. */
+.desktop-view .dt-pane-switcher {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Titled blocks inside a panel. These replace what used to be separate
+   stacked panels: the grid gives each slot exactly one box, so groupings are
+   expressed with a rule and a heading rather than another border. */
+.desktop-view .dt-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.desktop-view .dt-section + .dt-section {
+  padding-top: var(--dt-gap);
+  border-top: 1px solid var(--dt-line-soft);
+}
+
+.desktop-view .dt-section-title {
+  margin: 0;
+  font-size: var(--dt-label);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The controls panel holds several sections, so it is the one that may need
+   to scroll internally on a short viewport. */
+.desktop-view .dt-panel-control .dt-panel-body {
+  align-content: start;
+}
+
+/* ── Panel primitive ──────────────────────────────────────────────────── */
+
+.desktop-view .dt-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--dt-surface);
+  border: 1px solid var(--dt-line);
+  border-radius: var(--dt-radius);
+  overflow: hidden;
+}
+
+.desktop-view .dt-panel-grow { min-height: 0; }
+
+.desktop-view .dt-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: clamp(7px, 1vh, 13px) var(--dt-pad);
+  border-bottom: 1px solid var(--dt-line-soft);
+  background: rgba(0, 0, 0, 0.28);
+  flex: none;
+}
+
+.desktop-view .dt-panel-title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--dt-label);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The console's labels are far smaller than the mobile ones, so the shared
+   em-relative "?" would come out illegible here. */
+.desktop-view .dt-panel-title .fhelp-btn {
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+.desktop-view .dt-panel-aside {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--dt-label);
+  color: var(--text-muted);
+}
+
+.desktop-view .dt-panel-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dt-gap);
+  padding: var(--dt-pad);
+}
+
+/* Opt-in scroll for unbounded lists only — never the page itself. */
+.desktop-view .dt-panel-body.dt-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.desktop-view .dt-scroll::-webkit-scrollbar { width: 8px; }
+.desktop-view .dt-scroll::-webkit-scrollbar-track { background: transparent; }
+.desktop-view .dt-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+}
+
+/* ── Controls ─────────────────────────────────────────────────────────── */
+
+.desktop-view .dt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.desktop-view .dt-field-label {
+  font-size: var(--dt-label);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.desktop-view .dt-segment {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  padding: 2px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--dt-line);
+  border-radius: var(--radius-sm);
+}
+
+.desktop-view .dt-segment-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.desktop-view .dt-segment:has(> :nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.desktop-view .dt-segment button {
+  height: var(--dt-control-h);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: var(--font-main);
+  font-size: var(--dt-text);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.desktop-view .dt-segment button:hover:not(:disabled) { color: var(--text); background: var(--dt-surface-hi); }
+.desktop-view .dt-segment button.active { background: var(--primary); color: #000; }
+.desktop-view .dt-segment button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.desktop-view .dt-fps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.desktop-view .dt-chip {
+  height: var(--dt-control-h);
+  padding: 0 10px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--dt-line);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--dt-text);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.desktop-view .dt-chip:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.3); }
+.desktop-view .dt-chip.active { background: var(--primary); border-color: var(--primary); color: #000; }
+.desktop-view .dt-chip:disabled { opacity: 0.35; cursor: not-allowed; }
+.desktop-view .dt-chip-lg { font-size: clamp(12px, 1.5vh, 17px); }
+
+.desktop-view .dt-btn,
+.desktop-view .dt-btn-sm {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--dt-line);
+  border-radius: var(--radius-sm);
+  color: var(--text-bright);
+  font-family: var(--font-main);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.desktop-view .dt-btn { height: var(--dt-control-h); padding: 0 18px; font-size: var(--dt-text); }
+.desktop-view .dt-btn-sm { height: clamp(22px, 3vh, 30px); padding: 0 12px; font-size: var(--dt-label); }
+.desktop-view .dt-btn:hover:not(:disabled),
+.desktop-view .dt-btn-sm:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
+.desktop-view .dt-btn:disabled,
+.desktop-view .dt-btn-sm:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.desktop-view .dt-btn-icon {
+  width: clamp(20px, 2.6vh, 26px);
+  height: clamp(20px, 2.6vh, 26px);
+  background: transparent;
+  border: 1px solid var(--dt-line);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: var(--dt-text);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.desktop-view .dt-btn-icon:hover { color: #ff3b71; border-color: #ff3b71; }
+
+.desktop-view .dt-input {
+  height: var(--dt-control-h);
+  padding: 0 10px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--dt-line);
+  border-radius: var(--radius-sm);
+  color: var(--text-bright);
+  font-family: var(--font-main);
+  font-size: var(--dt-text);
+  width: 100%;
+  min-width: 0;
+}
+
+.desktop-view .dt-input:focus { outline: none; border-color: rgba(255, 255, 255, 0.4); }
+.desktop-view .dt-input:disabled { opacity: 0.4; }
+.desktop-view .dt-input-mono { font-family: var(--font-mono); letter-spacing: 0.08em; }
+
+.desktop-view .dt-input-flush {
+  height: clamp(22px, 3vh, 30px);
+  background: transparent;
+  border-color: transparent;
+  padding: 0 4px;
+}
+
+.desktop-view .dt-input-flush:hover { border-color: var(--dt-line); }
+
+.desktop-view .dt-inline { display: flex; gap: 6px; align-items: center; }
+.desktop-view .dt-inline .dt-input { flex: 1; }
+.desktop-view .dt-inline-spread { justify-content: space-between; }
+
+.desktop-view .dt-range { width: 100%; accent-color: #fff; }
+
+.desktop-view .dt-range-scale {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: var(--dt-label);
+  color: var(--text-muted);
+}
+
+.desktop-view .dt-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--dt-text);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.desktop-view .dt-hint {
+  margin: 0;
+  font-size: var(--dt-label);
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.desktop-view .dt-warn {
+  margin: 0;
+  font-size: var(--dt-text);
+  color: #f5a623;
+}
+
+.desktop-view .dt-lock,
+.desktop-view .dt-count {
+  padding: 2px 8px;
+  border: 1px solid var(--dt-line);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: var(--dt-label);
+  color: var(--text-muted);
+}
+
+.desktop-view .dt-value-lg {
+  font-family: var(--font-mono);
+  font-size: clamp(14px, 1.9vh, 22px);
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.desktop-view .dt-readout {
+  min-width: 0;
+}
+
+.desktop-view .dt-mono { font-family: var(--font-mono); }
+
+/* ── Stat row ─────────────────────────────────────────────────────────── */
+
+.desktop-view .dt-stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.desktop-view .dt-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: clamp(6px, 0.9vh, 11px) 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--dt-line-soft);
+  border-radius: var(--radius-sm);
+}
+
+.desktop-view .dt-stat strong {
+  font-family: var(--font-mono);
+  font-size: var(--dt-text);
+  color: var(--text-bright);
+}
+
+/* ── Tables ───────────────────────────────────────────────────────────── */
+
+.desktop-view .dt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--dt-text);
+}
+
+.desktop-view .dt-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 6px 8px;
+  background: #0b0b0b;
+  border-bottom: 1px solid var(--dt-line);
+  text-align: left;
+  font-size: var(--dt-label);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.desktop-view .dt-table td {
+  padding: clamp(4px, 0.7vh, 9px) 8px;
+  border-bottom: 1px solid var(--dt-line-soft);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.desktop-view .dt-table tr.offline td { opacity: 0.4; }
+.desktop-view .dt-table td.warn { color: #f5a623; }
+.desktop-view .dt-table-markers td:nth-child(5) { width: 100%; white-space: normal; }
+.desktop-view .dt-marker-tc { color: var(--text-bright); font-weight: 700; }
+
+.desktop-view .dt-dot,
+.desktop-view .dt-marker-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.desktop-view .dt-dot.ok { background: #35d07f; }
+.desktop-view .dt-dot.warn { background: #f5a623; }
+.desktop-view .dt-dot.offline { background: #555; }
+
+.desktop-view .dt-marker-dot.red { background: #ff3b71; }
+.desktop-view .dt-marker-dot.blue { background: #3b8dff; }
+.desktop-view .dt-marker-dot.green { background: #35d07f; }
+.desktop-view .dt-marker-dot.yellow { background: #f5c542; }
+
+/* ── Tally ────────────────────────────────────────────────────────────── */
+
+.desktop-view .dt-tally-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.desktop-view .dt-tally-btn {
+  height: var(--dt-control-h);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--dt-line);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: var(--dt-text);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.15s;
+}
+
+.desktop-view .dt-tally-btn:hover { border-color: rgba(255, 255, 255, 0.35); }
+.desktop-view .dt-tally-btn:active { transform: scale(0.97); }
+.desktop-view .dt-tally-btn.active { color: #000; }
+.desktop-view .dt-tally-btn-sm { height: clamp(22px, 3vh, 30px); font-size: var(--dt-label); }
+
+.desktop-view .dt-all-tally {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.desktop-view .dt-cam-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(150px, 13vw, 210px), 1fr));
+  gap: var(--dt-gap);
+  align-content: start;
+}
+
+.desktop-view .dt-cam-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: clamp(8px, 1.1vh, 13px);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--dt-line);
+  border-radius: var(--radius-sm);
+}
+
+.desktop-view .dt-cam-card.offline { opacity: 0.45; }
+
+.desktop-view .dt-cam-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.desktop-view .dt-cam-head strong {
+  font-size: var(--dt-text);
+  color: var(--text-bright);
+  letter-spacing: 0.05em;
+}
+
+.desktop-view .dt-cam-head span {
+  font-size: var(--dt-label);
+  color: var(--text-muted);
+}
+
+/* ── Log ──────────────────────────────────────────────────────────────── */
+
+.desktop-view .dt-log {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.desktop-view .dt-log li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--dt-line-soft);
+  font-size: var(--dt-label);
+  color: var(--text);
+}
+
+.desktop-view .dt-log-state {
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.desktop-view .dt-log-state.state-live { background: rgba(255, 59, 113, 0.22); color: #ff7d9f; }
+.desktop-view .dt-log-state.state-preview { background: rgba(53, 208, 127, 0.2); color: #6be0a5; }
+
+/* ── Empty states ─────────────────────────────────────────────────────── */
+
+/* Fills its panel and centres, so a list that is legitimately empty looks
+   like a waiting state rather than a panel that failed to render. */
+.desktop-view .dt-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: clamp(16px, 3vh, 40px);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.desktop-view .dt-empty strong {
+  font-size: var(--dt-title);
+  color: var(--text);
+  letter-spacing: 0.06em;
+}
+
+.desktop-view .dt-empty span { font-size: var(--dt-text); }
+
+.desktop-view .dt-empty-full {
+  height: 100%;
+  border: 1px dashed var(--dt-line);
+  border-radius: var(--dt-radius);
+}
+
+.desktop-view .dt-export-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* ── Session panel (hosts the shared ConnectionManager) ───────────────── */
+
+/* ConnectionManager is shared with the mobile layout, so rather than changing
+   its markup, its spacing is compacted here to fit a console row. */
+.desktop-view .dt-panel-control .dt-panel-body { gap: 8px; }
+.desktop-view .dt-panel-control .control-section { gap: 6px; margin: 0; }
+.desktop-view .dt-panel-control .section-label { font-size: var(--dt-label); }
+.desktop-view .dt-panel-control .p2p-panel-pro { gap: 8px; }
+
+/* START SOURCE and START TC are one decision, and stacking them cost ~90px —
+   enough to push this column into a scrollbar at 720p. Side by side they fit,
+   and wrapping keeps it correct when START TC is hidden for network start. */
+.desktop-view .dt-panel-control .p2p-master-box {
+  display: flex;
+  /* App.css lays this out as a column; the direction must be stated
+     explicitly or the wrap below just stacks the items taller. */
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.desktop-view .dt-panel-control .p2p-master-box > .id-display-row { flex: 1 0 100%; }
+.desktop-view .dt-panel-control .p2p-master-box > .control-section,
+.desktop-view .dt-panel-control .p2p-master-box > .start-tc-input { flex: 1 1 150px; min-width: 0; }
+/* min-height, not height: at 720p a fixed 29px box clipped the descenders on
+   "MANUAL TC" / "NETWORK TIME". */
+.desktop-view .dt-panel-control .p2p-init-pro button,
+.desktop-view .dt-panel-control .sync-toggle-pro button {
+  min-height: var(--dt-control-h);
+  height: auto;
+  font-size: var(--dt-text);
+}
+.desktop-view .dt-panel-control .id-display { font-size: clamp(13px, 1.7vh, 19px); }
+.desktop-view .dt-panel-control .dev-panel { display: none; }
+
+/* ── Embedded switcher ────────────────────────────────────────────────── */
+
+/* The director panel is normally a fixed fullscreen overlay; inside the tab
+   it has to become an ordinary block that fills the stage instead. */
+.desktop-view .dt-pane-switcher .dt-embedded-switcher {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 1px solid var(--dt-line);
+  border-radius: var(--dt-radius);
+  overflow: hidden;
+}
+
+.desktop-view .dt-pane-switcher .dt-embedded-switcher .atem-workspace-layout {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The switcher was drawn for a fullscreen overlay, so on a 720p console its
+   multiview is taller than the tab. Its own sections scroll rather than clip:
+   a camera the director cannot scroll to is a camera they cannot cut to. */
+.desktop-view .dt-pane-switcher .dt-embedded-switcher .atem-multiview-board,
+.desktop-view .dt-pane-switcher .dt-embedded-switcher .creator-camera-section {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── OBS link ─────────────────────────────────────────────────────────── */
+
+/* Two short forms and a scene table: the settings column sits at its natural
+   height like the timecode pane rather than being stretched to the stage. */
+.desktop-view .dt-pane-obs { grid-auto-rows: minmax(0, 1fr); }
+
+.desktop-view .dt-table-obs select { width: 100%; }
+.desktop-view .dt-table-obs td:first-child { width: 40%; white-space: normal; }
+
+/* The scene that is actually on air has to be findable at a glance from
+   across the room, which a row of small text is not. */
+.desktop-view .dt-table-obs tr.obs-row-program td { color: #ff5a5a; font-weight: 700; }
+.desktop-view .dt-table-obs tr.obs-row-preview td { color: #35d07f; }
