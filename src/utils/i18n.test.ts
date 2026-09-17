@@ -21,7 +21,7 @@ describe('t', () => {
   it('has Japanese parity for every English key', () => {
     const testKeys = [
       'tab.main', 'status.ready', 'label.frameRate', 'btn.start',
-      'hdr.ariaTally', 'hdr.ariaDirector', 'dir.subtitleObs', 'dir.pickCam',
+      'help.markers.title', 'help.sync.title',
       'dt.hint.fps', 'dt.hint.offset', 'dt.hint.startTc', 'dt.hint.syncClients',
     ];
     for (const k of testKeys) {

@@ -13,16 +13,14 @@ describe('visibleDesktopTabs', () => {
     expect(visibleDesktopTabs(true)).toHaveLength(DESKTOP_TABS.length);
   });
 
-  it('hides the switcher from a device that is not running the session', () => {
+  it('gives a client every tab too, since none are host-only', () => {
     const ids = visibleDesktopTabs(false).map(tab => tab.id);
-    expect(ids).not.toContain('switcher');
-    expect(ids).toContain('timecode');
-    expect(ids).toContain('tally');
+    expect(ids).toEqual(['timecode', 'sync', 'markers']);
   });
 
   it('keeps the declared order', () => {
     expect(visibleDesktopTabs(true).map(tab => tab.id))
-      .toEqual(['timecode', 'sync', 'switcher', 'tally', 'obs', 'markers']);
+      .toEqual(['timecode', 'sync', 'markers']);
   });
 
   it('assigns every tab a unique hotkey', () => {
@@ -46,39 +44,19 @@ describe('isDesktopTabId', () => {
 
 describe('resolveDesktopTab', () => {
   it('keeps a valid stored tab', () => {
-    expect(resolveDesktopTab('tally', false)).toBe('tally');
+    expect(resolveDesktopTab('markers', false)).toBe('markers');
   });
 
   it('falls back to the default for unknown or missing values', () => {
     expect(resolveDesktopTab(null, true)).toBe(DEFAULT_DESKTOP_TAB);
     expect(resolveDesktopTab('garbage', true)).toBe(DEFAULT_DESKTOP_TAB);
   });
-
-  it('lets the host stay on the switcher', () => {
-    expect(resolveDesktopTab('switcher', true)).toBe('switcher');
-  });
-
-  it('moves off the switcher when this device is no longer the host', () => {
-    // Otherwise a client demoted mid-session would be left staring at a tab
-    // that renders nothing.
-    expect(resolveDesktopTab('switcher', false)).toBe(DEFAULT_DESKTOP_TAB);
-  });
 });
 
 describe('desktopTabForHotkey', () => {
   it('maps a digit to its tab', () => {
     expect(desktopTabForHotkey('1', false)).toBe('timecode');
-    expect(desktopTabForHotkey('6', false)).toBe('markers');
-  });
-
-  it('maps the switcher digit only for the host', () => {
-    expect(desktopTabForHotkey('3', true)).toBe('switcher');
-    expect(desktopTabForHotkey('3', false)).toBeNull();
-  });
-
-  it('maps the OBS digit only for the host', () => {
-    expect(desktopTabForHotkey('5', true)).toBe('obs');
-    expect(desktopTabForHotkey('5', false)).toBeNull();
+    expect(desktopTabForHotkey('3', false)).toBe('markers');
   });
 
   it('returns null for a digit that addresses no tab', () => {

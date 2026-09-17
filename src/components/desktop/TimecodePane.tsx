@@ -1,8 +1,5 @@
 import { useLTC } from '../../LTCSyncContext';
 import { FPS_OPTIONS } from '../../constants';
-import { useMediaStreams } from '../../hooks/useMediaStreams';
-import { resolveReturnFeed } from '../../utils/switcherRouting';
-import { ReturnMonitor } from '../ReturnMonitor';
 import { DesktopPanel, DesktopSection } from './DesktopPanel';
 
 interface TimecodePaneProps {
@@ -22,22 +19,16 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
     outputOffset, setOutputOffset,
     manualTimecode, setManualTimecode,
     userBits, autoUserBits,
-    targetId, isTallyConnected, pipEnabled, setPipEnabled,
-    setTallyOpen, setDirectorPanelOpen, setIsVisualSlate,
     tr,
   } = useLTC();
-
-  const mediaStreams = useMediaStreams();
-  const returnFeed = resolveReturnFeed(targetId, mediaStreams);
 
   // A client follows its master's frame rate and offset; letting the operator
   // change them here would be silently overwritten on the next heartbeat.
   const followsMaster = syncMode === 'p2p' && p2pRole === 'client';
   const locked = isRunning || followsMaster;
-  const isClient = p2pRole === 'client';
 
   return (
-    <div className={`dt-pane dt-pane-timecode${isClient ? ' has-return' : ''}`}>
+    <div className="dt-pane dt-pane-timecode">
       <DesktopPanel
         title={tr('label.frameRate')}
         help="timecode"
@@ -144,25 +135,6 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
           <p className="dt-hint">{tr('dt.hint.startTc')}</p>
         </DesktopSection>
       </DesktopPanel>
-
-      {/* A camera operator needs the return feed on their default tab, not
-          buried behind a section they would have to go looking for. */}
-      {isClient && (
-        <DesktopPanel title="RETURN" className="dt-panel-return">
-          <ReturnMonitor
-            stream={returnFeed.stream}
-            sourceId={returnFeed.peerId}
-            connected={isTallyConnected}
-            onOpenFullscreen={() => {
-              setDirectorPanelOpen(false);
-              setIsVisualSlate(false);
-              setTallyOpen(true);
-            }}
-            pipEnabled={pipEnabled}
-            setPipEnabled={setPipEnabled}
-          />
-        </DesktopPanel>
-      )}
     </div>
   );
 }

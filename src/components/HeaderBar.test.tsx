@@ -11,15 +11,9 @@ describe('HeaderBar', () => {
     batteryLevel: null,
     isCharging: false,
     batteryEta: null,
-    tallyOpen: false,
-    tallyState: 'off' as const,
-    isHost: true,
     lang: 'en' as const,
     setLang: vi.fn(),
     setShowGuide: vi.fn(),
-    setDirectorPanelOpen: vi.fn(),
-    setIsVisualSlate: vi.fn(),
-    setTallyOpen: vi.fn(),
     tr: (key: string) => key,
   };
 
@@ -54,20 +48,6 @@ describe('HeaderBar', () => {
     expect(screen.getByText((content) => content.includes('⚡'))).toBeTruthy();
   });
 
-  it('toggles tally open when TALLY button is clicked', () => {
-    const setTallyOpen = vi.fn();
-    render(<HeaderBar {...baseProps} setTallyOpen={setTallyOpen} />);
-    fireEvent.click(screen.getByText('TALLY'));
-    expect(setTallyOpen).toHaveBeenCalledOnce();
-  });
-
-  it('opens director panel when DIR button is clicked', () => {
-    const setDirectorPanelOpen = vi.fn();
-    render(<HeaderBar {...baseProps} setDirectorPanelOpen={setDirectorPanelOpen} />);
-    fireEvent.click(screen.getByText('DIR'));
-    expect(setDirectorPanelOpen).toHaveBeenCalledOnce();
-  });
-
   it('toggles language when language button is clicked', () => {
     const setLang = vi.fn();
     render(<HeaderBar {...baseProps} lang="en" setLang={setLang} />);
@@ -83,10 +63,5 @@ describe('HeaderBar', () => {
     render(<HeaderBar {...baseProps} setShowGuide={setShowGuide} />);
     fireEvent.click(screen.getByText('?'));
     expect(setShowGuide).toHaveBeenCalledOnce();
-  });
-
-  it('hides DIR button when not host', () => {
-    render(<HeaderBar {...baseProps} isHost={false} />);
-    expect(screen.queryByText('DIR')).toBeNull();
   });
 });

@@ -1,30 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { LTCSyncProvider, useLTC } from './LTCSyncContext';
 import { FPS_OPTIONS } from './constants';
 import { VideoPlayer } from './VideoPlayer';
 import { ConnectionManager } from './ConnectionManager';
-import { tallyLabelKey, TALLY_COLORS } from './utils/tally';
-import type { TallyState } from './utils/tally';
 import type { SyncMode } from './LTCSyncContext';
 import { formatSyncAge } from './utils/DriftMonitor';
 import { Toaster, toast } from 'react-hot-toast';
-import { ReturnMonitor } from './components/ReturnMonitor';
-import { TallyOverlay } from './components/TallyOverlay';
 import { GuideOverlay } from './components/GuideOverlay';
-import { useMediaStreams } from './hooks/useMediaStreams';
-import { useObsTally } from './hooks/useObsTally';
-import { FloatingPip } from './components/FloatingPip';
 import { HeaderBar } from './components/HeaderBar';
 import { HelpButton } from './components/HelpButton';
 import { FooterControls } from './components/FooterControls';
 import { MarkerList } from './components/MarkerList';
 import { ClientList } from './components/ClientList';
 import { PwaRegister } from './components/PwaRegister';
-import { getAutoSwitcherAssignment, resolveReturnFeed } from './utils/switcherRouting';
 import './App.css';
 
 const DesktopShell = lazy(() => import('./components/desktop/DesktopShell').then(m => ({ default: m.DesktopShell })));
-const DirectorPanel = lazy(() => import('./components/DirectorPanel').then(m => ({ default: m.DirectorPanel })));
 const VisualSlate = lazy(() => import('./components/VisualSlate').then(m => ({ default: m.VisualSlate })));
 
 function MainApp() {
@@ -57,33 +48,12 @@ function MainApp() {
     setDefaultReelName,
     outputOffset,
     setOutputOffset,
-    peerId,
-    targetId,
     isHost,
     driftStatus,
     isPaused,
     stopHoldPct,
     showGuide,
     setShowGuide,
-    tallyOpen,
-    setTallyOpen,
-    tallyTorchEnabled,
-    setTallyTorchEnabled,
-    manualTally,
-    tallyPayload,
-    tallyTime,
-    tallyDimmerOpacity,
-    tallyTcSize,
-    setTallyTcSize,
-    tallyStyle,
-    setTallyStyle,
-    tallyBorderSize,
-    setTallyBorderSize,
-    pipEnabled,
-    setPipEnabled,
-    directorPanelOpen,
-    setDirectorPanelOpen,
-    cameraLabels,
     isResyncing,
     lang,
     setLang,
@@ -96,7 +66,6 @@ function MainApp() {
     sceneName,
     setSceneName,
     tr,
-    playHapticFeedback,
     addMarker,
     removeMarker,
     updateMarkerComment,
@@ -108,43 +77,8 @@ function MainApp() {
     beginStopHold,
     cancelStopHold,
     handleManualResync,
-    handleManualTallyChange,
-    handleClientTallyChange,
-    handleSwitcherBusChange,
-    tallyState,
-    isTallyConnected,
-    handleDimmerCycle,
-    handleTorchToggle,
-    handleTallyExit,
     holdStoppedRef,
-    setIsVideoEnabled,
-    mediaServiceRef
   } = useLTC();
-
-  const mediaStreams = useMediaStreams();
-  const [pgmSourceId, setPgmSourceId] = useState<string | null>(null);
-  const [previewSourceId, setPreviewSourceId] = useState<string | null>(null);
-  const [isAutoTransitioning, setIsAutoTransitioning] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [transitionProgress, setTransitionProgress] = useState(0); // 0 (PGM) to 100 (PVW)
-  const autoTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const returnFeed = resolveReturnFeed(targetId, mediaStreams);
-  const returnStream = returnFeed.stream;
-  const clientIds = useMemo(() => Object.keys(clients), [clients]);
-  const obs = useObsTally({ isHost, clientIds });
-  // While OBS is linked it *is* the switcher, so it feeds the same program and
-  // preview state the built-in buses write and everything downstream — the
-  // tally broadcast, the action log, the PGM return feed — is unchanged.
-  //
-  // It deliberately bypasses getAutoSwitcherAssignment's fallback: a scene with
-  // no camera behind it (titles, a slate, a screen share) must leave every lamp
-  // dark. Auto-picking "some camera" there would light a red lamp on an
-  // operator who is not on air, which is the one failure a tally must not have.
-  const { programId: effectivePgmSourceId, previewId: effectivePreviewSourceId } = obs.obsControlActive
-    ? obs.obsAssignment
-    : isHost
-      ? getAutoSwitcherAssignment(Object.keys(clients), pgmSourceId, previewSourceId)
-      : { programId: pgmSourceId, previewId: previewSourceId };
 
   const handleOutputModeChange = (mode: 'stereo' | 'mono-l') => {
     setOutputMode(mode);
@@ -178,139 +112,6 @@ function MainApp() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!isHost) return;
-    const service = mediaServiceRef.current;
-    if (!service) return;
-
-    if (!effectivePgmSourceId) {
-      void service.setPgmStream(null);
-      return;
-    }
-
-    void service.setPgmStream(mediaStreams.get(effectivePgmSourceId) ?? null);
-  }, [effectivePgmSourceId, isHost, mediaStreams, mediaServiceRef]);
-
-  useEffect(() => {
-    if (!isHost) return;
-    handleSwitcherBusChange(effectivePgmSourceId, effectivePreviewSourceId);
-  }, [effectivePgmSourceId, effectivePreviewSourceId, handleSwitcherBusChange, isHost]);
-
-  useEffect(() => () => {
-    if (autoTransitionTimerRef.current) {
-      clearTimeout(autoTransitionTimerRef.current);
-    }
-  }, []);
-
-  const handleSelectProgram = useCallback((id: string) => {
-    playHapticFeedback();
-    setIsVideoEnabled(true);
-    setPgmSourceId(id);
-    handleSwitcherBusChange(id, effectivePreviewSourceId);
-  }, [effectivePreviewSourceId, handleSwitcherBusChange, playHapticFeedback, setIsVideoEnabled]);
-
-  const handleSelectPreview = useCallback((id: string) => {
-    playHapticFeedback();
-    setIsVideoEnabled(true);
-    setPreviewSourceId(id);
-    handleSwitcherBusChange(effectivePgmSourceId, id);
-  }, [effectivePgmSourceId, handleSwitcherBusChange, playHapticFeedback, setIsVideoEnabled]);
-
-  const handleCut = useCallback(() => {
-    if (!effectivePreviewSourceId) return;
-    playHapticFeedback();
-    const nextProgram = effectivePreviewSourceId;
-    const nextPreview = effectivePgmSourceId;
-    setIsVideoEnabled(true);
-    setPgmSourceId(nextProgram);
-    setPreviewSourceId(nextPreview);
-    handleSwitcherBusChange(nextProgram, nextPreview);
-    setTransitionProgress(0);
-    setIsTransitioning(false);
-  }, [effectivePgmSourceId, effectivePreviewSourceId, handleSwitcherBusChange, playHapticFeedback, setIsVideoEnabled]);
-
-  const handleAuto = useCallback(() => {
-    if (!effectivePreviewSourceId || isAutoTransitioning || isTransitioning) return;
-    playHapticFeedback();
-    setIsAutoTransitioning(true);
-    setIsTransitioning(true);
-
-    const duration = 500; // 0.5s
-    const startTime = performance.now();
-
-    const animate = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      setTransitionProgress(Math.round(progress * 100));
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        const nextProgram = effectivePreviewSourceId;
-        const nextPreview = effectivePgmSourceId;
-        setIsVideoEnabled(true);
-        setPgmSourceId(nextProgram);
-        setPreviewSourceId(nextPreview);
-        handleSwitcherBusChange(nextProgram, nextPreview);
-        setIsAutoTransitioning(false);
-        setIsTransitioning(false);
-        setTransitionProgress(0);
-      }
-    };
-
-    requestAnimationFrame(animate);
-  }, [
-    effectivePgmSourceId,
-    effectivePreviewSourceId,
-    handleSwitcherBusChange,
-    isAutoTransitioning,
-    isTransitioning,
-    playHapticFeedback,
-    setIsVideoEnabled,
-  ]);
-
-  const handleTBarChange = useCallback((value: number) => {
-    if (!effectivePreviewSourceId) return;
-
-    if (value > 0 && value < 100) {
-      setIsTransitioning(true);
-      setTransitionProgress(value);
-    } else if (value === 100) {
-      playHapticFeedback();
-      const nextProgram = effectivePreviewSourceId;
-      const nextPreview = effectivePgmSourceId;
-      setIsVideoEnabled(true);
-      setPgmSourceId(nextProgram);
-      setPreviewSourceId(nextPreview);
-      handleSwitcherBusChange(nextProgram, nextPreview);
-      setIsTransitioning(false);
-      setTransitionProgress(0);
-    } else {
-      setIsTransitioning(false);
-      setTransitionProgress(0);
-    }
-  }, [effectivePgmSourceId, effectivePreviewSourceId, handleSwitcherBusChange, playHapticFeedback, setIsVideoEnabled]);
-
-  // Bundled once so the desktop SWITCHER tab and the fullscreen DIR overlay
-  // are driven by exactly the same handlers.
-  const switcherControls = useMemo(() => ({
-    effectivePgmSourceId,
-    effectivePreviewSourceId,
-    isTransitioning,
-    transitionProgress,
-    isAutoTransitioning,
-    handleSelectPreview,
-    handleSelectProgram,
-    handleCut,
-    handleAuto,
-    handleTBarChange,
-    obsControlled: obs.obsControlActive,
-  }), [
-    effectivePgmSourceId, effectivePreviewSourceId, isTransitioning, transitionProgress,
-    isAutoTransitioning, handleSelectPreview, handleSelectProgram, handleCut, handleAuto,
-    handleTBarChange, obs.obsControlActive,
-  ]);
-
   return (
     <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
       <PwaRegister />
@@ -322,15 +123,9 @@ function MainApp() {
         batteryLevel={batteryLevel}
         isCharging={isCharging}
         batteryEta={batteryEta}
-        tallyOpen={tallyOpen}
-        tallyState={tallyState}
-        isHost={isHost}
         lang={lang}
         setLang={setLang}
         setShowGuide={setShowGuide}
-        setDirectorPanelOpen={setDirectorPanelOpen}
-        setIsVisualSlate={setIsVisualSlate}
-        setTallyOpen={setTallyOpen}
         tr={tr}
       />
 
@@ -344,16 +139,8 @@ function MainApp() {
 
       {!isMobile && (
         <Suspense fallback={<div className="desktop-view-placeholder" style={{ minHeight: '100vh', background: '#0a0a0c' }} />}>
-          <DesktopShell
-            switcher={switcherControls}
-            obs={obs}
-            onOutputModeChange={handleOutputModeChange}
-          />
+          <DesktopShell onOutputModeChange={handleOutputModeChange} />
         </Suspense>
-      )}
-
-      {p2pRole === 'client' && pipEnabled && returnStream && (
-        <FloatingPip stream={returnStream} onClose={() => setPipEnabled(false)} />
       )}
 
       {isMobile && (
@@ -361,21 +148,6 @@ function MainApp() {
         {activeTab === 'main' && (
           <div className="tab-pane main-pane">
             <VideoPlayer />
-
-            {p2pRole === 'client' && (
-              <ReturnMonitor
-                stream={returnStream}
-                sourceId={returnFeed.peerId}
-                connected={isTallyConnected}
-                onOpenFullscreen={() => {
-                  setDirectorPanelOpen(false);
-                  setIsVisualSlate(false);
-                  setTallyOpen(true);
-                }}
-                pipEnabled={pipEnabled}
-                setPipEnabled={setPipEnabled}
-              />
-            )}
 
             {syncMode === 'network' && (
               <div className="main-sync-bar">
@@ -438,7 +210,7 @@ function MainApp() {
               </label>
               <div className="sync-toggle-pro">
                 {(['system', 'network', 'p2p', 'freerun'] as SyncMode[]).map((m) => (
-                  <button 
+                  <button
                     key={m}
                     className={syncMode === m ? 'active' : ''}
                     onClick={() => setSyncMode(m)}
@@ -487,87 +259,6 @@ function MainApp() {
 
         {activeTab === 'tools' && (
           <div className="tab-pane tools-pane">
-            <section className="tool-section-shell tool-section-shell-tally">
-              <div className="tool-section-head">
-                <label className="section-label">
-                  {tr('label.tally')}
-                  <HelpButton topic="tally" tr={tr} variant="inline" />
-                </label>
-                <div className="tally-options">
-                  <label className="toggle-label">
-                    <input
-                      type="checkbox"
-                      checked={tallyTorchEnabled}
-                      onChange={(e) => setTallyTorchEnabled(e.target.checked)}
-                    />
-                    <span>Torch LED</span>
-                  </label>
-                </div>
-              </div>
-              <div className="control-section tally-section">
-                {isHost && (
-                  <button
-                    className="tally-open-btn btn-director-switcher"
-                    onClick={() => { setTallyOpen(false); setIsVisualSlate(false); setDirectorPanelOpen(true); }}
-                  >
-                    DIRECTOR SWITCHER PANEL
-                  </button>
-                )}
-                <div className="tally-state-row">
-                  {(['live', 'preview', 'off'] as TallyState[]).map(s => (
-                    <button
-                      key={s}
-                      className={`tally-state-btn ${manualTally === s ? 'active' : ''}`}
-                      style={manualTally === s ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
-                      onClick={() => handleManualTallyChange(s)}
-                    >
-                      {tr(tallyLabelKey(s))}
-                    </button>
-                  ))}
-                </div>
-                <button className="tally-open-btn" onClick={() => { setDirectorPanelOpen(false); setIsVisualSlate(false); setTallyOpen(true); }}>{tr('tally.fullscreen')}</button>
-              </div>
-            </section>
-
-            {isHost && Object.keys(clients).length > 0 && (
-              <section className="tool-section-shell clients-list-section">
-                <div className="tool-section-head">
-                  <label className="section-label">CONNECTED CLIENTS ({Object.keys(clients).length})</label>
-                </div>
-                <div className="clients-grid">
-                  {Object.entries(clients).map(([id, stats]) => {
-                    const isOffline = nowTick - stats.lastSeen > 30000;
-                    return (
-                      <div key={id} className={`client-card ${isOffline ? 'offline' : ''}`}>
-                        <div className="client-id">{id}</div>
-                        <div className="client-stats">
-                          <span className="stat">RTT: {stats.rtt.toFixed(0)}ms</span>
-                          <span className={`stat ${stats.drift >= 0.5 ? 'drift-warn' : ''}`}>
-                            δ: {stats.drift.toFixed(2)}s
-                          </span>
-                        </div>
-                        <div className="client-tally-controls">
-                          {(['live', 'preview', 'off'] as TallyState[]).map(s => {
-                             const isActive = tallyPayload?.assignments?.[id] === s;
-                             return (
-                               <button
-                                 key={s}
-                                 className={`tally-state-btn mini ${isActive ? 'active' : ''}`}
-                                 style={isActive ? { background: TALLY_COLORS[s], borderColor: TALLY_COLORS[s] } : undefined}
-                                 onClick={() => handleClientTallyChange(id, s)}
-                               >
-                                 {tr(tallyLabelKey(s))}
-                               </button>
-                             );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
             <section className="tool-section-shell tool-section-shell-meta">
               <div className="tools-grid-pro tools-grid-meta">
                 <div className="tool-card tool-card-userbits span-2">
@@ -597,7 +288,7 @@ function MainApp() {
                 </div>
               </div>
             </section>
-            
+
             <MarkerList
               markers={markers}
               addMarker={addMarker}
@@ -609,16 +300,11 @@ function MainApp() {
               tr={tr}
             />
 
-            {isHost && Object.keys(clients).length > 0 && (
-              <ClientList
-                clients={clients}
-                nowTick={nowTick}
-                tallyPayload={tallyPayload}
-                isHost={isHost}
-                tr={tr}
-                handleClientTallyChange={handleClientTallyChange}
-              />
-            )}
+            <ClientList
+              clients={clients}
+              nowTick={nowTick}
+              isHost={isHost}
+            />
           </div>
         )}
       </main>
@@ -649,39 +335,6 @@ function MainApp() {
       />
 
       <Toaster position="top-center" containerStyle={{ zIndex: 10500 }} toastOptions={{ style: { background: '#333', color: '#fff' } }} />
-
-      {tallyOpen && (
-        <TallyOverlay
-          tallyState={tallyState}
-          tallyTime={tallyTime}
-          tallyDimmerOpacity={tallyDimmerOpacity}
-          tallyTcSize={tallyTcSize}
-          tallyStyle={tallyStyle}
-          tallyBorderSize={tallyBorderSize}
-          isTallyConnected={isTallyConnected}
-          p2pRole={p2pRole}
-          returnStream={returnStream}
-          peerId={peerId}
-          cameraLabels={cameraLabels}
-          batteryLevel={batteryLevel}
-          isCharging={isCharging}
-          tr={tr}
-          playHapticFeedback={playHapticFeedback}
-          handleDimmerCycle={handleDimmerCycle}
-          handleTorchToggle={handleTorchToggle}
-          handleTallyExit={handleTallyExit}
-          setTallyStyle={setTallyStyle}
-          setTallyBorderSize={setTallyBorderSize}
-          setTallyTcSize={setTallyTcSize}
-          tallyTorchEnabled={tallyTorchEnabled}
-        />
-      )}
-
-      {directorPanelOpen && (
-        <Suspense fallback={null}>
-          <DirectorPanel {...switcherControls} />
-        </Suspense>
-      )}
 
       {isVisualSlate && (
         <Suspense fallback={null}>

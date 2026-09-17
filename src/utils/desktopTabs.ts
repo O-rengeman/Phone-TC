@@ -4,7 +4,7 @@
 // tabs exist and which one is selected are unit-testable on their own, and so
 // the shell component stays a layout concern rather than a policy one.
 
-export type DesktopTabId = 'timecode' | 'sync' | 'switcher' | 'tally' | 'obs' | 'markers';
+export type DesktopTabId = 'timecode' | 'sync' | 'markers';
 
 export interface DesktopTabDef {
   id: DesktopTabId;
@@ -19,10 +19,7 @@ export interface DesktopTabDef {
 export const DESKTOP_TABS: readonly DesktopTabDef[] = [
   { id: 'timecode', labelKey: 'dtab.timecode', hotkey: '1' },
   { id: 'sync', labelKey: 'dtab.sync', hotkey: '2' },
-  { id: 'switcher', labelKey: 'dtab.switcher', hotkey: '3', hostOnly: true },
-  { id: 'tally', labelKey: 'dtab.tally', hotkey: '4' },
-  { id: 'obs', labelKey: 'dtab.obs', hotkey: '5', hostOnly: true },
-  { id: 'markers', labelKey: 'dtab.markers', hotkey: '6' },
+  { id: 'markers', labelKey: 'dtab.markers', hotkey: '3' },
 ];
 
 export const DEFAULT_DESKTOP_TAB: DesktopTabId = 'timecode';
@@ -31,9 +28,9 @@ export const DEFAULT_DESKTOP_TAB: DesktopTabId = 'timecode';
 export const DESKTOP_TAB_STORAGE_KEY = 'ltc-desktop-tab';
 
 /**
- * The tabs available to this device. The switcher belongs to whoever is
- * running the session; showing it to a camera operator would offer controls
- * that silently do nothing.
+ * The tabs available to this device. Some future tab may be host-only again
+ * (e.g. session-wide settings), so the filter stays in place even though no
+ * current tab uses it.
  */
 export function visibleDesktopTabs(isHost: boolean): DesktopTabDef[] {
   return DESKTOP_TABS.filter(tab => !tab.hostOnly || isHost);

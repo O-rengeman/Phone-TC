@@ -40,8 +40,8 @@ interface UseLtcEngineParams {
   setSlateTime: React.Dispatch<React.SetStateAction<string>>;
   isVisualSlateRef: React.RefObject<boolean>;
   // Refs owned by the main provider (shared with other already-extracted
-  // hooks called earlier, e.g. useMarkers/useNetworkSync/useTallyControl),
-  // so this hook consumes them rather than creating its own copies.
+  // hooks called earlier, e.g. useMarkers/useNetworkSync), so this hook
+  // consumes them rather than creating its own copies.
   audioCtxRef: React.RefObject<AudioContext | null>;
   engineRef: React.RefObject<LtcEngine | null>;
   workletNodeRef: React.RefObject<AudioWorkletNode | null>;
@@ -77,11 +77,11 @@ interface UseLtcEngineResult {
  * playback. This is the last and most cross-cutting extraction:
  * startSequence/stopEngine legitimately need to read sync-mode, P2P, and
  * drift-monitor state, so the parameter list here is wide by necessity,
- * mirroring useP2P/useTallyControl's dependency-injection pattern rather
+ * mirroring useP2P's dependency-injection pattern rather
  * than trying to force an artificial boundary.
  *
  * The audio/engine refs themselves stay owned by the main provider (they're
- * also passed into useMarkers/useNetworkSync/useTallyControl, which are
+ * also passed into useMarkers/useNetworkSync, which are
  * called earlier) — this hook receives and mutates them, it doesn't create
  * its own copies.
  */

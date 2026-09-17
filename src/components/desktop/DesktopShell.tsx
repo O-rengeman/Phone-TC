@@ -12,17 +12,10 @@ import {
 import type { DesktopTabId } from '../../utils/desktopTabs';
 import { TimecodePane } from './TimecodePane';
 import { SyncPane } from './SyncPane';
-import { SwitcherPane } from './SwitcherPane';
-import type { SwitcherControls } from './SwitcherPane';
-import { TallyPane } from './TallyPane';
-import { ObsPane } from './ObsPane';
 import { MarkersPane } from './MarkersPane';
-import type { ObsControls } from '../../hooks/useObsTally';
 import '../../desktop.css';
 
 interface DesktopShellProps {
-  switcher: SwitcherControls;
-  obs: ObsControls;
   onOutputModeChange: (mode: 'stereo' | 'mono-l') => void;
 }
 
@@ -45,7 +38,7 @@ function readStoredTab(): string | null {
  * pane physically cannot push the layout taller than the window, so overflow
  * is contained inside whichever panel opted into it.
  */
-export function DesktopShell({ switcher, obs, onOutputModeChange }: DesktopShellProps) {
+export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
   const {
     isHost, isRunning, isPreparing, syncMode, driftStatus, p2pRole,
     peerId, p2pStatus, masterDrift, clients, nowTick,
@@ -149,9 +142,6 @@ export function DesktopShell({ switcher, obs, onOutputModeChange }: DesktopShell
       <main className="dt-stage">
         {activeTab === 'timecode' && <TimecodePane onOutputModeChange={onOutputModeChange} />}
         {activeTab === 'sync' && <SyncPane />}
-        {activeTab === 'switcher' && <SwitcherPane {...switcher} />}
-        {activeTab === 'tally' && <TallyPane />}
-        {activeTab === 'obs' && <ObsPane obs={obs} />}
         {activeTab === 'markers' && <MarkersPane />}
       </main>
     </div>

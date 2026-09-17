@@ -1,16 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import { ClientList } from './ClientList';
-import type { TallyState } from '../utils/tally';
 
 describe('ClientList', () => {
   const baseProps = {
     clients: {} as Record<string, { lastSeen: number; rtt: number; drift: number }>,
     nowTick: 1000,
-    tallyPayload: null as { assignments?: Record<string, TallyState> } | null,
     isHost: true,
-    tr: (key: string) => key,
-    handleClientTallyChange: vi.fn(),
   };
 
   it('returns null when not host', () => {
@@ -49,28 +45,6 @@ describe('ClientList', () => {
     render(<ClientList {...baseProps} clients={clients} />);
     const driftStat = screen.getByText('δ: 0.80s');
     expect(driftStat.classList.contains('drift-warn')).toBe(true);
-  });
-
-  it('calls handleClientTallyChange when tally state button is clicked', () => {
-    const handleClientTallyChange = vi.fn();
-    const clients = {
-      client1: { lastSeen: 1000, rtt: 50, drift: 0.1 },
-    };
-    render(<ClientList {...baseProps} clients={clients} handleClientTallyChange={handleClientTallyChange} />);
-    fireEvent.click(screen.getByText('tally.live'));
-    expect(handleClientTallyChange).toHaveBeenCalledWith('client1', 'live');
-  });
-
-  it('shows active tally state from payload', () => {
-    const clients = {
-      client1: { lastSeen: 1000, rtt: 50, drift: 0.1 },
-    };
-    const tallyPayload = {
-      assignments: { client1: 'live' as TallyState },
-    };
-    render(<ClientList {...baseProps} clients={clients} tallyPayload={tallyPayload} />);
-    const liveButton = screen.getByText('tally.live');
-    expect(liveButton.classList.contains('active')).toBe(true);
   });
 
   it('renders multiple clients', () => {

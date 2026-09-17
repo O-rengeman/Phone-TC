@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { FPS_OPTIONS } from '../constants';
-import type { TallyState } from '../utils/tally';
 
 interface HeaderBarProps {
   isRunning: boolean;
@@ -10,15 +9,9 @@ interface HeaderBarProps {
   batteryLevel: number | null;
   isCharging: boolean;
   batteryEta: number | null;
-  tallyOpen: boolean;
-  tallyState: TallyState;
-  isHost: boolean;
   lang: 'en' | 'ja';
   setLang: (l: 'en' | 'ja' | ((prev: 'en' | 'ja') => 'en' | 'ja')) => void;
   setShowGuide: (v: boolean) => void;
-  setDirectorPanelOpen: (v: boolean) => void;
-  setIsVisualSlate: (v: boolean) => void;
-  setTallyOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
   tr: (key: string) => string;
 }
 
@@ -30,15 +23,9 @@ export function HeaderBar({
   batteryLevel,
   isCharging,
   batteryEta,
-  tallyOpen,
-  tallyState,
-  isHost,
   lang,
   setLang,
   setShowGuide,
-  setDirectorPanelOpen,
-  setIsVisualSlate,
-  setTallyOpen: setTallyOpenState,
   tr,
 }: HeaderBarProps) {
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
@@ -87,32 +74,6 @@ export function HeaderBar({
         </div>
         <div className="hdr-divider" />
         <div className="hdr-actions">
-          <button
-            type="button"
-            className={`hdr-tally-btn ${tallyOpen ? 'active' : ''}`}
-            onClick={() => { setDirectorPanelOpen(false); setIsVisualSlate(false); setTallyOpenState((v: boolean) => !v); }}
-            aria-label={tr('hdr.ariaTally')}
-            title="TALLY"
-          >
-            <span 
-              className="hdr-tally-dot" 
-              style={{ 
-                background: tallyState === 'live' ? '#ff2222' : tallyState === 'preview' ? '#22cc55' : tallyState === 'standby' ? '#ff9900' : '#333' 
-              }} 
-            />
-            TALLY
-          </button>
-          {isHost && (
-            <button
-              type="button"
-              className="hdr-director-btn"
-              onClick={() => { setTallyOpenState(false); setIsVisualSlate(false); setDirectorPanelOpen(true); }}
-              aria-label={tr('hdr.ariaDirector')}
-              title="DIRECTOR"
-            >
-              DIR
-            </button>
-          )}
           <button
             type="button"
             className="lang-btn"

@@ -7,7 +7,7 @@
  * instead of being noticed on set.
  */
 
-export type HelpTopicId = 'timecode' | 'sync' | 'switcher' | 'tally' | 'obs' | 'markers';
+export type HelpTopicId = 'timecode' | 'sync' | 'markers';
 
 export interface HelpTopic {
   id: HelpTopicId;
@@ -20,9 +20,6 @@ export interface HelpTopic {
 export const HELP_TOPICS: Record<HelpTopicId, HelpTopic> = {
   timecode: { id: 'timecode', steps: 8, tips: 2 },
   sync: { id: 'sync', steps: 6, tips: 2 },
-  switcher: { id: 'switcher', steps: 6, tips: 2 },
-  tally: { id: 'tally', steps: 7, tips: 2 },
-  obs: { id: 'obs', steps: 7, tips: 2 },
   markers: { id: 'markers', steps: 6, tips: 2 },
 };
 

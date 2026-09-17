@@ -8,16 +8,16 @@ const tr = (key: string) => t(key, 'ja');
 
 describe('HelpButton', () => {
   it('shows nothing until it is pressed', () => {
-    render(<HelpButton topic="obs" tr={tr} />);
+    render(<HelpButton topic="sync" tr={tr} />);
     expect(document.querySelector('.fhelp-overlay')).toBeNull();
   });
 
   it('opens the sheet for its own topic', () => {
-    render(<HelpButton topic="obs" tr={tr} />);
+    render(<HelpButton topic="sync" tr={tr} />);
     fireEvent.click(screen.getByRole('button', { name: /使い方/ }));
 
     expect(screen.getByRole('dialog')).toBeTruthy();
-    expect(screen.getByText(t('help.obs.title', 'ja'))).toBeTruthy();
+    expect(screen.getByText(t('help.sync.title', 'ja'))).toBeTruthy();
   });
 
   it('lists every step and tip of the topic', () => {
@@ -39,7 +39,7 @@ describe('HelpButton', () => {
   });
 
   it('closes on the close button', () => {
-    render(<HelpButton topic="tally" tr={tr} />);
+    render(<HelpButton topic="sync" tr={tr} />);
     fireEvent.click(screen.getByRole('button', { name: /使い方/ }));
     fireEvent.click(screen.getByRole('button', { name: t('help.close', 'ja') }));
 
@@ -47,7 +47,7 @@ describe('HelpButton', () => {
   });
 
   it('closes on a click outside the sheet', () => {
-    render(<HelpButton topic="tally" tr={tr} />);
+    render(<HelpButton topic="sync" tr={tr} />);
     fireEvent.click(screen.getByRole('button', { name: /使い方/ }));
     fireEvent.click(document.querySelector('.fhelp-overlay')!);
 
@@ -55,7 +55,7 @@ describe('HelpButton', () => {
   });
 
   it('keeps the sheet open when the sheet itself is clicked', () => {
-    render(<HelpButton topic="tally" tr={tr} />);
+    render(<HelpButton topic="sync" tr={tr} />);
     fireEvent.click(screen.getByRole('button', { name: /使い方/ }));
     fireEvent.click(screen.getByRole('dialog'));
 

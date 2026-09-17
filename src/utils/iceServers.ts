@@ -1,5 +1,4 @@
-// Shared ICE server list for PeerJS (src/utils/PeerSync.ts) and the WebRTC
-// video-monitoring peer connections (src/utils/WebRTCMediaService.ts).
+// ICE server list for PeerJS (src/utils/PeerSync.ts).
 //
 // STUN alone lets two peers discover their public IP/port, but cannot
 // traverse symmetric NAT (common on mobile carrier networks and CGNAT) or

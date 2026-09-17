@@ -18,15 +18,7 @@ export function VideoPlayer() {
     currentTcRef,
     isVisualSlateRef,
     slateTimeRef,
-    tallyTimeRef,
-    tallyOpenRef,
-    directorTimeRef,
-    directorPanelOpenRef,
     setSlateTime,
-    setTallyTime,
-    setDirectorTime,
-    setTallyOpen,
-    setDirectorPanelOpen
   } = useLTC();
 
   useEffect(() => {
@@ -47,16 +39,6 @@ export function VideoPlayer() {
       // 必要に応じて Slate Time を更新する
       if (isVisualSlateRef.current && slateTimeRef.current !== tc) {
         setSlateTime(tc);
-      }
-
-      if (tallyOpenRef.current && tallyTimeRef.current !== tc) {
-        tallyTimeRef.current = tc;
-        setTallyTime(tc);
-      }
-
-      if (directorPanelOpenRef.current && directorTimeRef.current !== tc) {
-        directorTimeRef.current = tc;
-        setDirectorTime(tc);
       }
 
       // 描画ロジック（バッテリー消費対策：バックグラウンド時は描画スキップ）
@@ -129,10 +111,10 @@ export function VideoPlayer() {
 
     rafId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(rafId);
-  }, [isRunning, isMobile, setSlateTime, setTallyTime, setDirectorTime, canvasRef, engineRef, currentTcRef, isVisualSlateRef, slateTimeRef, tallyTimeRef, tallyOpenRef, directorTimeRef, directorPanelOpenRef]);
+  }, [isRunning, isMobile, setSlateTime, canvasRef, engineRef, currentTcRef, isVisualSlateRef, slateTimeRef]);
 
   return (
-    <div className="timecode-card-pro" onClick={() => { setTallyOpen(false); setDirectorPanelOpen(false); setIsVisualSlate(true); }}>
+    <div className="timecode-card-pro" onClick={() => { setIsVisualSlate(true); }}>
       <canvas ref={canvasRef} className="time-canvas" />
       <div className="info-strip-pro">
         <span className="info-label">FPS: {FPS_OPTIONS[fpsIndex].label}</span>

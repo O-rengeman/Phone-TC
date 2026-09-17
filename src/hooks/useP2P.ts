@@ -45,7 +45,6 @@ interface UseP2PResult {
   setPacketLossRate: React.Dispatch<React.SetStateAction<number>>;
   peerSyncRef: React.MutableRefObject<PeerSync | null>;
   messageHandlerRef: React.MutableRefObject<((msg: SyncMessage) => void) | null>;
-  signalingHandlerRef: React.MutableRefObject<((msg: SyncMessage) => void) | null>;
   rttHistoryRef: React.MutableRefObject<number[]>;
   lastSyncTimeRef: React.MutableRefObject<number>;
   lastHeartbeatTimeRef: React.MutableRefObject<number>;
@@ -90,7 +89,6 @@ export function useP2P({
 
   const peerSyncRef = useRef<PeerSync | null>(null);
   const messageHandlerRef = useRef<((msg: SyncMessage) => void) | null>(null);
-  const signalingHandlerRef = useRef<((msg: SyncMessage) => void) | null>(null);
   const rttHistoryRef = useRef<number[]>([]);
   const lastSyncTimeRef = useRef<number>(0);
   const lastHeartbeatTimeRef = useRef<number>(0);
@@ -123,8 +121,6 @@ export function useP2P({
       const ps = new PeerSync(
         (msg) => messageHandlerRef.current?.(msg),
         (status) => setP2pStatus(status),
-        undefined,
-        (msg) => signalingHandlerRef.current?.(msg)
       );
       const id = await ps.initialize();
       setPeerId(id);
@@ -145,8 +141,6 @@ export function useP2P({
       const ps = new PeerSync(
         (msg) => messageHandlerRef.current?.(msg),
         (status) => setP2pStatus(status),
-        undefined,
-        (msg) => signalingHandlerRef.current?.(msg)
       );
       const id = await ps.initialize();
       setPeerId(id);
@@ -256,7 +250,7 @@ export function useP2P({
     peerId, targetId, setTargetId, p2pStatus, setP2pStatus, isHost,
     masterDrift, setMasterDrift, clients, setClients,
     packetLossRate, setPacketLossRate,
-    peerSyncRef, messageHandlerRef, signalingHandlerRef, rttHistoryRef, lastSyncTimeRef, lastHeartbeatTimeRef, lastMasterContactTimeRef,
+    peerSyncRef, messageHandlerRef, rttHistoryRef, lastSyncTimeRef, lastHeartbeatTimeRef, lastMasterContactTimeRef,
     resetP2P, setupP2PMaster, setupP2PClient, joinSession,
   };
 }

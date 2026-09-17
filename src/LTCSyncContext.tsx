@@ -13,8 +13,6 @@ import type { Lang } from './utils/i18n';
 import toast from 'react-hot-toast';
 import type { DriftStatus } from './utils/DriftMonitor';
 import type { Marker } from './utils/export';
-import { adoptTally } from './utils/tally';
-import type { TallyState, TallyPayload } from './utils/tally';
 import { debug } from './utils/log';
 import { FPS_OPTIONS } from './constants';
 import { useBatteryMonitor } from './hooks/useBatteryMonitor';
@@ -23,11 +21,7 @@ import { useAudioContextRecovery } from './hooks/useAudioContextRecovery';
 import { useMarkers } from './hooks/useMarkers';
 import { useNetworkSync } from './hooks/useNetworkSync';
 import { useP2P } from './hooks/useP2P';
-import { useTallyControl } from './hooks/useTallyControl';
 import { useLtcEngine } from './hooks/useLtcEngine';
-import { WebRTCMediaService } from './utils/WebRTCMediaService';
-import { mediaStreamActions } from './hooks/useMediaStreams';
-import { shouldActivateMediaService, shouldStartClientCamera } from './utils/videoMonitoring';
 import { shouldUseMobileLayout } from './utils/layout';
 
 export type SyncMode = 'system' | 'network' | 'p2p' | 'freerun';
@@ -47,16 +41,16 @@ const getIsMobileLayout = () => {
 
 // Split into two contexts so that a consumer reading only stable actions/refs
 // doesn't re-render on every volatile state tick (masterDrift, clients,
-// tallyPayload, nowTick, ...). useLTC() below merges both back into one
-// object so every existing consumer (App/VideoPlayer/ConnectionManager)
-// keeps working unchanged.
+// nowTick, ...). useLTC() below merges both back into one object so every
+// existing consumer (App/VideoPlayer/ConnectionManager) keeps working
+// unchanged.
 //
 // Caveat: several of the functions in LTCActionsType (addMarker,
-// handleClientTallyChange, handleStartStop/handlePause/beginStopHold,
-// handleManualResync, setupP2PMaster/setupP2PClient, removeMarker,
-// exportToEDL/exportToALE) close directly over frequently-changing state
-// (markers, tallyPayload, isRunning, syncMode, ...) and aren't memoized at
-// their source — see the useCallback commit that preceded this one for why.
+// handleStartStop/handlePause/beginStopHold, handleManualResync,
+// setupP2PMaster/setupP2PClient, removeMarker, exportToEDL/exportToALE)
+// close directly over frequently-changing state (markers, isRunning,
+// syncMode, ...) and aren't memoized at their source — see the useCallback
+// commit that preceded this one for why.
 // So the actions bucket recomputes on those functions' own triggers; that's
 // an intentional, incremental step. Fully stabilizing the rest would mean
 // converting those hooks' state reads to refs, deferred pending Phase 7
@@ -87,8 +81,6 @@ interface LTCStateType {
   setIsVisualSlate: React.Dispatch<React.SetStateAction<boolean>>;
   slateTime: string;
   setSlateTime: React.Dispatch<React.SetStateAction<string>>;
-  setTallyTime: React.Dispatch<React.SetStateAction<string>>;
-  setDirectorTime: React.Dispatch<React.SetStateAction<string>>;
   nowTick: number;
   userBits: string;
   setUserBits: React.Dispatch<React.SetStateAction<string>>;
@@ -112,30 +104,8 @@ interface LTCStateType {
   setP2pSyncSource: React.Dispatch<React.SetStateAction<'manual' | 'network'>>;
   showGuide: boolean;
   setShowGuide: React.Dispatch<React.SetStateAction<boolean>>;
-  tallyOpen: boolean;
-  setTallyOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  tallyTorchEnabled: boolean;
-  setTallyTorchEnabled: React.Dispatch<React.SetStateAction<boolean>>;
-  manualTally: TallyState;
-  tallyPayload: TallyPayload | null;
-  tallyTime: string;
-  tallyDimmerOpacity: number;
-  setTallyDimmerOpacity: React.Dispatch<React.SetStateAction<number>>;
-  tallyTcSize: 'sm' | 'md' | 'lg';
-  setTallyTcSize: React.Dispatch<React.SetStateAction<'sm' | 'md' | 'lg'>>;
-  tallyStyle: 'full' | 'border';
-  setTallyStyle: React.Dispatch<React.SetStateAction<'full' | 'border'>>;
-  tallyBorderSize: 'thin' | 'medium' | 'thick';
-  setTallyBorderSize: React.Dispatch<React.SetStateAction<'thin' | 'medium' | 'thick'>>;
-  pipEnabled: boolean;
-  setPipEnabled: React.Dispatch<React.SetStateAction<boolean>>;
-  clientBitrates: Record<string, number>;
-  directorPanelOpen: boolean;
-  setDirectorPanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  directorTime: string;
   cameraLabels: Record<string, string>;
   setCameraLabels: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  tallyActionLog: { time: string; cam: string; state: string }[];
   isResyncing: boolean;
   lang: Lang;
   setLang: React.Dispatch<React.SetStateAction<Lang>>;
@@ -149,10 +119,6 @@ interface LTCStateType {
   setPacketLossRate: React.Dispatch<React.SetStateAction<number>>;
   sceneName: string;
   setSceneName: React.Dispatch<React.SetStateAction<string>>;
-  tallyState: TallyState;
-  isTallyConnected: boolean;
-  isVideoEnabled: boolean;
-  setIsVideoEnabled: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 interface LTCActionsType {
@@ -166,17 +132,11 @@ interface LTCActionsType {
   currentTcRef: React.MutableRefObject<string>;
   isVisualSlateRef: React.MutableRefObject<boolean>;
   slateTimeRef: React.MutableRefObject<string>;
-  tallyTimeRef: React.MutableRefObject<string>;
-  tallyOpenRef: React.MutableRefObject<boolean>;
-  directorTimeRef: React.MutableRefObject<string>;
-  directorPanelOpenRef: React.MutableRefObject<boolean>;
   holdStoppedRef: React.MutableRefObject<boolean>;
   stopHoldStartRef: React.MutableRefObject<number>;
   stopHoldRafRef: React.MutableRefObject<number | null>;
-  mediaServiceRef: React.MutableRefObject<import('./utils/WebRTCMediaService').WebRTCMediaService | null>;
 
   tr: (key: string, vars?: Record<string, string | number>) => string;
-  playHapticFeedback: () => void;
   addToast: (msg: string, level?: ToastLevel) => void;
   addMarker: (color: 'Red' | 'Blue' | 'Green' | 'Yellow') => void;
   removeMarker: (id: number) => void;
@@ -193,15 +153,6 @@ interface LTCActionsType {
   beginStopHold: () => void;
   cancelStopHold: () => void;
   handleManualResync: () => Promise<void>;
-  handleManualTallyChange: (s: TallyState) => void;
-  handleClientTallyChange: (clientId: string, s: TallyState) => void;
-  handleAllTallyChange: (s: TallyState) => void;
-  handleSwitcherBusChange: (programId: string | null, previewId: string | null) => void;
-  handleDimmerCycle: (e: React.MouseEvent) => void;
-  handleTorchToggle: (e: React.MouseEvent) => void;
-  handleTallyExit: (e: React.MouseEvent) => void;
-  toggleVideoMonitoring: () => void;
-  changeClientBitrate: (clientId: string, bitrateBps: number) => void;
 }
 
 type LTCSyncContextType = LTCStateType & LTCActionsType;
@@ -286,11 +237,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [isPaused, setIsPaused] = useState(false);
   const [stopHoldPct, setStopHoldPct] = useState(0);
   const [showGuide, setShowGuide] = useState(false);
-  
-  const [directorPanelOpen, setDirectorPanelOpen] = useState(false);
-  const [directorTime, setDirectorTime] = useState<string>('00:00:00:00');
-  const directorTimeRef = useRef<string>(directorTime);
-  const directorPanelOpenRef = useRef<boolean>(directorPanelOpen);
+
   const [cameraLabels, setCameraLabels] = useState<Record<string, string>>(() => {
     try {
       const saved = localStorage.getItem('ltc-camera-labels');
@@ -300,10 +247,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
   const [lang, setLang] = useState<Lang>(() => getInitialLang());
   const langRef = useRef<Lang>(lang);
-  
-  useEffect(() => {
-    directorPanelOpenRef.current = directorPanelOpen;
-  }, [directorPanelOpen]);
 
   const tr = useCallback((key: string, vars?: Record<string, string | number>) => translate(key, lang, vars), [lang]);
   useEffect(() => { langRef.current = lang; persistLang(lang); }, [lang]);
@@ -312,9 +255,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
   const [p2pSyncSource, setP2pSyncSource] = useState<'manual' | 'network'>('manual');
   const [nowTick, setNowTick] = useState(() => Date.now());
-  // The multiview is the switcher's primary surface; camera previews should
-  // appear as soon as a source connects without requiring a separate toggle.
-  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const onMasterHeartbeatTimeoutRef = useRef<(() => void) | null>(null);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -326,7 +266,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const currentTcRef = useRef<string>('00:00:00:00');
   const analyserRef = useRef<AnalyserNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
-  const mediaServiceRef = useRef<import('./utils/WebRTCMediaService').WebRTCMediaService | null>(null);
 
   const addToast = useCallback((msg: string, level: ToastLevel = 'info') => {
     if (level === 'error') {
@@ -348,7 +287,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     peerId, targetId, setTargetId, p2pStatus, setP2pStatus, isHost,
     masterDrift, setMasterDrift, clients, setClients,
     packetLossRate, setPacketLossRate,
-    peerSyncRef, messageHandlerRef, signalingHandlerRef, rttHistoryRef, lastSyncTimeRef, lastHeartbeatTimeRef, lastMasterContactTimeRef,
+    peerSyncRef, messageHandlerRef, rttHistoryRef, lastSyncTimeRef, lastHeartbeatTimeRef, lastMasterContactTimeRef,
     resetP2P, setupP2PMaster, setupP2PClient, joinSession,
   } = useP2P({
     syncMode,
@@ -362,119 +301,11 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     onMasterHeartbeatTimeout: () => onMasterHeartbeatTimeoutRef.current?.(),
   });
 
-  const {
-    tallyOpen, setTallyOpen, tallyTorchEnabled, setTallyTorchEnabled,
-    manualTally, tallyPayload, setTallyPayload, tallyTime, setTallyTime,
-    tallyDimmerOpacity, setTallyDimmerOpacity, tallyTcSize, setTallyTcSize, tallyActionLog,
-    tallyTimeRef, tallyOpenRef,
-    isTallyConnected, tallyState,
-    playHapticFeedback, handleManualTallyChange, handleClientTallyChange, handleAllTallyChange, handleSwitcherBusChange,
-    handleDimmerCycle, handleTorchToggle, handleTallyExit,
-    tallyStyle, setTallyStyle, tallyBorderSize, setTallyBorderSize,
-  } = useTallyControl({
-    isHost, p2pRole, peerId, peerSyncRef, lastHeartbeatTimeRef,
-    nowTick, cameraLabels, currentTcRef,
-  });
-
-  const [pipEnabled, setPipEnabled] = useState(false);
-  const [clientBitrates, setClientBitrates] = useState<Record<string, number>>({});
-
-  const changeClientBitrate = useCallback((clientId: string, bitrateBps: number) => {
-    if (!isHost) return;
-    setClientBitrates(prev => ({ ...prev, [clientId]: bitrateBps }));
-    peerSyncRef.current?.broadcast({
-      type: 'set-bitrate',
-      masterTimecode: '',
-      masterTimestamp: 0,
-      fps: 0,
-      isDropFrame: false,
-      isRunning: false,
-      bitrateBps,
-      targetId: clientId
-    });
-  }, [isHost, peerSyncRef]);
-
   useEffect(() => {
     if (!p2pRole) return;
     const id = setInterval(() => setNowTick(Date.now()), 1000);
     return () => clearInterval(id);
   }, [p2pRole]);
-
-  // Manage WebRTCMediaService lifecycle
-  useEffect(() => {
-    const peerSync = peerSyncRef.current;
-    const shouldActivate = Boolean(peerId) && shouldActivateMediaService(p2pRole, targetId);
-
-    if (!shouldActivate || !peerSync || !peerId) {
-      if (mediaServiceRef.current) {
-        mediaServiceRef.current.closeAll();
-        mediaServiceRef.current = null;
-        mediaStreamActions.clearStreams();
-      }
-      return;
-    }
-
-    const service = new WebRTCMediaService(peerSync, peerId, isHost);
-    mediaServiceRef.current = service;
-
-    service.onRemoteStream = ({ peerId: pId, stream }) => {
-      mediaStreamActions.addStream(pId, stream);
-    };
-
-    service.onStreamClosed = (pId) => {
-      mediaStreamActions.removeStream(pId);
-    };
-
-    service.onPgmSwitchError = () => {
-      addToast(translate('toast.pgmSwitchFailed', langRef.current), 'error');
-    };
-
-    signalingHandlerRef.current = (msg: SyncMessage) => {
-      void mediaServiceRef.current?.handleSignalingMessage(msg);
-    };
-
-    // NOTE: starting the camera/connecting to a peer happens in the separate
-    // effect below, gated on targetId reaching its full length rather than
-    // being a dependency here — see that effect's comment for why.
-
-    return () => {
-      service.closeAll();
-      mediaServiceRef.current = null;
-      mediaStreamActions.clearStreams();
-      signalingHandlerRef.current = null;
-    };
-  }, [isHost, p2pRole, targetId, peerId, peerSyncRef, signalingHandlerRef, addToast, langRef]);
-
-  // Client-only: start the camera and connect to the master once targetId is
-  // complete, not on every keystroke while
-  // it's being typed in ConnectionManager. Kept separate from the effect
-  // above so retyping targetId doesn't tear down/recreate the whole
-  // WebRTCMediaService (which would stop the camera and drop all peer
-  // connections). connectToPeer() already no-ops if a connection to this
-  // target exists, so re-running this effect on unrelated state changes is
-  // harmless.
-  useEffect(() => {
-    if (!shouldStartClientCamera(p2pRole, targetId)) return;
-    const service = mediaServiceRef.current;
-    if (!service) return;
-    let cancelled = false;
-
-    void service.startLocalCamera().then(() => {
-      if (!cancelled && mediaServiceRef.current === service) {
-        void service.connectToPeer(targetId).catch((err: unknown) => {
-          console.error('[WebRTC] Failed to connect return monitor', err);
-          addToast(translate('toast.returnMonitorFailed', langRef.current), 'error');
-        });
-      }
-    }).catch((err: unknown) => {
-      console.error('[WebRTC] Camera permission or startup failed', err);
-      addToast(translate('toast.cameraDenied', langRef.current), 'error');
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [p2pRole, targetId, mediaServiceRef, addToast, langRef]);
 
   useEffect(() => {
     // StatusBar and ScreenOrientation are native-only. Calling them in a
@@ -746,10 +577,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
           }
           setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (HB)`);
 
-          if (msg.tally) {
-            setTallyPayload(prev => adoptTally(prev, msg.tally!));
-          }
-
           lastHeartbeatTimeRef.current = Date.now();
 
           if (Date.now() % 5000 < 500) {
@@ -763,15 +590,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
                 rtt: rttHistoryRef.current.length > 0 ? Math.min(...rttHistoryRef.current) : 0,
                 drift: diff
              });
-          }
-        } else if (msg.type === 'tally' && !isHost) {
-          if (msg.tally) {
-            setTallyPayload(prev => adoptTally(prev, msg.tally!));
-          }
-        } else if (msg.type === 'set-bitrate' && !isHost) {
-          if (msg.targetId === peerId && msg.bitrateBps !== undefined) {
-            void mediaServiceRef.current?.updateBitrateAll(msg.bitrateBps);
-            setClientBitrates(prev => ({ ...prev, [msg.targetId!]: msg.bitrateBps! }));
           }
         }
       }
@@ -865,7 +683,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
           isDropFrame: FPS_OPTIONS[fpsIndex].drop,
           isRunning: isRunning,
           isPaused: isPaused,
-          tally: tallyPayload ?? undefined
         });
       }, 100);
     }
@@ -874,7 +691,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       clearInterval(interval);
       if (hbInterval) clearInterval(hbInterval);
     };
-  }, [isHost, p2pRole, fpsIndex, masterDrift, isRunning, isPaused, tallyPayload, getUnshiftedTc, lastSyncTimeRef, peerSyncRef]);
+  }, [isHost, p2pRole, fpsIndex, masterDrift, isRunning, isPaused, getUnshiftedTc, lastSyncTimeRef, peerSyncRef]);
 
   // VU meter (peak level + clip detection for mono-L mic input) now lives in
   // useVuMeter() + <VuMeter>, consuming analyserRef directly, so its ~60Hz
@@ -883,10 +700,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try { localStorage.setItem('ltc-camera-labels', JSON.stringify(cameraLabels)); } catch { /* ignore */ }
   }, [cameraLabels]);
-
-  const toggleVideoMonitoring = useCallback(() => {
-    setIsVideoEnabled(prev => !prev);
-  }, []);
 
   const stateValue = useMemo<LTCStateType>(() => ({
     isRunning, setIsRunning,
@@ -904,8 +717,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     isVisualSlate, setIsVisualSlate,
     isSlateFlashing,
     slateTime, setSlateTime,
-    setTallyTime,
-    setDirectorTime,
     userBits, setUserBits,
     markers, setMarkers,
     defaultReelName, setDefaultReelName,
@@ -920,21 +731,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     stopHoldPct,
     p2pSyncSource, setP2pSyncSource,
     showGuide, setShowGuide,
-    tallyOpen, setTallyOpen,
-    tallyTorchEnabled, setTallyTorchEnabled,
-    manualTally,
-    tallyPayload,
-    tallyTime,
-    tallyDimmerOpacity, setTallyDimmerOpacity,
-    tallyTcSize, setTallyTcSize,
-    tallyStyle, setTallyStyle,
-    tallyBorderSize, setTallyBorderSize,
-    pipEnabled, setPipEnabled,
-    clientBitrates,
-    directorPanelOpen, setDirectorPanelOpen,
-    directorTime,
     cameraLabels, setCameraLabels,
-    tallyActionLog,
     isResyncing,
     lang, setLang,
     batteryLevel,
@@ -946,24 +743,18 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     packetLossRate, setPacketLossRate,
     sceneName, setSceneName,
     nowTick,
-    tallyState,
-    isTallyConnected,
-    isVideoEnabled, setIsVideoEnabled,
   }), [
     isRunning, fpsIndex, volume, syncStatus, syncMode, isPreparing, manualTimecode, p2pRole,
     activeTab, isMobile, outputMode, autoUserBits, isVisualSlate, isSlateFlashing, slateTime,
-    setTallyTime, setDirectorTime, userBits, markers, defaultReelName, outputLevel, outputOffset,
+    userBits, markers, defaultReelName, outputLevel, outputOffset,
     peerId, targetId, p2pStatus, isHost, driftStatus, isPaused, stopHoldPct, p2pSyncSource,
-    showGuide, tallyOpen, tallyTorchEnabled, manualTally, tallyPayload, tallyTime,
-    tallyDimmerOpacity, tallyTcSize, directorPanelOpen, directorTime, cameraLabels, tallyActionLog,
+    showGuide, cameraLabels,
     isResyncing, lang, batteryLevel, isCharging, batteryEta, markerFlash, masterDrift, clients,
-    packetLossRate, sceneName, nowTick, tallyState, isTallyConnected,
-    tallyStyle, setTallyStyle, tallyBorderSize, setTallyBorderSize, pipEnabled, setPipEnabled, clientBitrates,
+    packetLossRate, sceneName, nowTick,
     setIsRunning, setFpsIndex, setVolume, setSyncMode, setManualTimecode, setActiveTab, setOutputMode,
     setAutoUserBits, setIsVisualSlate, setSlateTime, setUserBits, setMarkers, setDefaultReelName,
-    setOutputLevel, setOutputOffset, setTargetId, setP2pSyncSource, setShowGuide, setTallyOpen,
-    setTallyTorchEnabled, setTallyDimmerOpacity, setTallyTcSize, setDirectorPanelOpen,
-    setCameraLabels, setLang, setPacketLossRate, setSceneName, setIsVideoEnabled, isVideoEnabled,
+    setOutputLevel, setOutputOffset, setTargetId, setP2pSyncSource, setShowGuide,
+    setCameraLabels, setLang, setPacketLossRate, setSceneName,
   ]);
 
   const actionsValue = useMemo<LTCActionsType>(() => ({
@@ -973,16 +764,10 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     currentTcRef,
     isVisualSlateRef,
     slateTimeRef,
-    tallyTimeRef,
-    tallyOpenRef,
-    directorTimeRef,
-    directorPanelOpenRef,
     holdStoppedRef,
     stopHoldStartRef,
     stopHoldRafRef,
-    mediaServiceRef,
     tr,
-    playHapticFeedback,
     addToast,
     addMarker,
     removeMarker,
@@ -999,23 +784,12 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     beginStopHold,
     cancelStopHold,
     handleManualResync,
-    handleManualTallyChange,
-    handleClientTallyChange,
-    handleAllTallyChange,
-    handleSwitcherBusChange,
-    handleDimmerCycle,
-    handleTorchToggle,
-    handleTallyExit,
-    toggleVideoMonitoring,
-    changeClientBitrate,
   }), [
-    analyserRef, canvasRef, engineRef, currentTcRef, isVisualSlateRef, slateTimeRef, tallyTimeRef,
-    tallyOpenRef, directorTimeRef, directorPanelOpenRef, holdStoppedRef, stopHoldStartRef, stopHoldRafRef,
-    tr, playHapticFeedback, addToast, addMarker, removeMarker, updateMarkerComment, exportToEDL,
+    analyserRef, canvasRef, engineRef, currentTcRef, isVisualSlateRef, slateTimeRef,
+    holdStoppedRef, stopHoldStartRef, stopHoldRafRef,
+    tr, addToast, addMarker, removeMarker, updateMarkerComment, exportToEDL,
     exportToALE, handleSlateClick, resetP2P, setupP2PMaster, setupP2PClient, joinSession,
     handleStartStop, handlePause, beginStopHold, cancelStopHold, handleManualResync,
-    handleManualTallyChange, handleClientTallyChange, handleAllTallyChange, handleSwitcherBusChange, handleDimmerCycle,
-    handleTorchToggle, handleTallyExit, toggleVideoMonitoring, mediaServiceRef, changeClientBitrate
   ]);
 
   return (

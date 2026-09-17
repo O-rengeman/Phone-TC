@@ -1,13 +1,12 @@
 import { Peer } from 'peerjs';
 import type { DataConnection } from 'peerjs';
 
-import type { TallyPayload } from './tally';
 import { debug } from './log';
 import { ICE_SERVERS } from './iceServers';
 import { computeBackoffDelay } from './backoff';
 
 export interface SyncMessage {
-  type: 'sync-request' | 'sync-response' | 'heartbeat' | 'report' | 'tally' | 'webrtc-offer' | 'webrtc-answer' | 'webrtc-candidate' | 'set-bitrate';
+  type: 'sync-request' | 'sync-response' | 'heartbeat' | 'report';
   masterTimecode: string;
   masterTimestamp: number;
   fps: number;
@@ -16,13 +15,8 @@ export interface SyncMessage {
   isPaused?: boolean;
   clientTimestamp?: number;
   clientId?: string; // Identifier for the sender
-  targetId?: string; // Identifier for the intended recipient (used for signaling)
   rtt?: number;      // Reported RTT from client
   drift?: number;    // Reported drift from client
-  tally?: TallyPayload;
-  sdp?: RTCSessionDescriptionInit; // For WebRTC signaling
-  candidate?: RTCIceCandidateInit; // For WebRTC signaling
-  bitrateBps?: number;             // Dynamic bandwidth limit config
 }
 
 /** Factory used to create the underlying Peer — overridable for tests. */
@@ -48,21 +42,10 @@ export const PEER_ID_RETRY_LIMIT = 5;
  */
 export const SIGNALING_RECONNECT_LIMIT = 8;
 
-/** DataConnection label used for the dedicated, reliable WebRTC-signaling channel. */
-const SIGNALING_LABEL = 'webrtc-signal';
-
 export class PeerSync {
   private peer: Peer | null = null;
   private connections: DataConnection[] = [];
-  // Signaling (offer/answer/ICE candidate) needs guaranteed, ordered delivery,
-  // unlike the lossy-tolerant `connections` above (deliberately `reliable:
-  // false` for low-latency timecode sync). Kept as a separate labeled,
-  // `reliable: true` DataConnection per peer so a dropped signaling message
-  // can't silently break the WebRTC handshake.
-  private signalingConnections = new Map<string, DataConnection>();
-  private pendingSignalingSends = new Map<string, SyncMessage[]>();
   private onMessageCallback: (msg: SyncMessage) => void;
-  private onSignalingCallback?: (msg: SyncMessage) => void;
   private onStatusCallback: (status: string) => void;
   private lossRate: number = 0;
   private peerFactory: PeerFactory;
@@ -74,12 +57,10 @@ export class PeerSync {
     onMessage: (msg: SyncMessage) => void,
     onStatus: (status: string) => void,
     peerFactory: PeerFactory = (id, options) => new Peer(id, options),
-    onSignaling?: (msg: SyncMessage) => void
   ) {
     this.onMessageCallback = onMessage;
     this.onStatusCallback = onStatus;
     this.peerFactory = peerFactory;
-    this.onSignalingCallback = onSignaling;
   }
 
   private generateShortId(): string {
@@ -218,32 +199,16 @@ export class PeerSync {
   }
 
   private handleConnection(conn: DataConnection) {
-    const isSignaling = conn.label === SIGNALING_LABEL;
-
-    if (isSignaling) {
-      this.signalingConnections.set(conn.peer, conn);
-    } else {
-      this.connections.push(conn);
-    }
+    this.connections.push(conn);
 
     conn.on('open', () => {
       this.onStatusCallback(`CONNECTED TO ${conn.peer}`);
       debug('Connection opened with:', conn.peer);
-      if (isSignaling) {
-        this.flushPendingSignaling(conn.peer, conn);
-      }
     });
 
     conn.on('data', (data: unknown) => {
       const msg = data as SyncMessage;
       msg.clientId = conn.peer; // Identify the sender
-
-      if (isSignaling || msg.type.startsWith('webrtc-')) {
-        if (this.onSignalingCallback) {
-          this.onSignalingCallback(msg);
-        }
-        return;
-      }
 
       // Master logic: Answer to sync-request automatically
       if (msg.type === 'sync-request' && this.onMessageCallback) {
@@ -255,77 +220,8 @@ export class PeerSync {
 
     conn.on('close', () => {
       this.onStatusCallback('CONNECTION CLOSED');
-      if (isSignaling) {
-        this.discardSignalingConnection(conn);
-      } else {
-        this.connections = this.connections.filter(c => c !== conn);
-      }
+      this.connections = this.connections.filter(c => c !== conn);
     });
-
-    if (isSignaling) {
-      // A signaling connection that never opens (peer unreachable, etc.) may
-      // emit 'error' instead of 'close' — without this, its stale queue would
-      // never be cleared and would get flushed alongside a later, unrelated
-      // connection attempt to the same target.
-      conn.on('error', () => {
-        this.discardSignalingConnection(conn);
-      });
-    }
-  }
-
-  /**
-   * Drops a signaling connection and any messages still queued for it —
-   * but only if `conn` is still the connection currently registered for its
-   * peer. If a newer connection has already replaced it (e.g. a delayed or
-   * duplicate 'close'/'error' event arriving for a connection that was
-   * already superseded), that newer connection's own queued messages must
-   * not be wiped out by this stale event.
-   */
-  private discardSignalingConnection(conn: DataConnection): void {
-    if (this.signalingConnections.get(conn.peer) === conn) {
-      this.signalingConnections.delete(conn.peer);
-      this.pendingSignalingSends.delete(conn.peer);
-    }
-  }
-
-  /** Lazily creates (or reuses) the reliable signaling DataConnection to targetId. */
-  private getOrCreateSignalingConnection(targetId: string): DataConnection | null {
-    const existing = this.signalingConnections.get(targetId);
-    if (existing) return existing;
-    if (!this.peer) return null;
-
-    const conn = this.peer.connect(targetId, {
-      label: SIGNALING_LABEL,
-      reliable: true,
-    });
-    this.handleConnection(conn);
-    return conn;
-  }
-
-  /** Flushes signaling messages queued while the connection to targetId was still opening. */
-  private flushPendingSignaling(targetId: string, conn: DataConnection): void {
-    const queued = this.pendingSignalingSends.get(targetId);
-    if (!queued) return;
-    this.pendingSignalingSends.delete(targetId);
-    queued.forEach(m => void conn.send(m));
-  }
-
-  /**
-   * Sends a WebRTC signaling message over the dedicated reliable channel,
-   * bypassing the simulated loss-rate gate entirely — a dropped offer/answer/
-   * ICE candidate breaks the handshake outright, unlike lossy sync traffic
-   * which tolerates the occasional drop.
-   */
-  private sendSignaling(targetId: string, msg: SyncMessage): void {
-    const conn = this.getOrCreateSignalingConnection(targetId);
-    if (!conn) return;
-    if (conn.open) {
-      void conn.send(msg);
-    } else {
-      const queue = this.pendingSignalingSends.get(targetId) ?? [];
-      queue.push(msg);
-      this.pendingSignalingSends.set(targetId, queue);
-    }
   }
 
   public setLossRate(rate: number): void {
@@ -345,20 +241,6 @@ export class PeerSync {
     });
   }
 
-  public sendTo(targetId: string, msg: SyncMessage) {
-    msg.targetId = targetId;
-
-    if (msg.type.startsWith('webrtc-')) {
-      this.sendSignaling(targetId, msg);
-      return;
-    }
-
-    const conn = this.connections.find(c => c.peer === targetId);
-    if (conn && conn.open && Math.random() >= this.lossRate) {
-      void conn.send(msg);
-    }
-  }
-
   public broadcast(msg: SyncMessage) {
     this.send(msg);
   }
@@ -367,9 +249,6 @@ export class PeerSync {
     this.isDestroyed = true;
     this.clearReconnectTimer();
     this.reconnectAttempt = 0;
-    this.signalingConnections.forEach(conn => conn.close());
-    this.signalingConnections.clear();
-    this.pendingSignalingSends.clear();
     this.peer?.destroy();
   }
 }
