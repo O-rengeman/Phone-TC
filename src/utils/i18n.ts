@@ -213,7 +213,8 @@ const en: Dict = {
   'dt.hint.startTc': 'Start TC can only be edited in FREE RUN mode.',
   'dt.hint.syncClients': 'The list of connected cameras is shown on the master device.',
   'dt.hint.reelScene': 'Reel and scene names are included in exported files.',
-  'dt.hint.markKeys': 'Stamp markers using the R / B / G / Y buttons in the footer.',
+  'dt.hint.markKeys': 'Stamp markers with the R / B / G / Y keys or the footer buttons.',
+  'dt.hint.transport': 'SPACE starts; hold SPACE while running to stop (700ms).',
 
   // --- P2P status line (produced as stable English, localized at display) ---
   'p2p.ready': 'READY: ID {id}',
@@ -488,7 +489,8 @@ const ja: Dict = {
   'dt.hint.startTc': '開始TCは FREE RUN 時のみ編集できます。',
   'dt.hint.syncClients': '接続中のカメラ一覧はマスター端末に表示されます。',
   'dt.hint.reelScene': 'リール名とシーン名は書き出しファイルに含まれます。',
-  'dt.hint.markKeys': '下部の R / B / G / Y ボタンで打刻します。',
+  'dt.hint.markKeys': 'R / B / G / Y キーまたは下部ボタンで打刻します。',
+  'dt.hint.transport': 'SPACE で開始、動作中に長押しで停止します(700ms)。',
 
   // --- P2P ステータス行（英語の機械文字列を表示時にローカライズ） ---
   'p2p.ready': '待機中: ID {id}',
