@@ -33,6 +33,9 @@ describe('MarkerList', () => {
     updateMarkerComment: vi.fn(),
     exportToEDL: vi.fn(),
     exportToALE: vi.fn(),
+    exportToFCPXML: vi.fn(),
+    exportToResolve: vi.fn(),
+    exportToCSV: vi.fn(),
     isMobile: false,
     tr: (key: string, vars?: Record<string, string | number>) =>
       key === 'marker.sceneTake' ? `Sc.${vars?.scene} Tk.${vars?.take}` : key,
@@ -90,6 +93,16 @@ describe('MarkerList', () => {
     const aleBtn = screen.getByText('ALE').closest('button');
     expect(edlBtn?.getAttribute('disabled')).not.toBeNull();
     expect(aleBtn?.getAttribute('disabled')).not.toBeNull();
+    for (const label of ['FCPXML', 'Resolve', 'CSV']) {
+      expect(screen.getByText(label).closest('button')?.disabled).toBe(true);
+    }
+  });
+
+  it.each(['FCPXML', 'Resolve', 'CSV'] as const)('exports %s', label => {
+    const callback = vi.fn();
+    render(<MarkerList {...baseProps} markers={[makeMarker()]} {...{ [`exportTo${label}`]: callback }} />);
+    fireEvent.click(screen.getByText(label));
+    expect(callback).toHaveBeenCalledOnce();
   });
 
   it('shows mobile quick mark buttons when isMobile is true', () => {
