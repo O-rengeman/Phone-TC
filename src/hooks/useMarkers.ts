@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import type { LtcEngine } from '../utils/LtcEngine';
-import { buildEdl, buildAle } from '../utils/export';
+import { buildEdl, buildAle, buildFcpxml, buildResolveMarkers, buildCsv } from '../utils/export';
 import type { Marker, MarkerColor } from '../utils/export';
 import { t as translate } from '../utils/i18n';
 import type { Lang } from '../utils/i18n';
@@ -42,6 +42,9 @@ interface UseMarkersResult {
   updateMarkerComment: (id: number, comment: string) => void;
   exportToEDL: () => void;
   exportToALE: () => void;
+  exportToFCPXML: () => void;
+  exportToResolve: () => void;
+  exportToCSV: () => void;
 }
 
 /**
@@ -170,5 +173,18 @@ export function useMarkers({
     void exportFile(ale, `PHONE_TC_${new Date().toISOString().slice(0, 10)}.ale`);
   };
 
-  return { markers, setMarkers, markerFlash, addMarker, removeMarker, updateMarkerComment, exportToEDL, exportToALE };
+  const exportToFCPXML = () => {
+    if (!markers.length) return;
+    void exportFile(buildFcpxml(markers, FPS_OPTIONS[fpsIndex]), `PHONE_TC_${new Date().toISOString().slice(0, 10)}.fcpxml`);
+  };
+  const exportToResolve = () => {
+    if (!markers.length) return;
+    void exportFile(buildResolveMarkers(markers, FPS_OPTIONS[fpsIndex]), `PHONE_TC_${new Date().toISOString().slice(0, 10)}_resolve_markers.edl`);
+  };
+  const exportToCSV = () => {
+    if (!markers.length) return;
+    void exportFile('\uFEFF' + buildCsv(markers), `PHONE_TC_${new Date().toISOString().slice(0, 10)}.csv`);
+  };
+
+  return { markers, setMarkers, markerFlash, addMarker, removeMarker, updateMarkerComment, exportToEDL, exportToALE, exportToFCPXML, exportToResolve, exportToCSV };
 }

@@ -12,6 +12,7 @@ import { DesktopPanel, DesktopSection } from './DesktopPanel';
 export function MarkersPane() {
   const {
     markers, removeMarker, updateMarkerComment, exportToEDL, exportToALE,
+    exportToFCPXML, exportToResolve, exportToCSV,
     defaultReelName, setDefaultReelName, sceneName, setSceneName,
     userBits, setUserBits, autoUserBits, setAutoUserBits,
     tr,
@@ -70,6 +71,9 @@ export function MarkersPane() {
             <button type="button" className="dt-btn" onClick={exportToALE} disabled={markers.length === 0}>
               ALE
             </button>
+            <button type="button" className="dt-btn" onClick={exportToFCPXML} disabled={markers.length === 0}>FCPXML</button>
+            <button type="button" className="dt-btn" onClick={exportToResolve} disabled={markers.length === 0}>Resolve</button>
+            <button type="button" className="dt-btn" onClick={exportToCSV} disabled={markers.length === 0}>CSV</button>
           </div>
           <p className="dt-hint">{tr('dt.hint.reelScene')}</p>
         </DesktopSection>

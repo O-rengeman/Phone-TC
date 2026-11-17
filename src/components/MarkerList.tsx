@@ -8,6 +8,9 @@ interface MarkerListProps {
   updateMarkerComment: (id: Marker['id'], comment: string) => void;
   exportToEDL: () => void;
   exportToALE: () => void;
+  exportToFCPXML: () => void;
+  exportToResolve: () => void;
+  exportToCSV: () => void;
   isMobile: boolean;
   tr: (key: string, vars?: Record<string, string | number>) => string;
 }
@@ -19,6 +22,7 @@ export function MarkerList({
   updateMarkerComment,
   exportToEDL,
   exportToALE,
+  exportToFCPXML, exportToResolve, exportToCSV,
   isMobile,
   tr,
 }: MarkerListProps) {
@@ -47,6 +51,9 @@ export function MarkerList({
           <div className="export-group">
             <button className="btn-export-pro" onClick={exportToEDL} disabled={markers.length === 0}>EDL</button>
             <button className="btn-export-pro" onClick={exportToALE} disabled={markers.length === 0}>ALE</button>
+            <button className="btn-export-pro" onClick={exportToFCPXML} disabled={markers.length === 0}>FCPXML</button>
+            <button className="btn-export-pro" onClick={exportToResolve} disabled={markers.length === 0}>Resolve</button>
+            <button className="btn-export-pro" onClick={exportToCSV} disabled={markers.length === 0}>CSV</button>
           </div>
         </div>
         <div className="marker-scroll">

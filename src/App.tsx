@@ -70,6 +70,7 @@ function MainApp() {
     updateMarkerComment,
     exportToEDL,
     exportToALE,
+    exportToFCPXML, exportToResolve, exportToCSV,
     handleSlateClick,
     handleStartStop,
     handlePause,
@@ -295,6 +296,9 @@ function MainApp() {
               updateMarkerComment={updateMarkerComment}
               exportToEDL={exportToEDL}
               exportToALE={exportToALE}
+              exportToFCPXML={exportToFCPXML}
+              exportToResolve={exportToResolve}
+              exportToCSV={exportToCSV}
               isMobile={isMobile}
               tr={tr}
             />

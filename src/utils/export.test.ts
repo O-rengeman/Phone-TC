@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildEdl, buildAle } from './export';
+import { buildEdl, buildAle, buildFcpxml, buildResolveMarkers, buildCsv } from './export';
+import { FPS_OPTIONS } from '../constants';
 import type { Marker } from './export';
 
 const markers: Marker[] = [
@@ -7,6 +8,63 @@ const markers: Marker[] = [
   { id: 2, tc: '00:00:10:00', time: '10:00:10', color: 'Blue', reelName: 'A002', take: 2, sceneName: '001', comment: 'Great shot' },
   { id: 1, tc: '00:00:05:00', time: '10:00:05', color: 'Red', reelName: 'A001', take: 1, sceneName: '001', comment: '' },
 ];
+
+describe('editor exports', () => {
+  const parse = (text: string) => {
+    const doc = new DOMParser().parseFromString(text, 'application/xml');
+    expect(doc.querySelector('parsererror')).toBeNull();
+    return doc;
+  };
+
+  it.each(FPS_OPTIONS)('builds valid FCPXML at $label', fps => {
+    const doc = parse(buildFcpxml(markers, fps));
+    expect(doc.querySelector('format')?.getAttribute('frameDuration')).toBe(`${fps.fpsDen}/${fps.fpsNum}s`);
+    expect(doc.querySelector('sequence')?.getAttribute('tcFormat')).toBe(fps.drop ? 'DF' : 'NDF');
+    expect([...doc.querySelectorAll('marker')].map(m => m.getAttribute('value'))).toEqual(['Scene 001 Take 1', 'Scene 001 Take 2']);
+  });
+
+  it('escapes XML attributes without losing Japanese notes or whitespace', () => {
+    const comment = '日本語 & < > " \'\n\t';
+    const doc = parse(buildFcpxml([{ ...markers[0], sceneName: 'A&B', comment }], FPS_OPTIONS[0]));
+    expect(doc.querySelector('marker')?.getAttribute('note')).toBe(comment);
+    expect(doc.querySelector('marker')?.getAttribute('value')).toBe('Scene A&B Take 2');
+  });
+
+  it('uses real drop-frame frame counts and a one-frame Resolve event across a skipped label', () => {
+    const df = [{ ...markers[0], tc: '00:01:00;02' }];
+    expect(parse(buildFcpxml(df, FPS_OPTIONS[4])).querySelector('marker')?.getAttribute('start')).toBe('1801800/30000s');
+    const edl = buildResolveMarkers([{ ...markers[0], tc: '00:00:59;29' }], FPS_OPTIONS[4]);
+    expect(edl).toContain('FCM: DROP FRAME');
+    expect(edl).toContain('00:00:59;29 00:01:00;02 00:00:59;29 00:01:00;02');
+  });
+
+  it('builds chronological Resolve events with comments and sanitized lines', () => {
+    const edl = buildResolveMarkers(markers, FPS_OPTIONS[2]);
+    expect(edl).toContain('00:00:05:00 00:00:05:01');
+    expect(edl).toContain('|C:ResolveColorBlue |M:Scene 001 Take 2 - Great shot |D:1');
+    expect(edl.indexOf('ResolveColorRed')).toBeLessThan(edl.indexOf('ResolveColorBlue'));
+    expect(buildResolveMarkers([{ ...markers[0], reelName: '', comment: 'a\nb\tc' }], FPS_OPTIONS[2])).toContain(' - abc |D:1');
+  });
+
+  it('preserves CSV commas, quotes, newlines and Japanese with RFC 4180 escaping', () => {
+    const csv = buildCsv([{ ...markers[0], comment: '日本語,"OK"\r\n次' }, markers[1]]);
+    expect(csv.startsWith('"Scene","Take","Timecode","Reel","Color","Time","Comment"\r\n')).toBe(true);
+    expect(csv).toContain('"日本語,""OK""\r\n次"\r\n');
+    expect(csv.indexOf('A001')).toBeLessThan(csv.indexOf('A002'));
+  });
+
+  it('produces empty documents and header-only tabular exports', () => {
+    expect(parse(buildFcpxml([], FPS_OPTIONS[2])).querySelectorAll('marker')).toHaveLength(0);
+    expect(buildResolveMarkers([], FPS_OPTIONS[2])).toBe('TITLE: Logged Takes\nFCM: NON-DROP FRAME\n\n');
+    expect(buildCsv([]).split('\r\n')).toHaveLength(2);
+  });
+
+  it('rejects invalid timecodes rather than generating corrupt timeline positions', () => {
+    const invalid = [{ ...markers[0], tc: 'invalid' }];
+    expect(() => buildFcpxml(invalid, FPS_OPTIONS[2])).toThrow();
+    expect(() => buildResolveMarkers(invalid, FPS_OPTIONS[2])).toThrow();
+  });
+});
 
 describe('buildEdl', () => {
   it('emits a header with the correct FCM for non-drop frame', () => {

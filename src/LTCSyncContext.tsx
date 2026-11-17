@@ -159,6 +159,9 @@ interface LTCActionsType {
   updateMarkerComment: (id: number, comment: string) => void;
   exportToEDL: () => void;
   exportToALE: () => void;
+  exportToFCPXML: () => void;
+  exportToResolve: () => void;
+  exportToCSV: () => void;
   handleSlateClick: () => void;
   resetP2P: () => void;
   setupP2PMaster: () => Promise<void>;
@@ -288,7 +291,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const {
     markers, setMarkers, markerFlash,
     addMarker, removeMarker, updateMarkerComment,
-    exportToEDL, exportToALE,
+    exportToEDL, exportToALE, exportToFCPXML, exportToResolve, exportToCSV,
   } = useMarkers({ engineRef, fpsIndex, defaultReelName, sceneName, langRef, addToast });
 
   const {
@@ -714,6 +717,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     updateMarkerComment,
     exportToEDL,
     exportToALE,
+    exportToFCPXML, exportToResolve, exportToCSV,
     handleSlateClick,
     resetP2P,
     setupP2PMaster,
@@ -728,7 +732,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     analyserRef, canvasRef, engineRef, currentTcRef, isVisualSlateRef, slateTimeRef,
     holdStoppedRef, stopHoldStartRef, stopHoldRafRef,
     tr, addToast, setSlateTime, addMarker, removeMarker, updateMarkerComment, exportToEDL,
-    exportToALE, handleSlateClick, resetP2P, setupP2PMaster, setupP2PClient, joinSession,
+    exportToALE, exportToFCPXML, exportToResolve, exportToCSV, handleSlateClick, resetP2P, setupP2PMaster, setupP2PClient, joinSession,
     handleStartStop, handlePause, beginStopHold, cancelStopHold, handleManualResync,
   ]);
 
