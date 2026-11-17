@@ -1,9 +1,19 @@
 import Timecode from 'smpte-timecode';
 
-// Pure builders for marker export formats. Kept free of DOM/Blob
+// Pure builders for marker export formats (EDL / ALE). Kept free of DOM/Blob
 // side effects so they can be unit-tested; the download wiring lives in App.tsx.
 
+import type { DriftConfidence } from './DriftMonitor';
+
 export type MarkerColor = 'Red' | 'Blue' | 'Green' | 'Yellow';
+
+export interface MarkerSync {
+  method: 'network' | 'p2p' | 'system' | 'freerun';
+  driftMs: number | null;
+  driftFrames: number | null;
+  msSinceSync: number | null;
+  confidence: DriftConfidence | 'none';
+}
 
 export interface Marker {
   id: number;
@@ -14,6 +24,7 @@ export interface Marker {
   take: number;
   sceneName: string;
   comment: string;
+  sync?: MarkerSync;
 }
 
 /** Strips characters that would corrupt the line-based EDL/ALE layout. */
@@ -49,13 +60,16 @@ export function buildEdl(markers: Marker[], isDropFrame: boolean): string {
 /** Builds an Avid ALE string from logged markers. */
 export function buildAle(markers: Marker[], fpsLabel: string): string {
   const safeFps = sanitize(fpsLabel);
-  let ale = `Heading\nFIELD_DELIM\tTABS\nVIDEO_FORMAT\t1080\nFPS\t${safeFps}\n\nColumn\nName\tTracks\tStart\tEnd\tScene\tTake\tDescription\n\nData\n`;
+  let ale = `Heading\nFIELD_DELIM\tTABS\nVIDEO_FORMAT\t1080\nFPS\t${safeFps}\n\nColumn\nName\tTracks\tStart\tEnd\tScene\tTake\tDescription\tSync_Method\tSync_Drift_ms\tSync_Drift_Frames\tSync_Age_s\tSync_Confidence\n\nData\n`;
   markers.forEach((m) => {
     // Same sanitization rule as EDL: user-entered scene names/comments can
     // contain tabs/newlines that would corrupt the TAB-delimited ALE rows.
     const scene = sanitize(m.sceneName);
     const commentPart = m.comment ? ` - ${sanitize(m.comment)}` : '';
-    ale += `Scene ${scene} Take ${m.take}\tV\t${sanitize(m.tc)}\t${sanitize(m.tc)}\t${scene}\t${m.take}\t${m.color} marker at ${sanitize(m.time)}${commentPart}\n`;
+    const numeric = (value: number | null) => value !== null && Number.isFinite(value) ? String(value) : '';
+    const sync = m.sync;
+    const syncFields = sync ? [sanitize(sync.method), numeric(sync.driftMs), numeric(sync.driftFrames), numeric(sync.msSinceSync === null ? null : sync.msSinceSync / 1000), sanitize(sync.confidence)] : ['', '', '', '', ''];
+    ale += `Scene ${scene} Take ${m.take}\tV\t${sanitize(m.tc)}\t${sanitize(m.tc)}\t${scene}\t${m.take}\t${m.color} marker at ${sanitize(m.time)}${commentPart}\t${syncFields.join('\t')}\n`;
   });
   return ale;
 }

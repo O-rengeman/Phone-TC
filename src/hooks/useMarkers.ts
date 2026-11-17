@@ -8,6 +8,9 @@ import { t as translate } from '../utils/i18n';
 import type { Lang } from '../utils/i18n';
 import { FPS_OPTIONS } from '../constants';
 import { STORAGE_KEYS, readStoredJson, writeStoredString } from '../utils/storage';
+import type { SyncMode } from '../LTCSyncContext';
+import type { DriftMonitor } from '../utils/DriftMonitor';
+import type { MarkerSync } from '../utils/export';
 
 type ToastLevel = 'info' | 'warn' | 'error';
 type MarkerFlash = { tc: string; color: string; count: number } | null;
@@ -25,6 +28,10 @@ const isMarkerArray = (v: unknown): v is Marker[] =>
     && typeof (m as Marker).tc === 'string');
 
 interface UseMarkersParams {
+  syncMode?: SyncMode;
+  driftMonitorRef?: React.RefObject<DriftMonitor>;
+  p2pDriftSeconds?: number | null;
+  p2pLastSyncRef?: React.RefObject<number>;
   engineRef: React.RefObject<LtcEngine | null>;
   fpsIndex: number;
   defaultReelName: string;
@@ -59,7 +66,13 @@ export function useMarkers({
   sceneName,
   langRef,
   addToast,
+  syncMode = 'network',
+  driftMonitorRef,
+  p2pDriftSeconds = null,
+  p2pLastSyncRef,
 }: UseMarkersParams): UseMarkersResult {
+  const syncRef = useRef({ syncMode, driftMonitorRef, p2pDriftSeconds, p2pLastSyncRef, fpsIndex });
+  useEffect(() => { syncRef.current = { syncMode, driftMonitorRef, p2pDriftSeconds, p2pLastSyncRef, fpsIndex }; }, [syncMode, driftMonitorRef, p2pDriftSeconds, p2pLastSyncRef, fpsIndex]);
   const [markers, setMarkers] = useState<Marker[]>(() =>
     readStoredJson(STORAGE_KEYS.markers, [] as Marker[], isMarkerArray));
   const [markerFlash, setMarkerFlash] = useState<MarkerFlash>(null);
@@ -105,6 +118,23 @@ export function useMarkers({
   }, [backupMarkers]);
 
   const addMarker = (color: MarkerColor) => {
+    const current = syncRef.current;
+    const sync: MarkerSync = { method: current.syncMode, driftMs: null, driftFrames: null, msSinceSync: null, confidence: 'none' };
+    const round = (value: number) => Number.isFinite(value) ? Math.round(value * 1000) / 1000 : null;
+    const driftStatus = current.syncMode === 'network'
+      ? current.driftMonitorRef?.current.getStatus(FPS_OPTIONS[current.fpsIndex].value, Date.now())
+      : null;
+    const lastP2pSync = current.p2pLastSyncRef?.current;
+    if (driftStatus?.hasSync) {
+      sync.driftMs = round(driftStatus.estimatedDriftMs);
+      sync.driftFrames = round(driftStatus.estimatedDriftFrames);
+      sync.msSinceSync = round(driftStatus.msSinceSync);
+      sync.confidence = driftStatus.confidence;
+    } else if (current.syncMode === 'p2p' && lastP2pSync && Number.isFinite(lastP2pSync) && current.p2pDriftSeconds !== null && Number.isFinite(current.p2pDriftSeconds)) {
+      sync.driftMs = round(current.p2pDriftSeconds * 1000);
+      sync.driftFrames = round(current.p2pDriftSeconds * FPS_OPTIONS[current.fpsIndex].value);
+      sync.msSinceSync = Math.max(0, Date.now() - lastP2pSync);
+    }
     const currentTC = engineRef.current ? engineRef.current.getTimecodeString() : '00:00:00:00';
     const nextTake = markers.length > 0 ? Math.max(...markers.map(m => m.take || 0)) + 1 : 1;
     const newMarker: Marker = {
@@ -115,7 +145,8 @@ export function useMarkers({
       reelName: defaultReelName,
       take: nextTake,
       sceneName: sceneName,
-      comment: ''
+      comment: '',
+      sync,
     };
     setMarkers(prev => [newMarker, ...prev]);
 
