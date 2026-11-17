@@ -277,6 +277,12 @@ export function useLtcEngine({
 
       if (!isPaused) {
         if (syncMode === 'network' || (syncMode === 'p2p' && p2pRole === 'master' && p2pSyncSource === 'network')) {
+          // This run will fall back to the local clock if acquisition fails.
+          // Never leave a previous run's reference looking like a fresh sync.
+          setSyncStatus(null);
+          setDriftStatus(null);
+          driftMonitorRef.current.reset();
+          lastNetworkOffsetRef.current = null;
           try {
             const result = await TimeSync.sync();
             setSyncStatus(result);
