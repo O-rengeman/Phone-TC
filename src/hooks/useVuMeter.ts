@@ -6,6 +6,7 @@ const CLIP_HOLD_MS = 3000;
 interface UseVuMeterResult {
   vuLevel: number;
   isClipping: boolean;
+  hasInputMeter: boolean;
 }
 
 /**
@@ -23,6 +24,7 @@ export function useVuMeter(
 ): UseVuMeterResult {
   const [vuLevel, setVuLevel] = useState(0);
   const [isClipping, setIsClipping] = useState(false);
+  const [hasInputMeter, setHasInputMeter] = useState(false);
   const clipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -34,6 +36,7 @@ export function useVuMeter(
       if (analyserRef.current) {
         const data = new Float32Array(analyserRef.current.fftSize);
         analyserRef.current.getFloatTimeDomainData(data);
+        setHasInputMeter(true);
         let peak = 0;
         for (let i = 0; i < data.length; i++) {
           const abs = Math.abs(data[i]);
@@ -47,6 +50,8 @@ export function useVuMeter(
             setIsClipping(false);
           }, CLIP_HOLD_MS);
         }
+      } else {
+        setHasInputMeter(false);
       }
       rafId = requestAnimationFrame(update);
     };
@@ -55,6 +60,7 @@ export function useVuMeter(
       cancelAnimationFrame(rafId);
       setVuLevel(0);
       setIsClipping(false);
+      setHasInputMeter(false);
       if (clipTimeoutRef.current) {
         clearTimeout(clipTimeoutRef.current);
         clipTimeoutRef.current = null;
@@ -62,5 +68,5 @@ export function useVuMeter(
     };
   }, [analyserRef, isRunning, outputMode]);
 
-  return { vuLevel, isClipping };
+  return { vuLevel, isClipping, hasInputMeter };
 }

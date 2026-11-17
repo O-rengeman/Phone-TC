@@ -8,6 +8,7 @@ import { useWakeLock } from './useWakeLock';
  */
 function makeFakeLock() {
   const lock = {
+    addEventListener: vi.fn(),
     released: false,
     release: vi.fn().mockImplementation(() => {
       lock.released = true;
@@ -166,9 +167,47 @@ describe('useWakeLock', () => {
     Object.defineProperty(navigator, 'wakeLock', { value: { request }, configurable: true });
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    renderHook(() => useWakeLock(true));
+    const { result } = renderHook(() => useWakeLock(true));
     await act(async () => { await Promise.resolve(); });
 
     expect(warnSpy).toHaveBeenCalledWith('Wake Lock error', expect.any(Error));
+    expect(result.current).toBe('error');
+  });
+
+  it('reports actual acquisition, OS release, reacquisition and stop', async () => {
+    const first = makeFakeLock();
+    const second = makeFakeLock();
+    const request = vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(second);
+    Object.defineProperty(navigator, 'wakeLock', { value: { request }, configurable: true });
+    const { result, rerender } = renderHook(({ running }) => useWakeLock(running), { initialProps: { running: true } });
+    expect(result.current).toBe('requesting');
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current).toBe('active');
+    expect(first.addEventListener).toHaveBeenCalledWith('release', expect.any(Function), { once: true });
+    act(() => {
+      first.released = true;
+      const onRelease = first.addEventListener.mock.calls[0][1] as () => void;
+      onRelease();
+    });
+    expect(result.current).toBe('released');
+    await act(async () => { setVisibility('visible'); await Promise.resolve(); });
+    expect(result.current).toBe('active');
+    rerender({ running: false });
+    expect(result.current).toBe('inactive');
+  });
+
+  it('reports unsupported rather than active on browsers without the API', () => {
+    const { result } = renderHook(() => useWakeLock(true));
+    expect(result.current).toBe('unsupported');
+  });
+
+  it('does not duplicate a pending request when visibility changes', async () => {
+    let resolveRequest: (lock: ReturnType<typeof makeFakeLock>) => void = () => {};
+    const request = vi.fn().mockImplementation(() => new Promise(resolve => { resolveRequest = resolve; }));
+    Object.defineProperty(navigator, 'wakeLock', { value: { request }, configurable: true });
+    renderHook(() => useWakeLock(true));
+    act(() => { setVisibility('visible'); });
+    expect(request).toHaveBeenCalledTimes(1);
+    await act(async () => { resolveRequest(makeFakeLock()); await Promise.resolve(); });
   });
 });

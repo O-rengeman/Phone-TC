@@ -56,6 +56,7 @@ describe('useVuMeter', () => {
     const { result } = renderHook(() => useVuMeter(ref, true, 'mono-l'));
     act(() => { vi.advanceTimersByTime(16); });
     expect(result.current.vuLevel).toBeCloseTo(0.42, 5);
+    expect(result.current.hasInputMeter).toBe(true);
   });
 
   it('flags clipping when the peak crosses the threshold and clears it after the hold time', () => {
@@ -71,6 +72,7 @@ describe('useVuMeter', () => {
     peakHolder.value = 0.1;
     act(() => { vi.advanceTimersByTime(3000); });
     expect(result.current.isClipping).toBe(false);
+    expect(result.current.hasInputMeter).toBe(false);
   });
 
   it('resets vuLevel and isClipping when the meter stops (mode change)', () => {
@@ -84,6 +86,7 @@ describe('useVuMeter', () => {
 
     rerender({ mode: 'stereo' });
     expect(result.current.vuLevel).toBe(0);
+    expect(result.current.hasInputMeter).toBe(false);
     expect(result.current.isClipping).toBe(false);
   });
 

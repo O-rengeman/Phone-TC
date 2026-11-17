@@ -14,6 +14,7 @@ interface HeaderBarProps {
   setLang: (l: 'en' | 'ja' | ((prev: 'en' | 'ja') => 'en' | 'ja')) => void;
   setShowGuide: (v: boolean) => void;
   tr: (key: string) => string;
+  onOpenPreflight?: () => void;
 }
 
 export function HeaderBar({
@@ -28,6 +29,7 @@ export function HeaderBar({
   setLang,
   setShowGuide,
   tr,
+  onOpenPreflight,
 }: HeaderBarProps) {
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
 
@@ -75,6 +77,7 @@ export function HeaderBar({
         </div>
         <div className="hdr-divider" />
         <div className="hdr-actions">
+          {onOpenPreflight && <button type="button" className="preflight-open" onClick={onOpenPreflight}>{tr('preflight.open')}</button>}
           <button
             type="button"
             className="lang-btn"
