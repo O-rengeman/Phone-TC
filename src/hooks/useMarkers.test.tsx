@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useMarkers } from './useMarkers';
 import type { LtcEngine } from '../utils/LtcEngine';
 import type { Lang } from '../utils/i18n';
+import { DriftMonitor } from '../utils/DriftMonitor';
 
 // vi.mock factories are hoisted above regular const declarations — anything
 // referenced inside one must be created via vi.hoisted() or the factory
@@ -60,15 +61,22 @@ describe('useMarkers', () => {
     expect(first.sync?.driftMs).toBe(12.34);
   });
 
-  it('captures rounded network drift and rejects nonfinite measurements', () => {
-    const status = { hasSync: true, msSinceSync: 1200, estimatedDriftMs: 1.23456, estimatedDriftFrames: 0.030864, confidence: 'medium' as const, measured: false, driftRatePpm: 30, rejamRecommended: false };
-    const { result, rerender } = renderHook(({ driftStatus }) => useMarkers(makeParams({ driftStatus })), { initialProps: { driftStatus: status } });
+  it('reads the live monitor after a stopped resync without a state update, using current time and fps', () => {
+    vi.useFakeTimers();
+    const monitor = new DriftMonitor();
+    const { result, rerender } = renderHook(({ fpsIndex }) => useMarkers(makeParams({ driftMonitorRef: { current: monitor }, fpsIndex })), { initialProps: { fpsIndex: 2 } });
     act(() => result.current.addMarker('Red'));
-    expect(result.current.markers[0].sync).toEqual({ method: 'network', driftMs: 1.235, driftFrames: 0.031, msSinceSync: 1200, confidence: 'medium' });
-    rerender({ driftStatus: { ...status, hasSync: false, estimatedDriftMs: Infinity } });
+    expect(result.current.markers[0].sync?.driftMs).toBeNull();
+    monitor.addSync(10);
+    vi.setSystemTime(Date.now() + 41152);
+    rerender({ fpsIndex: 5 });
+    act(() => result.current.addMarker('Red'));
+    expect(result.current.markers[0].sync).toEqual({ method: 'network', driftMs: 1.235, driftFrames: 0.037, msSinceSync: 41152, confidence: 'medium' });
+    monitor.reset();
     act(() => result.current.addMarker('Blue'));
     expect(result.current.markers[0].sync?.driftMs).toBeNull();
     expect(result.current.markers[0].sync?.confidence).toBe('none');
+    vi.useRealTimers();
   });
   it('starts empty when localStorage has no saved markers', () => {
     const { result } = renderHook(() => useMarkers(makeParams()));

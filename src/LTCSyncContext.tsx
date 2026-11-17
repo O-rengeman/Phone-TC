@@ -383,7 +383,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     addMarker, removeMarker, updateMarkerComment,
     exportToEDL, exportToALE,
   } = useMarkers({ engineRef, fpsIndex, defaultReelName, sceneName, langRef, addToast,
-    syncMode, driftStatus, p2pDriftSeconds: p2pRole === 'client' ? masterDrift : null,
+    syncMode, driftMonitorRef, p2pDriftSeconds: p2pRole === 'client' ? masterDrift : null,
     p2pLastSyncRef: lastSyncTimeRef,
   });
 

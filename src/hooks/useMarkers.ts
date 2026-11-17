@@ -9,7 +9,7 @@ import type { Lang } from '../utils/i18n';
 import { FPS_OPTIONS } from '../constants';
 import { STORAGE_KEYS, readStoredJson, writeStoredString } from '../utils/storage';
 import type { SyncMode } from '../LTCSyncContext';
-import type { DriftStatus } from '../utils/DriftMonitor';
+import type { DriftMonitor } from '../utils/DriftMonitor';
 import type { MarkerSync } from '../utils/export';
 
 type ToastLevel = 'info' | 'warn' | 'error';
@@ -29,7 +29,7 @@ const isMarkerArray = (v: unknown): v is Marker[] =>
 
 interface UseMarkersParams {
   syncMode?: SyncMode;
-  driftStatus?: DriftStatus | null;
+  driftMonitorRef?: React.RefObject<DriftMonitor>;
   p2pDriftSeconds?: number | null;
   p2pLastSyncRef?: React.RefObject<number>;
   engineRef: React.RefObject<LtcEngine | null>;
@@ -64,12 +64,12 @@ export function useMarkers({
   langRef,
   addToast,
   syncMode = 'network',
-  driftStatus = null,
+  driftMonitorRef,
   p2pDriftSeconds = null,
   p2pLastSyncRef,
 }: UseMarkersParams): UseMarkersResult {
-  const syncRef = useRef({ syncMode, driftStatus, p2pDriftSeconds, p2pLastSyncRef, fpsIndex });
-  useEffect(() => { syncRef.current = { syncMode, driftStatus, p2pDriftSeconds, p2pLastSyncRef, fpsIndex }; }, [syncMode, driftStatus, p2pDriftSeconds, p2pLastSyncRef, fpsIndex]);
+  const syncRef = useRef({ syncMode, driftMonitorRef, p2pDriftSeconds, p2pLastSyncRef, fpsIndex });
+  useEffect(() => { syncRef.current = { syncMode, driftMonitorRef, p2pDriftSeconds, p2pLastSyncRef, fpsIndex }; }, [syncMode, driftMonitorRef, p2pDriftSeconds, p2pLastSyncRef, fpsIndex]);
   const [markers, setMarkers] = useState<Marker[]>(() =>
     readStoredJson(STORAGE_KEYS.markers, [] as Marker[], isMarkerArray));
   const [markerFlash, setMarkerFlash] = useState<MarkerFlash>(null);
@@ -118,11 +118,14 @@ export function useMarkers({
     const current = syncRef.current;
     const sync: MarkerSync = { method: current.syncMode, driftMs: null, driftFrames: null, msSinceSync: null, confidence: 'none' };
     const round = (value: number) => Number.isFinite(value) ? Math.round(value * 1000) / 1000 : null;
-    if (current.syncMode === 'network' && current.driftStatus?.hasSync) {
-      sync.driftMs = round(current.driftStatus.estimatedDriftMs);
-      sync.driftFrames = round(current.driftStatus.estimatedDriftFrames);
-      sync.msSinceSync = round(current.driftStatus.msSinceSync);
-      sync.confidence = current.driftStatus.confidence;
+    const driftStatus = current.syncMode === 'network'
+      ? current.driftMonitorRef?.current.getStatus(FPS_OPTIONS[current.fpsIndex].value, Date.now())
+      : null;
+    if (driftStatus?.hasSync) {
+      sync.driftMs = round(driftStatus.estimatedDriftMs);
+      sync.driftFrames = round(driftStatus.estimatedDriftFrames);
+      sync.msSinceSync = round(driftStatus.msSinceSync);
+      sync.confidence = driftStatus.confidence;
     } else if (current.syncMode === 'p2p' && current.p2pDriftSeconds !== null && Number.isFinite(current.p2pDriftSeconds)) {
       sync.driftMs = round(current.p2pDriftSeconds * 1000);
       sync.driftFrames = round(current.p2pDriftSeconds * FPS_OPTIONS[current.fpsIndex].value);
