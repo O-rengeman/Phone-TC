@@ -5,7 +5,7 @@ import { VideoPlayer } from '../../VideoPlayer';
 import { formatSyncAge } from '../../utils/DriftMonitor';
 import { isClientOffline } from '../../utils/clients';
 import { formatP2pStatus } from '../../utils/p2pStatus';
-import { JAM_THRESHOLD_SEC } from '../../constants';
+import { JAM_THRESHOLD_SEC, OUTPUT_OFFSET_MAX, OUTPUT_OFFSET_MIN } from '../../constants';
 import type { Marker } from '../../utils/export';
 import {
   DESKTOP_TAB_STORAGE_KEY,
@@ -17,6 +17,8 @@ import type { DesktopTabId } from '../../utils/desktopTabs';
 import { TimecodePane } from './TimecodePane';
 import { SyncPane } from './SyncPane';
 import { MarkersPane } from './MarkersPane';
+import { ActivityPane } from './ActivityPane';
+import { useActivityRecorder } from './useActivityRecorder';
 import '../../desktop.css';
 
 interface DesktopShellProps {
@@ -57,11 +59,17 @@ function readStoredTab(): string | null {
  */
 export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
   const {
-    isHost, isRunning, isPreparing, syncMode, driftStatus, p2pRole,
+    isHost, isRunning, isPreparing, isPaused, syncMode, driftStatus, p2pRole,
     peerId, p2pStatus, masterDrift, clients, nowTick,
     lang, tr,
-    handleStartStop, beginStopHold, cancelStopHold, addMarker, holdStoppedRef,
+    handleStartStop, handlePause, handleManualResync, beginStopHold, cancelStopHold,
+    addMarker, holdStoppedRef, setIsVisualSlate, setShowGuide,
+    setOutputOffset, markers, isResyncing,
   } = useLTC();
+
+  // Feeds the activity log — mounted for the whole desktop session so the
+  // log accumulates even while another tab is on screen.
+  useActivityRecorder();
 
   const [requestedTab, setRequestedTab] = useState<string | null>(readStoredTab);
   const activeTab = resolveDesktopTab(requestedTab, isHost);
@@ -100,6 +108,8 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
   // async start can't retrigger it, and page scroll is suppressed either way.
   // R/B/G/Y drop the matching marker colour, same as the footer buttons.
   const transportDisabled = isPreparing || (syncMode === 'p2p' && p2pRole === 'client');
+  // Same lock rule the TimecodePane applies to its offset slider.
+  const offsetLocked = isRunning || (syncMode === 'p2p' && p2pRole === 'client');
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -124,10 +134,43 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
       }
 
       if (event.repeat) return;
-      const color = MARKER_KEY_COLORS[event.key.toLowerCase()];
+      const key = event.key.toLowerCase();
+
+      const color = MARKER_KEY_COLORS[key];
       if (color) {
         event.preventDefault();
         addMarker(color);
+        return;
+      }
+
+      // Secondary shortcuts — each is a single press, no hold semantics.
+      switch (key) {
+        case 'p':
+          event.preventDefault();
+          if (isRunning && !isPaused) handlePause();
+          break;
+        case 'j':
+          event.preventDefault();
+          if (syncMode === 'network' && !isResyncing) void handleManualResync();
+          break;
+        case 'v':
+          event.preventDefault();
+          setIsVisualSlate(v => !v);
+          break;
+        case '?':
+          event.preventDefault();
+          setShowGuide(true);
+          break;
+        case '[':
+        case ']':
+          event.preventDefault();
+          if (!offsetLocked) {
+            const delta = key === ']' ? 1 : -1;
+            setOutputOffset(o => Math.max(OUTPUT_OFFSET_MIN, Math.min(OUTPUT_OFFSET_MAX, o + delta)));
+          }
+          break;
+        default:
+          break;
       }
     };
 
@@ -147,7 +190,11 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [isRunning, transportDisabled, beginStopHold, cancelStopHold, handleStartStop, addMarker, holdStoppedRef]);
+  }, [
+    isRunning, isPaused, isResyncing, syncMode, p2pRole, offsetLocked, transportDisabled,
+    beginStopHold, cancelStopHold, handleStartStop, handlePause, handleManualResync,
+    addMarker, holdStoppedRef, setIsVisualSlate, setShowGuide, setOutputOffset,
+  ]);
 
   const onlineCount = Object.values(clients).filter(c => !isClientOffline(c, nowTick)).length;
   const clientCount = Object.keys(clients).length;
@@ -190,6 +237,10 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
             </strong>
           </div>
           <div className="dt-readout-stat">
+            <span className="dt-stat-label">{tr('dt.takes')}</span>
+            <strong>{markers.length}</strong>
+          </div>
+          <div className="dt-readout-stat">
             <span className="dt-stat-label">{p2pRole === 'master' ? tr('dt.sessionId') : tr('dt.link')}</span>
             <strong className="dt-mono dt-readout-link">
               {p2pRole === 'master' ? (peerId || '—') : (p2pRole ? formatP2pStatus(p2pStatus, lang) : '—')}
@@ -218,6 +269,7 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
         {activeTab === 'timecode' && <TimecodePane onOutputModeChange={onOutputModeChange} />}
         {activeTab === 'sync' && <SyncPane />}
         {activeTab === 'markers' && <MarkersPane />}
+        {activeTab === 'activity' && <ActivityPane />}
       </main>
     </div>
   );

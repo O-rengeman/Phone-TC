@@ -65,6 +65,11 @@ export const CLIENT_REPORT_WINDOW_SLACK_MS = 500;
 export const CLIENT_OFFLINE_AFTER_MS = 30000;
 export const CLIENT_DRIFT_WARN_SEC = 0.03;
 
+/** Frame-offset nudge range — shared by the TimecodePane slider and the
+    [ / ] keyboard shortcuts so both enforce the same bounds. */
+export const OUTPUT_OFFSET_MIN = -10;
+export const OUTPUT_OFFSET_MAX = 10;
+
 // ---------------------------------------------------------------------------
 // App version — keep in sync with package.json `version`.
 // ---------------------------------------------------------------------------
