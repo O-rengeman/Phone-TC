@@ -50,6 +50,20 @@ afterEach(() => {
 });
 
 describe('useMarkers', () => {
+  it('does not log stopped heartbeat drift or an age until a P2P sync is applied', () => {
+    const lastSyncRef = { current: 0 };
+    const { result } = renderHook(() => useMarkers(makeParams({ syncMode: 'p2p', p2pDriftSeconds: 0.012, p2pLastSyncRef: lastSyncRef })));
+    act(() => result.current.addMarker('Red'));
+    expect(result.current.markers[0].sync).toEqual({ method: 'p2p', driftMs: null, driftFrames: null, msSinceSync: null, confidence: 'none' });
+    lastSyncRef.current = Date.now() - 1000;
+    act(() => result.current.addMarker('Blue'));
+    expect(result.current.markers[0].sync).toMatchObject({ method: 'p2p', driftMs: 12, driftFrames: 0.3 });
+    expect(result.current.markers[0].sync?.msSinceSync).toBeGreaterThanOrEqual(1000);
+    lastSyncRef.current = 0;
+    act(() => result.current.addMarker('Green'));
+    expect(result.current.markers[0].sync?.msSinceSync).toBeNull();
+    expect(result.current.markers[0].sync?.driftMs).toBeNull();
+  });
   it('snapshots current mode and measured P2P seconds in milliseconds without changing earlier takes', () => {
     const { result, rerender } = renderHook(({ mode, drift }: { mode: 'p2p' | 'system'; drift: number | null }) => useMarkers(makeParams({ syncMode: mode, p2pDriftSeconds: drift, p2pLastSyncRef: { current: Date.now() - 1000 } })), { initialProps: { mode: 'p2p', drift: 0.01234 } });
     act(() => result.current.addMarker('Red'));

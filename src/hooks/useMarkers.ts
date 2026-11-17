@@ -121,16 +121,16 @@ export function useMarkers({
     const driftStatus = current.syncMode === 'network'
       ? current.driftMonitorRef?.current.getStatus(FPS_OPTIONS[current.fpsIndex].value, Date.now())
       : null;
+    const lastP2pSync = current.p2pLastSyncRef?.current;
     if (driftStatus?.hasSync) {
       sync.driftMs = round(driftStatus.estimatedDriftMs);
       sync.driftFrames = round(driftStatus.estimatedDriftFrames);
       sync.msSinceSync = round(driftStatus.msSinceSync);
       sync.confidence = driftStatus.confidence;
-    } else if (current.syncMode === 'p2p' && current.p2pDriftSeconds !== null && Number.isFinite(current.p2pDriftSeconds)) {
+    } else if (current.syncMode === 'p2p' && lastP2pSync && Number.isFinite(lastP2pSync) && current.p2pDriftSeconds !== null && Number.isFinite(current.p2pDriftSeconds)) {
       sync.driftMs = round(current.p2pDriftSeconds * 1000);
       sync.driftFrames = round(current.p2pDriftSeconds * FPS_OPTIONS[current.fpsIndex].value);
-      const lastSync = current.p2pLastSyncRef?.current;
-      sync.msSinceSync = lastSync ? Math.max(0, Date.now() - lastSync) : null;
+      sync.msSinceSync = Math.max(0, Date.now() - lastP2pSync);
     }
     const currentTC = engineRef.current ? engineRef.current.getTimecodeString() : '00:00:00:00';
     const nextTake = markers.length > 0 ? Math.max(...markers.map(m => m.take || 0)) + 1 : 1;
