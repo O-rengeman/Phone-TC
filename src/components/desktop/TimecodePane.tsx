@@ -32,7 +32,7 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
       <DesktopPanel
         title={tr('label.frameRate')}
         help="timecode"
-        aside={locked ? <span className="dt-lock">{followsMaster ? 'FOLLOWING MASTER' : 'RUNNING'}</span> : undefined}
+        aside={locked ? <span className="dt-lock">{followsMaster ? tr('dt.followingMaster') : tr('dt.running')}</span> : undefined}
       >
         <div className="dt-fps-grid">
           {FPS_OPTIONS.map((opt, i) => (
@@ -59,20 +59,20 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
               className={outputMode === 'stereo' ? 'active' : ''}
               onClick={() => onOutputModeChange('stereo')}
             >
-              STEREO TC
+              {tr('out.stereoTc')}
             </button>
             <button
               type="button"
               className={outputMode === 'mono-l' ? 'active' : ''}
               onClick={() => onOutputModeChange('mono-l')}
             >
-              L-TC / R-AUDIO
+              {tr('out.ltcRaudio')}
             </button>
           </div>
         </div>
 
         <div className="dt-field">
-          <span className="dt-field-label">LEVEL</span>
+          <span className="dt-field-label">{tr('dt.level')}</span>
           <div className="dt-segment">
             <button
               type="button"
@@ -86,16 +86,16 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
               className={outputLevel === 'mic' ? 'active' : ''}
               onClick={() => setOutputLevel('mic')}
             >
-              MIC (-20dB)
+              {tr('dt.mic')}
             </button>
           </div>
         </div>
       </DesktopPanel>
 
       <DesktopPanel title={tr('dt.timing')} scroll>
-        <DesktopSection title="TC OFFSET">
+        <DesktopSection title={tr('dt.tcOffset')}>
           <div className="dt-inline dt-inline-spread">
-            <span className="dt-field-label">FRAMES</span>
+            <span className="dt-field-label">{tr('dt.frames')}</span>
             <span className="dt-value-lg">{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
           </div>
           <input
@@ -107,7 +107,7 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
             value={outputOffset}
             onChange={e => setOutputOffset(parseInt(e.target.value, 10))}
             disabled={locked}
-            aria-label="TC OFFSET (FRAMES)"
+            aria-label={tr('cm.tcOffset')}
           />
           <div className="dt-range-scale">
             <span>-10</span><span>0</span><span>+10</span>

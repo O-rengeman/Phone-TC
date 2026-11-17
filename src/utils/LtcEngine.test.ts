@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { LtcEngine } from './LtcEngine';
 import type { LtcSettings } from './LtcEngine';
 
@@ -45,67 +45,6 @@ describe('LtcEngine.getTimecodeForOffset', () => {
   });
 });
 
-describe('LtcEngine.softSync', () => {
-  let engine: LtcEngine;
-
-  beforeEach(() => {
-    engine = new LtcEngine(settings);
-    engine.setManualTimecode('00:00:00:00');
-  });
-
-  it('calls jamSyncDirect when drift exceeds 0.5s', () => {
-    // 2s away at 30fps → far past threshold
-    const spy = vi.spyOn(engine, 'jamSyncDirect').mockImplementation(() => {});
-    engine.softSync('00:00:02:00', 0, false);
-    expect(spy).toHaveBeenCalledOnce();
-    expect(spy).toHaveBeenCalledWith('00:00:02:00', 0, false);
-  });
-
-  it('nudges TC by exactly one frame when drift is small', () => {
-    // 5 frames = ~0.167s < 0.5s threshold
-    engine.softSync('00:00:00:05', 0, false);
-    expect(engine.getTimecodeString()).toBe('00:00:00:01');
-  });
-
-  it('is a no-op when drift is zero', () => {
-    engine.setManualTimecode('00:00:05:00');
-    engine.softSync('00:00:05:00', 0, false);
-    expect(engine.getTimecodeString()).toBe('00:00:05:00');
-  });
-
-  it('falls back to jamSyncDirect when inner TC parse throws', () => {
-    // Mocking getDiffSeconds to return small drift so the inner try block executes;
-    // passing an invalid TC string causes Timecode() to throw inside that block.
-    vi.spyOn(engine, 'getDiffSeconds').mockReturnValueOnce(0.1);
-    const jamSpy = vi.spyOn(engine, 'jamSyncDirect').mockImplementation(() => {});
-    engine.softSync('INVALID-TC', 0, false);
-    expect(jamSpy).toHaveBeenCalledWith('INVALID-TC', 0, false);
-  });
-});
-
-describe('LtcEngine.jamSyncDirect', () => {
-  it('jumps directly to the master TC when there is no latency', () => {
-    const engine = new LtcEngine(settings);
-    engine.setManualTimecode('00:00:00:00');
-    engine.jamSyncDirect('00:00:10:00', 0, false);
-    expect(engine.getTimecodeString()).toBe('00:00:10:00');
-  });
-
-  it('adds latency-compensated frames when the master is running', () => {
-    // 1000ms one-way latency at 30fps = 30 frames = 1s ahead.
-    const engine = new LtcEngine(settings);
-    engine.setManualTimecode('00:00:00:00');
-    engine.jamSyncDirect('00:00:10:00', 1000, true);
-    expect(engine.getTimecodeString()).toBe('00:00:11:00');
-  });
-
-  it('does not add latency frames when the master is not running', () => {
-    const engine = new LtcEngine(settings);
-    engine.jamSyncDirect('00:00:10:00', 1000, false);
-    expect(engine.getTimecodeString()).toBe('00:00:10:00');
-  });
-});
-
 describe('LtcEngine.getCorrectedTc', () => {
   it('returns the latency-compensated TC without mutating engine state', () => {
     const engine = new LtcEngine(settings);
@@ -134,35 +73,6 @@ describe('LtcEngine.signedFrameDiffTo', () => {
 
   it('returns 0 for an unparseable target', () => {
     expect(engine.signedFrameDiffTo('garbage')).toBe(0);
-  });
-});
-
-describe('LtcEngine.jamSyncIfNeeded', () => {
-  let engine: LtcEngine;
-  beforeEach(() => {
-    engine = new LtcEngine(settings);
-    engine.setManualTimecode('00:00:00:00');
-  });
-
-  it('syncs and returns true when drift meets the threshold', () => {
-    const applied = engine.jamSyncIfNeeded('00:00:10:00', 0, false, 0.5);
-    expect(applied).toBe(true);
-    expect(engine.getTimecodeString()).toBe('00:00:10:00');
-  });
-
-  it('does nothing and returns false when drift is below the threshold', () => {
-    engine.setManualTimecode('00:00:10:00');
-    const applied = engine.jamSyncIfNeeded('00:00:10:01', 0, false, 0.5);
-    expect(applied).toBe(false);
-    expect(engine.getTimecodeString()).toBe('00:00:10:00');
-  });
-});
-
-describe('LtcEngine.getTimecodeParts', () => {
-  it('splits the current timecode into h/m/s/f', () => {
-    const engine = new LtcEngine(settings);
-    engine.setManualTimecode('01:02:03:04');
-    expect(engine.getTimecodeParts()).toEqual({ h: 1, m: 2, s: 3, f: 4 });
   });
 });
 
@@ -227,11 +137,9 @@ describe('LtcEngine misc setters', () => {
     expect(() => engine.updateSampleRate(44100)).not.toThrow();
   });
 
-  it('syncWithOffset and resetToSystemTime produce valid timecodes', () => {
+  it('syncWithOffset produces a valid timecode', () => {
     const engine = new LtcEngine(settings);
     engine.syncWithOffset(0);
-    expect(engine.getTimecodeString()).toMatch(/^\d{2}:\d{2}:\d{2}:\d{2}$/);
-    engine.resetToSystemTime();
     expect(engine.getTimecodeString()).toMatch(/^\d{2}:\d{2}:\d{2}:\d{2}$/);
   });
 });

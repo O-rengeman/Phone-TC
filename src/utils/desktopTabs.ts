@@ -1,3 +1,5 @@
+import { STORAGE_KEYS } from './storage';
+
 // Tab model for the desktop console.
 //
 // Kept as pure data + pure functions (no React) so the rules that decide which
@@ -25,7 +27,7 @@ export const DESKTOP_TABS: readonly DesktopTabDef[] = [
 export const DEFAULT_DESKTOP_TAB: DesktopTabId = 'timecode';
 
 /** localStorage key holding the last selected desktop tab. */
-export const DESKTOP_TAB_STORAGE_KEY = 'ltc-desktop-tab';
+export const DESKTOP_TAB_STORAGE_KEY = STORAGE_KEYS.desktopTab;
 
 /**
  * The tabs available to this device. Some future tab may be host-only again

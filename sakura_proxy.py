@@ -8,6 +8,7 @@ import urllib.request
 import traceback
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer # マルチスレッド対応モジュールを追加
+from urllib.parse import urlparse
 
 TARGET_URL = "https://api.ai.sakura.ad.jp/v1/chat/completions"
 API_KEY_ENV = "SAKURA_API_KEY"
@@ -68,8 +69,32 @@ def determine_target_model(req_data):
     return "preview/Qwen3.6-35B-A3B", "Standard-Coding"
 
 class SakuraProxyHandler(BaseHTTPRequestHandler):
+    # localhost 以外の Origin からのブラウザリクエストを拒否する。
+    # Origin/Referer を送らない非ブラウザクライアント（curl・IDEプラグイン等）は許可。
+    _LOCAL_HOSTNAMES = {"localhost", "127.0.0.1", "::1"}
+
+    def _origin_allowed(self):
+        origin = self.headers.get("Origin") or self.headers.get("Referer") or ""
+        if not origin:
+            return True
+        host = urlparse(origin).hostname or ""
+        return host in self._LOCAL_HOSTNAMES
+
+    def _reject_origin(self):
+        sys.stdout.write(f"\n[BLOCKED] 非ローカルOriginからのリクエストを拒否: {self.headers.get('Origin') or self.headers.get('Referer')}\n")
+        try:
+            self.send_response(403)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write("Forbidden: localhost origins only".encode("utf-8"))
+        except Exception:
+            pass
+
     # CORS対応（VS Codeの仕様対策）
     def do_OPTIONS(self):
+        if not self._origin_allowed():
+            self._reject_origin()
+            return
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
@@ -90,6 +115,10 @@ class SakuraProxyHandler(BaseHTTPRequestHandler):
                 pass
 
     def _handle_post(self):
+        if not self._origin_allowed():
+            self._reject_origin()
+            return
+
         content_length = int(self.headers.get("Content-Length", 0))
         raw_body = self.rfile.read(content_length)
 

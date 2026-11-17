@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { FPS_OPTIONS } from '../constants';
+import { FPS_OPTIONS, APP_VERSION } from '../constants';
+import { formatDuration } from '../utils/battery';
 
 interface HeaderBarProps {
   isRunning: boolean;
@@ -45,13 +46,13 @@ export function HeaderBar({
     <header>
       <div className="logo-area">
         <div className="logo">LTC SYNC PRO</div>
-        <div className="version">v1.3</div>
+        <div className="version">v{APP_VERSION}</div>
       </div>
       <div className="header-right">
         <div className="hdr-status">
           {!isOnline && (
             <div className="offline-chip" style={{ background: '#d32f2f', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>
-              OFFLINE
+              {tr('status.offline')}
             </div>
           )}
           <div className={`status-pill ${isRunning ? 'live' : isPreparing ? 'prep' : 'idle'}`}>
@@ -67,7 +68,7 @@ export function HeaderBar({
             <div className={`batt-chip ${batteryLevel <= 0.15 && !isCharging ? 'low' : ''}`}>
               <span className="batt-pct">{isCharging ? '⚡' : ''}{Math.round(batteryLevel * 100)}%</span>
               {!isCharging && isRunning && batteryEta !== null && (
-                <span className="batt-eta">{batteryEta.toFixed(0)}s</span>
+                <span className="batt-eta">{formatDuration(batteryEta)}</span>
               )}
             </div>
           )}
@@ -78,8 +79,8 @@ export function HeaderBar({
             type="button"
             className="lang-btn"
             onClick={() => setLang((l: 'en' | 'ja') => (l === 'en' ? 'ja' : 'en'))}
-            aria-label="Toggle language"
-            title="Language"
+            aria-label={tr('lang.toggle')}
+            title={tr('lang.label')}
           >
             {lang === 'en' ? '日本語' : 'EN'}
           </button>

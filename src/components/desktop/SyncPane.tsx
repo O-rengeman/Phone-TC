@@ -1,11 +1,11 @@
 import { useLTC } from '../../LTCSyncContext';
 import type { SyncMode } from '../../LTCSyncContext';
 import { formatSyncAge } from '../../utils/DriftMonitor';
+import { isClientDrifting, isClientOffline } from '../../utils/clients';
 import { ConnectionManager } from '../../ConnectionManager';
 import { DesktopPanel, DesktopSection } from './DesktopPanel';
 
 const SYNC_MODES: SyncMode[] = ['system', 'network', 'p2p', 'freerun'];
-const OFFLINE_AFTER_MS = 30000;
 
 /**
  * Where the time comes from, and who is on the session. Grouped together
@@ -16,7 +16,7 @@ const OFFLINE_AFTER_MS = 30000;
 export function SyncPane() {
   const {
     isRunning, syncMode, setSyncMode, syncStatus, driftStatus,
-    p2pRole, isHost, clients, nowTick, cameraLabels,
+    p2pRole, isHost, clients, nowTick,
     isResyncing, handleManualResync,
     tr,
   } = useLTC();
@@ -43,11 +43,11 @@ export function SyncPane() {
 
           <div className="dt-stat-row">
             <div className="dt-stat">
-              <span className="dt-stat-label">LATENCY</span>
+              <span className="dt-stat-label">{tr('dt.latency')}</span>
               <strong>{syncStatus ? `${syncStatus.latency.toFixed(1)}ms` : '—'}</strong>
             </div>
             <div className="dt-stat">
-              <span className="dt-stat-label">OFFSET</span>
+              <span className="dt-stat-label">{tr('dt.offset')}</span>
               <strong>{syncStatus ? `${syncStatus.offset.toFixed(1)}ms` : '—'}</strong>
             </div>
             <div className="dt-stat">
@@ -67,7 +67,7 @@ export function SyncPane() {
             </button>
           )}
 
-          {driftStatus?.hasSync && driftStatus.msSinceSync >= 3600000 && (
+          {driftStatus?.hasSync && driftStatus.rejamRecommended && (
             <p className="dt-warn">⚠️ {tr('drift.rejam')}</p>
           )}
         </DesktopSection>
@@ -92,20 +92,20 @@ export function SyncPane() {
           <table className="dt-table">
             <thead>
               <tr>
-                <th>CAMERA</th>
+                <th>{tr('dt.camera')}</th>
                 <th>ID</th>
-                <th>RTT</th>
-                <th>DRIFT</th>
-                <th>STATUS</th>
+                <th>{tr('dt.rtt')}</th>
+                <th>{tr('dt.drift')}</th>
+                <th>{tr('dt.status')}</th>
               </tr>
             </thead>
             <tbody>
               {clientEntries.map(([id, stats], idx) => {
-                const offline = nowTick - stats.lastSeen > OFFLINE_AFTER_MS;
-                const driftWarn = Math.abs(stats.drift) >= 0.03;
+                const offline = isClientOffline(stats, nowTick);
+                const driftWarn = isClientDrifting(stats.drift);
                 return (
                   <tr key={id} className={offline ? 'offline' : ''}>
-                    <td>{cameraLabels[id] || `CAM${idx + 1}`}</td>
+                    <td>{`CAM${idx + 1}`}</td>
                     <td className="dt-mono">{id}</td>
                     <td className="dt-mono">{stats.rtt.toFixed(0)}ms</td>
                     <td className={`dt-mono ${driftWarn ? 'warn' : ''}`}>
@@ -113,7 +113,7 @@ export function SyncPane() {
                     </td>
                     <td>
                       <span className={`dt-dot ${offline ? 'offline' : driftWarn ? 'warn' : 'ok'}`} />
-                      {offline ? 'OFFLINE' : driftWarn ? 'DRIFT' : 'LOCKED'}
+                      {offline ? tr('dt.offline') : driftWarn ? tr('dt.drift') : tr('dt.locked')}
                     </td>
                   </tr>
                 );

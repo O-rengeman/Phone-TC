@@ -161,6 +161,19 @@ describe('PeerSync data handling', () => {
     expect(messages).toHaveLength(1);
     expect(messages[0].type).toBe('report');
   });
+
+  it('drops malformed payloads at the boundary instead of forwarding them', async () => {
+    const { fake, messages } = await setupOpenPeer();
+    const conn = makeConn({ open: true });
+    fake.emit('connection', conn);
+
+    conn.emit('data', 'not-an-object');
+    conn.emit('data', { type: 'bogus-type' });
+    conn.emit('data', { type: 'heartbeat' }); // missing required master fields
+    conn.emit('data', null);
+
+    expect(messages).toHaveLength(0);
+  });
 });
 
 describe('PeerSync connection lifecycle', () => {
@@ -192,6 +205,22 @@ describe('PeerSync connection lifecycle', () => {
   it('connect() is a no-op before initialize', () => {
     const ps = new PeerSync(() => {}, () => {});
     expect(() => ps.connect('TARGET')).not.toThrow();
+  });
+
+  it('connect() does not stack a second DataConnection to the same peer', async () => {
+    const { ps, fake } = await setupOpenPeer();
+    ps.connect('TARGET');
+    ps.connect('TARGET');
+    ps.connect('TARGET');
+    expect(fake.connectCalls).toHaveLength(1);
+  });
+
+  it('connect() allows a new connection after the previous one closed', async () => {
+    const { ps, fake } = await setupOpenPeer();
+    ps.connect('TARGET');
+    fake.lastConn!.emit('close');
+    ps.connect('TARGET');
+    expect(fake.connectCalls).toHaveLength(2);
   });
 });
 

@@ -9,7 +9,7 @@ interface MarkerListProps {
   exportToEDL: () => void;
   exportToALE: () => void;
   isMobile: boolean;
-  tr: (key: string) => string;
+  tr: (key: string, vars?: Record<string, string | number>) => string;
 }
 
 export function MarkerList({
@@ -60,7 +60,7 @@ export function MarkerList({
                     <div className={`color-dot ${m.color.toLowerCase()}`}>{m.color.charAt(0)}</div>
                     <span className="m-tc">{m.tc}</span>
                     <span className="m-take">
-                      Sc.{m.sceneName || '001'} Tk.{m.take}
+                      {tr('marker.sceneTake', { scene: m.sceneName || '001', take: m.take })}
                     </span>
                   </div>
                   <div className="marker-row-right">

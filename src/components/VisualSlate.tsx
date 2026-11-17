@@ -1,9 +1,9 @@
 import { QRCodeCanvas } from 'qrcode.react';
 import { FPS_OPTIONS } from '../constants';
 import type { Marker } from '../utils/export';
+import { useSlateTime } from '../slateTimeContext';
 
 interface VisualSlateProps {
-  slateTime: string;
   isSlateFlashing: boolean;
   handleSlateClick: () => void;
   defaultReelName: string;
@@ -11,12 +11,11 @@ interface VisualSlateProps {
   markers: Marker[];
   fpsIndex: number;
   userBits: string;
-  tr: (key: string) => string;
+  tr: (key: string, vars?: Record<string, string | number>) => string;
   setIsVisualSlate: (v: boolean) => void;
 }
 
 export function VisualSlate({
-  slateTime,
   isSlateFlashing,
   handleSlateClick,
   defaultReelName,
@@ -27,18 +26,21 @@ export function VisualSlate({
   tr,
   setIsVisualSlate,
 }: VisualSlateProps) {
+  // Consumed from its own context so ~30fps TC updates re-render only this
+  // overlay — not every useLTC() consumer in the tree.
+  const slateTime = useSlateTime();
   return (
     <div className={`visual-slate-overlay ${isSlateFlashing ? 'flashing' : ''}`}>
       <div className="slate-tap-area" onClick={handleSlateClick} />
       <div className="slate-content">
         <div className="slate-tc">{slateTime}</div>
         <div className="slate-metadata-row">
-          <div>REEL: {defaultReelName}</div>
-          <div>SCENE: {sceneName}</div>
-          <div>TAKE: {markers.length > 0 ? Math.max(...markers.map(m => m.take || 0)) + 1 : 1}</div>
+          <div>{tr('slate.reel')}: {defaultReelName}</div>
+          <div>{tr('slate.scene')}: {sceneName}</div>
+          <div>{tr('slate.take')}: {markers.length > 0 ? Math.max(...markers.map(m => m.take || 0)) + 1 : 1}</div>
         </div>
         <div className="slate-info">
-          {FPS_OPTIONS[fpsIndex].label} FPS | UBIT: {userBits}
+          {tr('slate.info', { fps: FPS_OPTIONS[fpsIndex].label, ubit: userBits })}
         </div>
         <div className="slate-qr">
           <QRCodeCanvas value={slateTime} size={256} level="L" includeMargin={true} />
@@ -48,7 +50,7 @@ export function VisualSlate({
       <button
         className="slate-close-btn"
         onClick={(e) => { e.stopPropagation(); setIsVisualSlate(false); }}
-        aria-label="Close Slate"
+        aria-label={tr('slate.ariaClose')}
       >
         ×
       </button>

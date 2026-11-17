@@ -46,10 +46,14 @@ export function buildEdl(markers: Marker[], isDropFrame: boolean): string {
 
 /** Builds an Avid ALE string from logged markers. */
 export function buildAle(markers: Marker[], fpsLabel: string): string {
-  let ale = `Heading\nFIELD_DELIM\tTABS\nVIDEO_FORMAT\t1080\nFPS\t${fpsLabel}\n\nColumn\nName\tTracks\tStart\tEnd\tScene\tTake\tDescription\n\nData\n`;
+  const safeFps = sanitize(fpsLabel);
+  let ale = `Heading\nFIELD_DELIM\tTABS\nVIDEO_FORMAT\t1080\nFPS\t${safeFps}\n\nColumn\nName\tTracks\tStart\tEnd\tScene\tTake\tDescription\n\nData\n`;
   markers.forEach((m) => {
-    const commentPart = m.comment ? ` - ${m.comment}` : '';
-    ale += `Scene ${m.sceneName} Take ${m.take}\tV\t${m.tc}\t${m.tc}\t${m.sceneName}\t${m.take}\t${m.color} marker at ${m.time}${commentPart}\n`;
+    // Same sanitization rule as EDL: user-entered scene names/comments can
+    // contain tabs/newlines that would corrupt the TAB-delimited ALE rows.
+    const scene = sanitize(m.sceneName);
+    const commentPart = m.comment ? ` - ${sanitize(m.comment)}` : '';
+    ale += `Scene ${scene} Take ${m.take}\tV\t${sanitize(m.tc)}\t${sanitize(m.tc)}\t${scene}\t${m.take}\t${m.color} marker at ${sanitize(m.time)}${commentPart}\n`;
   });
   return ale;
 }

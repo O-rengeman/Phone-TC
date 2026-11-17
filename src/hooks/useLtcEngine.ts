@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
-import Timecode from 'smpte-timecode';
 import { LtcEngine } from '../utils/LtcEngine';
 import type { LtcSettings } from '../utils/LtcEngine';
 import { TimeSync } from '../utils/TimeSync';
-import type { PeerSync, SyncMessage } from '../utils/PeerSync';
+import type { PeerSync } from '../utils/PeerSync';
 import type { DriftMonitor, DriftStatus } from '../utils/DriftMonitor';
 import { TimecodeNativeBridge } from '../utils/TimecodeNativeBridge';
 import { t as translate } from '../utils/i18n';
@@ -11,6 +10,8 @@ import type { Lang } from '../utils/i18n';
 import { debug } from '../utils/log';
 import { LTC_WORKLET_SOURCE } from '../audio/ltcWorkletSource';
 import { FPS_OPTIONS } from '../constants';
+import { effectiveOutputVolume } from '../utils/audioLevel';
+import { offsetMsWithOutputOffset, shiftTimecode } from '../utils/timecode';
 import type { SyncMode } from '../LTCSyncContext';
 
 type ToastLevel = 'info' | 'warn' | 'error';
@@ -101,7 +102,7 @@ export function useLtcEngine({
     const settings: LtcSettings = {
       fps: FPS_OPTIONS[fpsIndex].value,
       sampleRate: 48000,
-      volume: outputLevel === 'line' ? volume : volume * 0.1,
+      volume: effectiveOutputVolume(volume, outputLevel),
       isDropFrame: FPS_OPTIONS[fpsIndex].drop,
       userBits: userBits,
       outputMode: outputMode,
@@ -121,16 +122,21 @@ export function useLtcEngine({
     }
   }, [fpsIndex, engineRef]);
 
+  // The engine's stored volume is the *effective* output volume — mic inputs
+  // are attenuated. This effect is the single writer; the worklet receives
+  // the same value via 'config' messages below.
   useEffect(() => {
-    if (engineRef.current) engineRef.current.setVolume(volume);
-  }, [volume, engineRef]);
+    if (engineRef.current) {
+      engineRef.current.setVolume(effectiveOutputVolume(volume, outputLevel));
+    }
+  }, [volume, outputLevel, engineRef]);
 
   useEffect(() => {
     const node = workletNodeRef.current;
     if (isRunning && node) {
       node.port.postMessage({
         type: 'config',
-        volume: outputLevel === 'line' ? volume : volume * 0.1,
+        volume: effectiveOutputVolume(volume, outputLevel),
         ubit: userBits,
         mode: outputMode,
       });
@@ -186,7 +192,7 @@ export function useLtcEngine({
         fpsNum: FPS_OPTIONS[fpsIndex].fpsNum,
         fpsDen: FPS_OPTIONS[fpsIndex].fpsDen,
         framesPerSec: Math.round(FPS_OPTIONS[fpsIndex].fpsNum / FPS_OPTIONS[fpsIndex].fpsDen),
-        volume: outputLevel === 'line' ? volume : volume * 0.1,
+        volume: effectiveOutputVolume(volume, outputLevel),
         ubit: userBits,
         mode: outputMode,
         h: currentTC[0], m: currentTC[1], s: currentTC[2], f: currentTC[3]
@@ -238,26 +244,31 @@ export function useLtcEngine({
     setIsRunning(false);
     driftMonitorRef.current.reset();
     setDriftStatus(null);
-    if (reset && engineRef.current) {
-      if (syncMode === 'freerun') {
-        try {
-          const tc = Timecode(manualTimecode, FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
-          if (outputOffset !== 0) tc.add(outputOffset);
-          engineRef.current.setManualTimecode(tc.toString());
-        } catch {
-          engineRef.current.setManualTimecode(manualTimecode);
-        }
-      } else if (syncMode === 'network' && lastNetworkOffsetRef.current !== null) {
-        const frameMs = 1000 / FPS_OPTIONS[fpsIndex].value;
-        engineRef.current.syncWithOffset(lastNetworkOffsetRef.current + (outputOffset * frameMs));
-      } else {
-        const frameMs = 1000 / FPS_OPTIONS[fpsIndex].value;
-        engineRef.current.syncWithOffset(outputOffset * frameMs);
-      }
-      currentTcRef.current = engineRef.current.getTimecodeString();
+    if (reset) {
+      // Reset to the same starting timecode startSequence would compute —
+      // previously this path had its own (different) branch logic that
+      // ignored the p2p-master-manual case and duplicated the offset math.
+      const baseOffset = syncMode === 'network' ? (lastNetworkOffsetRef.current ?? 0) : 0;
+      applyInitialTimecode(baseOffset);
+      currentTcRef.current = engineRef.current!.getTimecodeString();
     }
     void TimecodeNativeBridge.stopBackgroundMode();
   };
+
+  // Single source of truth for "what timecode does the engine start from" —
+  // used by both startSequence and stopEngine(reset). baseOffsetMs is the
+  // network offset already measured by the caller (0 when unavailable).
+  const applyInitialTimecode = useCallback((baseOffsetMs: number) => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const fps = FPS_OPTIONS[fpsIndex].value;
+    const drop = FPS_OPTIONS[fpsIndex].drop;
+    if (syncMode === 'freerun' || (syncMode === 'p2p' && p2pRole === 'master' && p2pSyncSource === 'manual')) {
+      engine.setManualTimecode(shiftTimecode(manualTimecode, outputOffset, fps, drop));
+    } else {
+      engine.syncWithOffset(offsetMsWithOutputOffset(baseOffsetMs, outputOffset, fps));
+    }
+  }, [syncMode, p2pRole, p2pSyncSource, manualTimecode, outputOffset, fpsIndex, engineRef]);
 
   const startSequence = async () => {
     setIsPreparing(true);
@@ -282,31 +293,14 @@ export function useLtcEngine({
 
         if (engineRef.current && syncMode === 'p2p' && p2pRole === 'client') {
           if (peerSyncRef.current) {
-            const msg: SyncMessage = {
+            peerSyncRef.current.broadcast({
               type: 'sync-request',
-              masterTimecode: '',
-              masterTimestamp: 0,
-              fps: 0,
-              isDropFrame: false,
-              isRunning: false,
               clientTimestamp: performance.now()
-            };
-            peerSyncRef.current.broadcast(msg);
+            });
           }
           lastSyncTimeRef.current = Date.now();
-        } else if (engineRef.current) {
-          if (syncMode === 'freerun' || (syncMode === 'p2p' && p2pRole === 'master' && p2pSyncSource === 'manual')) {
-            try {
-              const tc = Timecode(manualTimecode, FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
-              if (outputOffset !== 0) tc.add(outputOffset);
-              engineRef.current.setManualTimecode(tc.toString());
-            } catch {
-              engineRef.current.setManualTimecode(manualTimecode);
-            }
-          } else {
-            const frameMs = 1000 / FPS_OPTIONS[fpsIndex].value;
-            engineRef.current.syncWithOffset(offset + (outputOffset * frameMs));
-          }
+        } else {
+          applyInitialTimecode(offset);
         }
       }
 
@@ -345,7 +339,7 @@ export function useLtcEngine({
       osc.stop(0.1);
 
       if (ctx.sampleRate !== 48000 && ctx.sampleRate !== 44100) {
-        addToast(`SAMPLE RATE: ${ctx.sampleRate}Hz - LTC TIMING MAY DRIFT`, 'warn');
+        addToast(translate('toast.sampleRate', langRef.current, { rate: ctx.sampleRate }), 'warn');
       }
 
       if (engineRef.current) {

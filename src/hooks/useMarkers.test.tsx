@@ -139,19 +139,27 @@ describe('useMarkers', () => {
   });
 
   it('backs up markers to native filesystem only when running on a native platform', () => {
+    // The filesystem backup is debounced (comment keystrokes rewrite markers
+    // constantly) — advance past the debounce window to observe the write.
+    vi.useFakeTimers();
     isNativePlatform.mockReturnValue(true);
     const { result } = renderHook(() => useMarkers(makeParams()));
     act(() => result.current.addMarker('Red'));
+    act(() => { vi.advanceTimersByTime(2100); });
 
     expect(writeFile).toHaveBeenCalledWith(expect.objectContaining({ path: 'ltc_sync_pro_backup.json' }));
+    vi.useRealTimers();
   });
 
   it('does not touch the filesystem when not on a native platform', () => {
+    vi.useFakeTimers();
     isNativePlatform.mockReturnValue(false);
     const { result } = renderHook(() => useMarkers(makeParams()));
     act(() => result.current.addMarker('Red'));
+    act(() => { vi.advanceTimersByTime(2100); });
 
     expect(writeFile).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it('exportToEDL is a no-op with zero markers', () => {

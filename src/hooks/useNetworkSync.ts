@@ -4,7 +4,8 @@ import type { LtcEngine } from '../utils/LtcEngine';
 import type { DriftMonitor, DriftStatus } from '../utils/DriftMonitor';
 import { t as translate } from '../utils/i18n';
 import type { Lang } from '../utils/i18n';
-import { FPS_OPTIONS } from '../constants';
+import { FPS_OPTIONS, DRIFT_RESYNC_THRESHOLD_SEC } from '../constants';
+import { offsetMsWithOutputOffset } from '../utils/timecode';
 import type { SyncMode } from '../LTCSyncContext';
 
 type ToastLevel = 'info' | 'warn' | 'error';
@@ -15,7 +16,6 @@ const DRIFT_TICK_MS = 1000;
 // Correction thresholds: ~1 frame at 30fps, or the NTP offset itself moved
 // by 33ms since the last applied correction.
 const OFFSET_DELTA_THRESHOLD_MS = 33;
-const DRIFT_THRESHOLD_SEC = 0.033;
 
 interface UseNetworkSyncParams {
   syncMode: SyncMode;
@@ -79,11 +79,18 @@ export function useNetworkSync({
         const offsetDelta = lastOffset !== null ? Math.abs(result.offset - lastOffset) : Infinity;
         const targetTc = engine.getTimecodeForOffset(result.offset);
         const driftSec = engine.getDiffSeconds(targetTc);
-        const shouldCorrect = offsetDelta >= OFFSET_DELTA_THRESHOLD_MS || driftSec >= DRIFT_THRESHOLD_SEC;
+        const shouldCorrect = offsetDelta >= OFFSET_DELTA_THRESHOLD_MS || driftSec >= DRIFT_RESYNC_THRESHOLD_SEC;
 
         if (shouldCorrect) {
           applySyncToWorklet(targetTc, 0, true);
-          engine.syncWithOffset(result.offset);
+          // Must include the user's output offset, same as the manual resync
+          // path — previously this dropped it and silently disagreed with
+          // startSequence/manual resync by outputOffset frames.
+          engine.syncWithOffset(offsetMsWithOutputOffset(
+            result.offset,
+            outputOffset,
+            FPS_OPTIONS[fpsIndex].value,
+          ));
           lastNetworkOffsetRef.current = result.offset;
         }
       } catch (e) {
@@ -92,7 +99,7 @@ export function useNetworkSync({
     }, NETWORK_SYNC_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [syncMode, isRunning, p2pRole, applySyncToWorklet, driftMonitorRef, engineRef, lastNetworkOffsetRef]);
+  }, [syncMode, isRunning, p2pRole, fpsIndex, outputOffset, applySyncToWorklet, driftMonitorRef, engineRef, lastNetworkOffsetRef]);
 
   useEffect(() => {
     if (syncMode !== 'network' || !isRunning) return;
@@ -112,8 +119,7 @@ export function useNetworkSync({
       driftMonitorRef.current.addSync(result.offset);
       const engine = engineRef.current;
       if (engine && p2pRole !== 'master') {
-        const frameMs = 1000 / FPS_OPTIONS[fpsIndex].value;
-        engine.syncWithOffset(result.offset + (outputOffset * frameMs));
+        engine.syncWithOffset(offsetMsWithOutputOffset(result.offset, outputOffset, FPS_OPTIONS[fpsIndex].value));
         lastNetworkOffsetRef.current = result.offset;
         if (isRunning) {
           applySyncToWorklet(engine.getTimecodeForOffset(result.offset), 0, true);

@@ -1,8 +1,10 @@
 import { useLTC } from "./LTCSyncContext";
+import { formatP2pStatus } from "./utils/p2pStatus";
 
 export function ConnectionManager() {
   const {
     tr,
+    lang,
     p2pRole,
     setupP2PMaster,
     setupP2PClient,
@@ -26,8 +28,8 @@ export function ConnectionManager() {
     const url = new URL(window.location.href);
     url.searchParams.set('join', peerId);
     navigator.clipboard.writeText(url.toString())
-      .then(() => addToast('Invite Link Copied!', 'info'))
-      .catch(() => addToast('Copy failed - copy the ID manually', 'error'));
+      .then(() => addToast(tr('toast.inviteCopied'), 'info'))
+      .catch(() => addToast(tr('toast.copyFailed'), 'error'));
   };
 
   return (
@@ -51,34 +53,34 @@ export function ConnectionManager() {
                   <span>ID: {peerId || '...'}</span>
                   {peerId && (
                     <button className="btn-small" onClick={copyInviteLink}>
-                      🔗 COPY LINK
+                      {tr('p2p.copyLink')}
                     </button>
                   )}
                 </div>
                 
                 <div className="control-section">
-                  <label className="section-label">START SOURCE</label>
+                  <label className="section-label">{tr('p2p.startSource')}</label>
                   <div className="sync-toggle-pro">
                     <button 
                       className={p2pSyncSource === 'manual' ? 'active' : ''} 
                       onClick={() => setP2pSyncSource('manual')}
                       disabled={isRunning}
                     >
-                      MANUAL TC
+                      {tr('p2p.manualTc')}
                     </button>
                     <button 
                       className={p2pSyncSource === 'network' ? 'active' : ''} 
                       onClick={() => setP2pSyncSource('network')}
                       disabled={isRunning}
                     >
-                      NETWORK TIME
+                      {tr('p2p.networkTime')}
                     </button>
                   </div>
                 </div>
 
                 {p2pSyncSource === 'manual' && (
                   <div className="start-tc-input">
-                    <label>START TC</label>
+                    <label>{tr('p2p.startTc')}</label>
                     <input 
                       value={manualTimecode} 
                       onChange={e => setManualTimecode(e.target.value)} 
@@ -92,22 +94,22 @@ export function ConnectionManager() {
             {p2pRole === 'client' && (
               <div className="p2p-client-box">
                 <input 
-                  placeholder="ENTER MASTER ID" 
+                  placeholder={tr('p2p.enterMasterId')} 
                   value={targetId} 
                   maxLength={8}
                   onChange={e => setTargetId(e.target.value.toUpperCase())} 
                 />
-                <button onClick={joinSession}>LINK</button>
+                <button onClick={joinSession}>{tr('p2p.link')}</button>
               </div>
             )}
-            <div className={`p2p-status-mini ${p2pStatus.includes('ERROR') ? 'error' : ''}`}>{p2pStatus}</div>
+            <div className={`p2p-status-mini ${p2pStatus.includes('ERROR') ? 'error' : ''}`}>{formatP2pStatus(p2pStatus, lang)}</div>
           </div>
         )}
       </div>
 
       {import.meta.env.DEV && (
         <div className="control-section dev-panel">
-          <label className="section-label dev-label">DEV: PACKET LOSS SIM</label>
+          <label className="section-label dev-label">{tr('p2p.devSim')}</label>
           <div className="dev-sim-row">
             <input
               type="range" 
