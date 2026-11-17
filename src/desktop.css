@@ -865,3 +865,93 @@
    across the room, which a row of small text is not. */
 .desktop-view .dt-table-obs tr.obs-row-program td { color: #ff5a5a; font-weight: 700; }
 .desktop-view .dt-table-obs tr.obs-row-preview td { color: #35d07f; }
+
+/* ── Keyboard & polish ────────────────────────────────────────────────── */
+
+/* Now that the console has real shortcuts (SPACE transport, R/B/G/Y marks,
+   Alt+digit tabs), focus has to be visible everywhere it can land. */
+.desktop-view .dt-tab:focus-visible,
+.desktop-view .dt-segment button:focus-visible,
+.desktop-view .dt-chip:focus-visible,
+.desktop-view .dt-btn:focus-visible,
+.desktop-view .dt-btn-sm:focus-visible,
+.desktop-view .dt-btn-icon:focus-visible,
+.desktop-view .dt-input:focus-visible {
+  outline: 2px solid #ff3b71;
+  outline-offset: 2px;
+}
+
+/* .dt-input:focus already restyles the border; keep the ring off it so the
+   two treatments don't stack into a double outline. */
+.desktop-view .dt-input:focus-visible { outline: none; }
+
+/* Press feedback: every clickable surface gives a 1px "seat" on activation. */
+.desktop-view .dt-btn:active:not(:disabled),
+.desktop-view .dt-btn-sm:active:not(:disabled),
+.desktop-view .dt-btn-icon:active,
+.desktop-view .dt-chip:active:not(:disabled),
+.desktop-view .dt-tab:active,
+.desktop-view .dt-segment button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.desktop-view .dt-btn,
+.desktop-view .dt-btn-sm,
+.desktop-view .dt-chip,
+.desktop-view .dt-tab,
+.desktop-view .dt-btn-icon {
+  transition: transform 0.06s ease;
+}
+
+/* LIVE gets an on-air pulse dot so the state reads at a glance from across
+   the room — the same language the REC dot in the timecode canvas uses. */
+.desktop-view .dt-readout-stat strong.live::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #ff3b71;
+  vertical-align: 1px;
+  animation: dt-live-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes dt-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.desktop-view .dt-readout-stat strong {
+  transition: color 0.2s ease;
+}
+
+/* Row hover on the two data tables — the eye needs a rail when scanning a
+   long client or marker list. */
+.desktop-view .dt-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+/* The re-jam warning is the one message on the sync tab that must not be
+   missed, so it gets a warning rail instead of floating as plain text. */
+.desktop-view .dt-warn {
+  padding: 7px 10px;
+  background: rgba(245, 166, 35, 0.09);
+  border-left: 3px solid #f5a623;
+  border-radius: 4px;
+}
+
+/* Panel headers pick up a faint top light so the console doesn't read as one
+   flat dark sheet. */
+.desktop-view .dt-panel-head {
+  background: linear-gradient(rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.18));
+}
+
+/* The shortcut legend at the foot of the timecode pane is a caption, not
+   body text — set it apart with a rule, and span the pane's three columns
+   since it sits as a direct grid child. */
+.desktop-view .dt-pane-timecode > .dt-hint-keys {
+  grid-column: 1 / -1;
+  padding-top: var(--dt-gap);
+  border-top: 1px solid var(--dt-line-soft);
+}

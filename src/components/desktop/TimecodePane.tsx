@@ -134,6 +134,8 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
           </div>
           <p className="dt-hint">{tr('dt.hint.startTc')}</p>
         </DesktopSection>
+
+        <p className="dt-hint dt-hint-keys">{tr('dt.hint.transport')}</p>
       </DesktopPanel>
     </div>
   );

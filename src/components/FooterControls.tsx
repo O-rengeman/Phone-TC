@@ -44,6 +44,7 @@ export function FooterControls({
             onPointerLeave={cancelStopHold}
             onContextMenu={(e) => e.preventDefault()}
             disabled={isPreparing || (syncMode === 'p2p' && p2pRole === 'client')}
+            title={isRunning ? `${tr('btn.holdToStop')} [SPACE]` : `${isPaused ? tr('btn.resume') : tr('btn.start')} [SPACE]`}
           >
             {isRunning && <div className="stop-hold-fill" style={{ width: `${stopHoldPct}%` }} />}
             <div className="btn-icon"></div>
@@ -64,10 +65,10 @@ export function FooterControls({
         <div className="footer-right">
           <div className="mark-label">{tr('btn.mark')}</div>
           <div className="mark-colors-container">
-            <button className="btn-mark-color red" onClick={() => addMarker('Red')} title={tr('marker.redTitle')}>R</button>
-            <button className="btn-mark-color blue" onClick={() => addMarker('Blue')} title={tr('marker.blueTitle')}>B</button>
-            <button className="btn-mark-color green" onClick={() => addMarker('Green')} title={tr('marker.greenTitle')}>G</button>
-            <button className="btn-mark-color yellow" onClick={() => addMarker('Yellow')} title={tr('marker.yellowTitle')}>Y</button>
+            <button className="btn-mark-color red" onClick={() => addMarker('Red')} title={`${tr('marker.redTitle')} [R]`}>R</button>
+            <button className="btn-mark-color blue" onClick={() => addMarker('Blue')} title={`${tr('marker.blueTitle')} [B]`}>B</button>
+            <button className="btn-mark-color green" onClick={() => addMarker('Green')} title={`${tr('marker.greenTitle')} [G]`}>G</button>
+            <button className="btn-mark-color yellow" onClick={() => addMarker('Yellow')} title={`${tr('marker.yellowTitle')} [Y]`}>Y</button>
           </div>
         </div>
       </div>
