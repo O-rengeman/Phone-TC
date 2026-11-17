@@ -180,13 +180,13 @@ const en: Dict = {
   'help.sync.tip2': 'Tip: the frame rate cannot be changed while output is running. Stop first, change it, then start again.',
 
   'help.markers.title': 'Logging takes and exporting',
-  'help.markers.summary': 'Mark moments while you shoot, annotate them between takes, then hand the editor an EDL or ALE with the timecode already in it.',
+  'help.markers.summary': 'Mark moments while you shoot, annotate them between takes, then hand the editor EDL, ALE, FCPXML, Resolve markers or CSV with timecode.',
   'help.markers.s1': 'While shooting, press [[R]] / [[B]] / [[G]] / [[Y]] in the footer to stamp the current timecode. Use the colours however suits you — for example R for a bad take, G for a good one.',
   'help.markers.s2': 'Open the [[MARKERS]] tab (Alt+3) to see everything you stamped.',
   'help.markers.s3': 'Type into the comment field on any row to describe the take. It is saved as you type.',
   'help.markers.s4': 'Fill in REEL (for example A001) and SCENE under METADATA — both are written into the exported file.',
   'help.markers.s5': 'USER BITS fills itself with the shoot date while [[AUTO (DATE)]] is on. Turn it off to type your own.',
-  'help.markers.s6': 'Export with [[EDL]] for most edit systems or [[ALE]] for Avid. Both stay disabled until there is at least one marker.',
+  'help.markers.s6': 'Export [[EDL]], [[ALE]] for Avid, [[FCPXML]] for Final Cut Pro, [[Resolve]] timeline markers (import the EDL as timeline markers), or [[CSV]] for spreadsheets. Exports stay disabled until there is at least one marker. Use the same frame rate as your recording.',
   'help.markers.tip1': 'Tip: markers survive unplugging the cable or backgrounding the app — they are only cleared when you clear them.',
   'help.markers.tip2': 'Tip: stamp at the head of each take rather than the tail; an editor searching for a take looks for where it starts.',
 
@@ -455,13 +455,13 @@ const ja: Dict = {
   'help.sync.tip2': 'ヒント：出力中はフレームレートを変更できません。いったん停止してから変更し、再度スタートしてください。',
 
   'help.markers.title': 'テイクを記録して書き出す',
-  'help.markers.summary': '撮影中に打刻し、テイクの合間にコメントを付けて、タイムコード入りのEDL／ALEとして編集に渡します。',
+  'help.markers.summary': '撮影中に打刻し、テイクの合間にコメントを付けて、タイムコード入りのEDL／ALE／FCPXML／Resolveマーカー／CSVとして編集に渡します。',
   'help.markers.s1': '撮影中、画面下の[[R]]／[[B]]／[[G]]／[[Y]]を押すと、その瞬間のタイムコードが記録されます。色の使い分けは自由です（例：R＝NG、G＝OK）。',
   'help.markers.s2': '[[マーカー]]タブ（Alt+3）を開くと、打刻した一覧が表示されます。',
   'help.markers.s3': '各行のコメント欄に「テイク2 OK」などを直接入力できます。入力した時点で保存されます。',
   'help.markers.s4': 'METADATA でリール名（例：A001）とシーン名を入れておきます。どちらも書き出しファイルに含まれます。',
   'help.markers.s5': 'USER BITS は[[自動（日付）]]がオンの間、撮影日が自動で入ります。自分で入力したいときはオフにします。',
-  'help.markers.s6': '書き出しは、一般的な編集ソフト向けなら[[EDL]]、Avid向けなら[[ALE]]。打刻が1件もないうちはどちらも押せません。',
+  'help.markers.s6': '[[EDL]]、Avid向けの[[ALE]]、Final Cut Pro向けの[[FCPXML]]、[[Resolve]]のタイムラインマーカー（EDLをタイムラインマーカーとして読み込み）、表計算用の[[CSV]]で書き出せます。打刻が1件もないうちは押せません。撮影時と同じフレームレートで書き出してください。',
   'help.markers.tip1': 'ヒント：マーカーはケーブルを抜いてもアプリを裏に回しても残ります。消えるのは自分で消したときだけです。',
   'help.markers.tip2': 'ヒント：打刻はテイクの終わりより頭で。編集側はテイクの開始位置を探すためです。',
 

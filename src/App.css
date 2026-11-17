@@ -983,6 +983,7 @@ input[type="range"] {
 
 .marker-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
@@ -1439,6 +1440,7 @@ input[type="range"] {
 
 .export-group {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 8px;
 }
@@ -6891,4 +6893,3 @@ input[type="range"] {
     grid-template-columns: 1fr;
   }
 }
-

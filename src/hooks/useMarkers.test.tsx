@@ -50,6 +50,24 @@ afterEach(() => {
 });
 
 describe('useMarkers', () => {
+  it.each(['exportToFCPXML', 'exportToResolve', 'exportToCSV'] as const)('%s saves, skips empty logs and reports save failures', async action => {
+    isNativePlatform.mockReturnValue(true);
+    const addToast = vi.fn();
+    const { result } = renderHook(() => useMarkers(makeParams({ addToast })));
+    act(() => result.current[action]());
+    expect(writeFile).not.toHaveBeenCalled();
+    act(() => result.current.addMarker('Red'));
+    await act(async () => { result.current[action](); await Promise.resolve(); });
+    const suffix = { exportToFCPXML: '.fcpxml', exportToResolve: '_resolve_markers.edl', exportToCSV: '.csv' }[action];
+    expect(writeFile).toHaveBeenCalledWith(expect.objectContaining({ path: expect.stringContaining(suffix) as unknown as string }));
+    if (action === 'exportToCSV') expect((writeFile.mock.calls[0][0] as { data: string }).data.charCodeAt(0)).toBe(0xFEFF);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    writeFile.mockRejectedValueOnce(new Error('disk full'));
+    await act(async () => { result.current[action](); await Promise.resolve(); });
+    expect(addToast).toHaveBeenLastCalledWith(expect.any(String), 'error');
+  });
+
+
   it('does not log stopped heartbeat drift or an age until a P2P sync is applied', () => {
     const lastSyncRef = { current: 0 };
     const { result } = renderHook(() => useMarkers(makeParams({ syncMode: 'p2p', p2pDriftSeconds: 0.012, p2pLastSyncRef: lastSyncRef })));
