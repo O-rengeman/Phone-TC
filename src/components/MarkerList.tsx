@@ -1,5 +1,6 @@
 import { HelpButton } from './HelpButton';
 import type { Marker } from '../utils/export';
+import { MarkerSyncBadge } from './MarkerSyncBadge';
 
 interface MarkerListProps {
   markers: Marker[];
@@ -76,6 +77,7 @@ export function MarkerList({
                   </div>
                 </div>
                 <div className="marker-comment-row">
+                  <MarkerSyncBadge sync={m.sync} tr={tr} />
                   <input
                     type="text"
                     className="marker-comment-input"

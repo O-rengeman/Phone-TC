@@ -1,5 +1,6 @@
 import { useLTC } from '../../LTCSyncContext';
 import { DesktopPanel, DesktopSection } from './DesktopPanel';
+import { MarkerSyncBadge } from '../MarkerSyncBadge';
 
 /**
  * The take log: markers laid down during a shot, the metadata that ends up in
@@ -106,7 +107,7 @@ export function MarkersPane() {
               {markers.map((marker, idx) => (
                 <tr key={marker.id}>
                   <td className="dt-mono">{idx + 1}</td>
-                  <td className="dt-mono dt-marker-tc">{marker.tc}</td>
+                  <td className="dt-mono dt-marker-tc">{marker.tc}<br /><MarkerSyncBadge sync={marker.sync} tr={tr} /></td>
                   <td className="dt-mono">{tr('marker.sceneTake', { scene: marker.sceneName || '001', take: marker.take })}</td>
                   <td>
                     <span className={`dt-marker-dot ${marker.color.toLowerCase()}`} />

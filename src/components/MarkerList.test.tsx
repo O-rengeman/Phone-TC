@@ -16,6 +16,16 @@ const makeMarker = (overrides: Partial<Marker> = {}): Marker => ({
 });
 
 describe('MarkerList', () => {
+  it('renders localized sync badges with confidence colors and hides legacy badges', () => {
+    render(<MarkerList {...baseProps} markers={[
+      makeMarker({ sync: { method: 'network', driftMs: 1.2, driftFrames: 0.03, msSinceSync: 1000, confidence: 'high' } }),
+      makeMarker({ id: 2, sync: { method: 'freerun', driftMs: null, driftFrames: null, msSinceSync: null, confidence: 'none' } }),
+      makeMarker({ id: 3 }),
+    ]} />);
+    expect(screen.getByText('marker.sync.network ±1.2ms').className).toContain('marker-sync-high');
+    expect(screen.getByText('marker.sync.freerun').className).toContain('marker-sync-none');
+    expect(document.querySelectorAll('.marker-sync-badge')).toHaveLength(2);
+  });
   const baseProps = {
     markers: [] as Marker[],
     addMarker: vi.fn(),
