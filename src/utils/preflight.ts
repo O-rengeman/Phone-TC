@@ -14,7 +14,7 @@ export interface PreflightState {
   batteryLevel: number | null;
   isCharging: boolean;
   syncMode: SyncMode;
-  syncStatus: { offset: number; latency: number } | null;
+  syncStatus: { offset: number; latency: number; fromCache?: boolean } | null;
   driftStatus: DriftStatus | null;
   isPreparing: boolean;
   isResyncing: boolean;
@@ -42,6 +42,7 @@ export function getPreflightChecks(s: PreflightState): PreflightCheck[] {
     && s.batteryLevel >= 0 && s.batteryLevel <= 1;
   const batteryOk = batteryKnown && (s.isCharging || s.batteryLevel! > 0.20);
   const networkKnown = s.syncStatus !== null
+    && !s.syncStatus.fromCache
     && Number.isFinite(s.syncStatus.offset) && Number.isFinite(s.syncStatus.latency);
   let syncOk = false;
   let syncDetail = 'preflight.syncMissing';
@@ -52,7 +53,7 @@ export function getPreflightChecks(s: PreflightState): PreflightCheck[] {
     syncDetail = s.syncMode === 'system' ? 'preflight.syncSystem' : 'preflight.syncFree';
   } else if (s.syncMode === 'network') {
     syncOk = networkKnown && !!s.driftStatus?.hasSync && !s.driftStatus.rejamRecommended;
-    syncDetail = syncOk ? 'preflight.syncNetwork' : 'preflight.syncMissing';
+    syncDetail = syncOk ? 'preflight.syncNetwork' : s.syncStatus?.fromCache ? 'preflight.syncCached' : 'preflight.syncMissing';
   } else if (s.p2pRole === 'client') {
     syncOk = /^(SYNCED|OK) \(/.test(s.p2pStatus) && s.masterDrift !== null
       && Number.isFinite(s.masterDrift) && Math.abs(s.masterDrift) < CLIENT_DRIFT_WARN_SEC;

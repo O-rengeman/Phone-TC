@@ -39,10 +39,12 @@ describe('preflight readiness', () => {
   it('does not pass missing, stale or pending network sync', () => {
     for (const patch of [
       { syncStatus: null }, { syncStatus: { offset: NaN, latency: 12 } },
+      { syncStatus: { offset: 4, latency: 12, fromCache: true } },
       { driftStatus: null }, { driftStatus: { ...healthyPreflight.driftStatus!, hasSync: false } },
       { driftStatus: { ...healthyPreflight.driftStatus!, rejamRecommended: true } },
       { isPreparing: true }, { isResyncing: true },
     ]) expect(check('sync', patch).ok).toBe(false);
+    expect(check('sync', { syncStatus: { offset: 4, latency: 12, fromCache: true } }).detail).toBe('preflight.syncCached');
   });
 
   it.each(['system', 'freerun'] as const)('labels %s explicitly as local-only', syncMode => {

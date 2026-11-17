@@ -78,7 +78,7 @@ interface LTCStateType {
   setFpsIndex: React.Dispatch<React.SetStateAction<number>>;
   volume: number;
   setVolume: React.Dispatch<React.SetStateAction<number>>;
-  syncStatus: { offset: number; latency: number } | null;
+  syncStatus: { offset: number; latency: number; fromCache?: boolean } | null;
   syncMode: SyncMode;
   setSyncMode: React.Dispatch<React.SetStateAction<SyncMode>>;
   isPreparing: boolean;
