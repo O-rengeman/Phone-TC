@@ -1,4 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+export type WakeLockStatus = 'unsupported' | 'inactive' | 'requesting' | 'active' | 'released' | 'error';
 
 /**
  * Holds a screen wake lock while `isRunning` is true, releasing it whenever
@@ -11,12 +13,12 @@ import { useEffect, useRef } from 'react';
  * Without that, checking a message mid-take is enough to let the display
  * sleep for the rest of the shoot.
  */
-export function useWakeLock(isRunning: boolean): void {
+export function useWakeLock(isRunning: boolean): WakeLockStatus {
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const supported = typeof navigator !== 'undefined' && 'wakeLock' in navigator;
+  const [status, setStatus] = useState<WakeLockStatus>(supported ? 'inactive' : 'unsupported');
 
   useEffect(() => {
-    const supported = typeof navigator !== 'undefined' && 'wakeLock' in navigator;
-
     const release = () => {
       const lock = wakeLockRef.current;
       wakeLockRef.current = null;
@@ -29,11 +31,13 @@ export function useWakeLock(isRunning: boolean): void {
     }
 
     let cancelled = false;
+    let pending = false;
 
     const acquire = () => {
       // A sentinel the OS already revoked is still referenced here but no
       // longer holds anything, so it must not block a fresh request.
-      if (wakeLockRef.current && !wakeLockRef.current.released) return;
+      if (pending || (wakeLockRef.current && !wakeLockRef.current.released)) return;
+      pending = true;
 
       navigator.wakeLock.request('screen').then((lock) => {
         if (cancelled) {
@@ -41,7 +45,14 @@ export function useWakeLock(isRunning: boolean): void {
           return;
         }
         wakeLockRef.current = lock;
-      }).catch((err: unknown) => console.warn('Wake Lock error', err));
+        setStatus(lock.released ? 'released' : 'active');
+        lock.addEventListener('release', () => {
+          if (!cancelled && wakeLockRef.current === lock) setStatus('released');
+        }, { once: true });
+      }).catch((err: unknown) => {
+        if (!cancelled) setStatus('error');
+        console.warn('Wake Lock error', err);
+      }).finally(() => { pending = false; });
     };
 
     acquire();
@@ -55,6 +66,9 @@ export function useWakeLock(isRunning: boolean): void {
       cancelled = true;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       release();
+      setStatus('inactive');
     };
-  }, [isRunning]);
+  }, [isRunning, supported]);
+
+  return !supported ? 'unsupported' : !isRunning ? 'inactive' : status === 'inactive' ? 'requesting' : status;
 }

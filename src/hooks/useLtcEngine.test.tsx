@@ -4,6 +4,7 @@ import { useLtcEngine } from './useLtcEngine';
 import type { LtcEngine } from '../utils/LtcEngine';
 import type { Lang } from '../utils/i18n';
 import type { Dispatch, SetStateAction } from 'react';
+import { TimeSync } from '../utils/TimeSync';
 
 const startBackgroundMode = vi.fn(() => Promise.resolve());
 const stopBackgroundMode = vi.fn(() => Promise.resolve());
@@ -60,9 +61,35 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe('useLtcEngine — thin state-transition coverage', () => {
+  it.each(['network', 'p2p'] as const)('clears the previous reference before a failed %s startup sync', async syncMode => {
+    vi.spyOn(TimeSync, 'sync').mockRejectedValue(new Error('offline'));
+    const setSyncStatus = vi.fn();
+    const lastNetworkOffsetRef = { current: 123 as number | null };
+    const audio = {
+      state: 'running', sampleRate: 48000, __ltcWorkletAdded: true,
+      createOscillator: () => ({ connect: vi.fn(), start: vi.fn(), stop: vi.fn() }),
+      createGain: () => ({ gain: { value: 0 }, connect: vi.fn() }),
+    } as unknown as AudioContext;
+    vi.stubGlobal('AudioWorkletNode', class {
+      port = { onmessage: null };
+      connect = vi.fn();
+    });
+    const params = makeParams({ isRunning: false, syncMode, p2pRole: syncMode === 'p2p' ? 'master' : null,
+      p2pSyncSource: 'network', audioCtxRef: { current: audio }, setSyncStatus, lastNetworkOffsetRef });
+    const { result } = renderHook(() => useLtcEngine(params));
+    await act(async () => { await result.current.handleStartStop(); });
+    expect(TimeSync.sync).toHaveBeenCalledOnce();
+    expect(setSyncStatus).toHaveBeenLastCalledWith(null);
+    expect(lastNetworkOffsetRef.current).toBeNull();
+    expect(params.driftMonitorRef.current.reset).toHaveBeenCalled();
+    expect(params.setIsRunning).toHaveBeenCalledWith(true);
+    expect(params.addToast).toHaveBeenCalledWith(expect.stringContaining('NTP'), 'error');
+  });
+
   it('handlePause stops playback and clears drift status when running', () => {
     const setIsPaused = vi.fn();
     const setIsRunning = vi.fn();

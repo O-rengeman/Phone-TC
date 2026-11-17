@@ -31,6 +31,7 @@ import { STORAGE_KEYS, readStored, writeStoredString } from './utils/storage';
 import { shiftTimecode } from './utils/timecode';
 import { useBatteryMonitor } from './hooks/useBatteryMonitor';
 import { useWakeLock } from './hooks/useWakeLock';
+import type { WakeLockStatus } from './hooks/useWakeLock';
 import { useAudioContextRecovery } from './hooks/useAudioContextRecovery';
 import { useMarkers } from './hooks/useMarkers';
 import { useNetworkSync } from './hooks/useNetworkSync';
@@ -77,7 +78,7 @@ interface LTCStateType {
   setFpsIndex: React.Dispatch<React.SetStateAction<number>>;
   volume: number;
   setVolume: React.Dispatch<React.SetStateAction<number>>;
-  syncStatus: { offset: number; latency: number } | null;
+  syncStatus: { offset: number; latency: number; fromCache?: boolean } | null;
   syncMode: SyncMode;
   setSyncMode: React.Dispatch<React.SetStateAction<SyncMode>>;
   isPreparing: boolean;
@@ -123,6 +124,7 @@ interface LTCStateType {
   batteryLevel: number | null;
   isCharging: boolean;
   batteryEta: number | null;
+  wakeLockStatus: WakeLockStatus;
   markerFlash: { tc: string; color: string; count: number } | null;
   masterDrift: number | null;
   clients: Record<string, { rtt: number; drift: number; lastSeen: number }>;
@@ -266,7 +268,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const onMasterHeartbeatTimeoutRef = useRef<(() => void) | null>(null);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
-  useWakeLock(isRunning);
+  const wakeLockStatus = useWakeLock(isRunning);
   useAudioContextRecovery(audioCtxRef, isRunning);
 
   const engineRef = useRef<LtcEngine | null>(null);
@@ -676,6 +678,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     batteryLevel,
     isCharging,
     batteryEta,
+    wakeLockStatus,
     markerFlash,
     masterDrift,
     clients,
@@ -688,7 +691,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     userBits, markers, defaultReelName, outputLevel, outputOffset,
     peerId, targetId, p2pStatus, isHost, driftStatus, isPaused, stopHoldPct, p2pSyncSource,
     showGuide,
-    isResyncing, lang, batteryLevel, isCharging, batteryEta, markerFlash, masterDrift, clients,
+    isResyncing, lang, batteryLevel, isCharging, batteryEta, wakeLockStatus, markerFlash, masterDrift, clients,
     packetLossRate, sceneName, nowTick,
     setIsRunning, setFpsIndex, setVolume, setSyncMode, setManualTimecode, setActiveTab, setOutputMode,
     setAutoUserBits, setIsVisualSlate, setUserBits, setMarkers, setDefaultReelName,
