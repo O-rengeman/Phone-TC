@@ -20,7 +20,7 @@ describe('HeaderBar', () => {
   it('renders the logo and version', () => {
     render(<HeaderBar {...baseProps} />);
     expect(screen.getByText('LTC SYNC PRO')).toBeTruthy();
-    expect(screen.getByText('v1.3')).toBeTruthy();
+    expect(screen.getByText('v1.3.0')).toBeTruthy();
   });
 
   it('shows the live status pill when running', () => {

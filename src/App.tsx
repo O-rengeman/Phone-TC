@@ -40,7 +40,6 @@ function MainApp() {
     isSlateFlashing,
     isVisualSlate,
     setIsVisualSlate,
-    slateTime,
     userBits,
     setUserBits,
     markers,
@@ -83,7 +82,7 @@ function MainApp() {
   const handleOutputModeChange = (mode: 'stereo' | 'mono-l') => {
     setOutputMode(mode);
     if (mode === 'mono-l') {
-      toast('⚠️ HEADPHONES REQUIRED for L-TC / R-AUDIO mode to prevent audio feedback loop!', {
+      toast(`⚠️ ${tr('toast.headphonesRequired')}`, {
         icon: '🎧',
         style: { background: '#f5a623', color: '#000', fontWeight: 'bold' }
       });
@@ -186,13 +185,13 @@ function MainApp() {
             <div className="control-section">
               <label className="section-label">{tr('label.outputMode')}</label>
               <div className="sync-toggle-pro">
-                <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')}>STEREO TC</button>
-                <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')}>L-TC / R-AUDIO</button>
+                <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')}>{tr('out.stereoTc')}</button>
+                <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')}>{tr('out.ltcRaudio')}</button>
               </div>
             </div>
 
             <div className="control-section">
-              <label className="section-label">TC OFFSET (FRAMES)</label>
+              <label className="section-label">{tr('cm.tcOffset')}</label>
               <div className="offset-control">
                 <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} />
                 <span className="offset-value">{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
@@ -221,7 +220,7 @@ function MainApp() {
                 ))}
               </div>
               {syncStatus && syncMode === 'network' && (
-                <div className="sync-detail">Latency: {syncStatus.latency.toFixed(1)}ms | Offset: {syncStatus.offset.toFixed(1)}ms</div>
+                <div className="sync-detail">{tr('cm.latencyOffset', { latency: syncStatus.latency.toFixed(1), offset: syncStatus.offset.toFixed(1) })}</div>
               )}
               {syncMode === 'network' && isRunning && driftStatus && driftStatus.hasSync && (
                 <div className="drift-panel">
@@ -229,7 +228,7 @@ function MainApp() {
                     <span>{tr('drift.lastSync')}</span>
                     <span>{formatSyncAge(driftStatus.msSinceSync)} {tr('drift.ago')}</span>
                   </div>
-                  {driftStatus.msSinceSync >= 3600000 && (
+                  {driftStatus.rejamRecommended && (
                     <div className="drift-rejam">⚠️ {tr('drift.rejam')}</div>
                   )}
                 </div>
@@ -304,6 +303,7 @@ function MainApp() {
               clients={clients}
               nowTick={nowTick}
               isHost={isHost}
+              tr={tr}
             />
           </div>
         )}
@@ -313,7 +313,7 @@ function MainApp() {
       {markerFlash && (
         <div className={`marker-flash ${markerFlash.color.toLowerCase()}`}>
           <span className={`mf-dot ${markerFlash.color.toLowerCase()}`}>{markerFlash.color.charAt(0)}</span>
-          <span className="mf-text">MARK {markerFlash.tc}</span>
+          <span className="mf-text">{tr('marker.flash', { tc: markerFlash.tc })}</span>
           <span className="mf-count">#{markerFlash.count}</span>
         </div>
       )}
@@ -339,7 +339,6 @@ function MainApp() {
       {isVisualSlate && (
         <Suspense fallback={null}>
           <VisualSlate
-            slateTime={slateTime}
             isSlateFlashing={isSlateFlashing}
             handleSlateClick={handleSlateClick}
             defaultReelName={defaultReelName}

@@ -1,4 +1,5 @@
 import { debug } from './log';
+import { STORAGE_KEYS } from './storage';
 
 export interface TimeSyncResult {
   offset: number;
@@ -12,7 +13,7 @@ const TIME_SERVERS = [
   'https://timeapi.io/api/Time/current/zone?timeZone=UTC',
 ];
 
-const NTP_CACHE_KEY = 'ltc-ntp-cache';
+const NTP_CACHE_KEY = STORAGE_KEYS.ntpCache;
 const NTP_CACHE_TTL_MS = 3600000; // 1 hour
 const FETCH_TIMEOUT_MS = 6000; // Abort a stuck time-server request after 6s
 const TOTAL_SYNC_TIMEOUT_MS = 12000; // Total budget for all servers combined
@@ -29,6 +30,24 @@ interface CachedTimeSync {
   latency?: unknown;
   savedAt?: unknown;
 }
+
+/**
+ * Parses an ISO-ish timestamp from a time server. Appends 'Z' only when the
+ * string carries no zone designator of its own — an explicit offset like
+ * '+09:00' is already unambiguous (the old code blindly appended 'Z' to
+ * `dateTime` values that already had an offset, producing Invalid Date → NaN).
+ * Returns null for anything unparseable so callers can skip the sample.
+ */
+function parseServerTimeMs(value: string | undefined): number | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  const hasZone = /(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(trimmed);
+  const ms = new Date(hasZone ? trimmed : `${trimmed}Z`).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/** Same sanity bound the cache applies — rejects absurd offsets. */
+const MAX_ABS_OFFSET_MS = 86400000; // 24h
 
 export class TimeSync {
   public static async sync(samplesPerServer: number = 2): Promise<TimeSyncResult> {
@@ -56,22 +75,22 @@ export class TimeSync {
           if (!response.ok) continue;
 
           const data = (await response.json()) as TimeServerResponse;
-          let serverTime: number;
-          if (data.dateTime) {
-            serverTime = new Date(data.dateTime + (data.dateTime.endsWith('Z') ? '' : 'Z')).getTime();
-          } else if (data.datetime) {
-            serverTime = new Date(data.datetime).getTime();
-          } else if (data.currentDateTime) {
-            serverTime = new Date(data.currentDateTime).getTime();
-          } else {
-            continue;
-          }
+          const serverTime = parseServerTimeMs(data.dateTime)
+            ?? parseServerTimeMs(data.datetime)
+            ?? parseServerTimeMs(data.currentDateTime);
+          if (serverTime === null) continue;
+
           const rtt = end - start;
           const latency = rtt / 2;
 
           const estimatedServerTimeAtArrival = serverTime + latency;
           const localTimeAtArrival = Date.now();
           const offset = estimatedServerTimeAtArrival - localTimeAtArrival;
+
+          // Never accept a non-finite or absurd offset — a malformed server
+          // response must fall through to the next server/cache, not poison
+          // the sync (NaN here used to reach Timecode and throw on start).
+          if (!Number.isFinite(offset) || Math.abs(offset) > MAX_ABS_OFFSET_MS) continue;
 
           if (!bestSample || latency < bestSample.latency) {
             bestSample = { offset, latency };

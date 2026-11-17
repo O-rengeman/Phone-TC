@@ -7,11 +7,22 @@ import type { Marker, MarkerColor } from '../utils/export';
 import { t as translate } from '../utils/i18n';
 import type { Lang } from '../utils/i18n';
 import { FPS_OPTIONS } from '../constants';
+import { STORAGE_KEYS, readStoredJson, writeStoredString } from '../utils/storage';
 
 type ToastLevel = 'info' | 'warn' | 'error';
 type MarkerFlash = { tc: string; color: string; count: number } | null;
 
 const MARKER_FLASH_MS = 1300;
+// Every keystroke in a comment rewrites markers state — persist to
+// localStorage immediately (cheap) but debounce the native filesystem
+// backup so we don't do a full-file write per character.
+const MARKER_BACKUP_DEBOUNCE_MS = 2000;
+
+const isMarkerArray = (v: unknown): v is Marker[] =>
+  Array.isArray(v) && v.every(m =>
+    typeof m === 'object' && m !== null
+    && typeof (m as Marker).id === 'number'
+    && typeof (m as Marker).tc === 'string');
 
 interface UseMarkersParams {
   engineRef: React.RefObject<LtcEngine | null>;
@@ -46,22 +57,19 @@ export function useMarkers({
   langRef,
   addToast,
 }: UseMarkersParams): UseMarkersResult {
-  const [markers, setMarkers] = useState<Marker[]>(() => {
-    try {
-      const saved = localStorage.getItem('ltc-markers');
-      if (!saved) return [];
-      const parsed = JSON.parse(saved) as unknown;
-      return Array.isArray(parsed) ? (parsed as Marker[]) : [];
-    } catch { return []; }
-  });
+  const [markers, setMarkers] = useState<Marker[]>(() =>
+    readStoredJson(STORAGE_KEYS.markers, [] as Marker[], isMarkerArray));
   const [markerFlash, setMarkerFlash] = useState<MarkerFlash>(null);
   const markerFlashTimerRef = useRef<number | null>(null);
+  const backupTimerRef = useRef<number | null>(null);
+  const markersRef = useRef(markers);
+  useEffect(() => { markersRef.current = markers; }, [markers]);
 
   useEffect(() => () => {
     if (markerFlashTimerRef.current !== null) clearTimeout(markerFlashTimerRef.current);
   }, []);
 
-  const backupMarkers = async (m: Marker[]) => {
+  const backupMarkers = useCallback(async (m: Marker[]) => {
     try {
       if (Capacitor.isNativePlatform()) {
         await Filesystem.writeFile({
@@ -74,14 +82,24 @@ export function useMarkers({
     } catch (e) {
       console.warn('Backup to filesystem failed:', e);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('ltc-markers', JSON.stringify(markers));
+    writeStoredString(STORAGE_KEYS.markers, JSON.stringify(markers));
+    if (backupTimerRef.current !== null) clearTimeout(backupTimerRef.current);
+    backupTimerRef.current = window.setTimeout(() => {
       void backupMarkers(markers);
-    } catch { /* ignore */ }
-  }, [markers]);
+    }, MARKER_BACKUP_DEBOUNCE_MS);
+    return () => {
+      if (backupTimerRef.current !== null) clearTimeout(backupTimerRef.current);
+    };
+  }, [markers, backupMarkers]);
+
+  // Flush the latest markers to the native backup on unmount so a pending
+  // debounced write isn't lost when the app is backgrounded/killed.
+  useEffect(() => () => {
+    void backupMarkers(markersRef.current);
+  }, [backupMarkers]);
 
   const addMarker = (color: MarkerColor) => {
     const currentTC = engineRef.current ? engineRef.current.getTimecodeString() : '00:00:00:00';
@@ -107,7 +125,7 @@ export function useMarkers({
   };
 
   const removeMarker = (id: number) => {
-    setMarkers(markers.filter(m => m.id !== id));
+    setMarkers(prev => prev.filter(m => m.id !== id));
   };
 
   const updateMarkerComment = useCallback((id: number, comment: string) => {
@@ -127,7 +145,7 @@ export function useMarkers({
         addToast(translate('toast.exportSaved', langRef.current, { path: `Documents/${filename}` }));
       } catch (e) {
         console.error('File export failed', e);
-        addToast('File export failed', 'error');
+        addToast(translate('toast.exportFailed', langRef.current), 'error');
       }
     } else {
       const blob = new Blob([content], { type: 'text/plain' });

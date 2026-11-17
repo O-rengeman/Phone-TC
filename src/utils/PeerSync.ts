@@ -5,18 +5,88 @@ import { debug } from './log';
 import { ICE_SERVERS } from './iceServers';
 import { computeBackoffDelay } from './backoff';
 
-export interface SyncMessage {
-  type: 'sync-request' | 'sync-response' | 'heartbeat' | 'report';
+/** Fields shared by messages that carry the master's timecode/fps/state. */
+interface MasterSyncFields {
   masterTimecode: string;
   masterTimestamp: number;
   fps: number;
   isDropFrame: boolean;
   isRunning: boolean;
   isPaused?: boolean;
+}
+
+interface SyncMessageBase {
+  /**
+   * PeerJS id of the sender. Stamped by the *receiver* from the connection —
+   * it is not part of the wire payload and senders leave it unset.
+   */
+  clientId?: string;
+}
+
+export interface SyncRequestMessage extends SyncMessageBase {
+  type: 'sync-request';
   clientTimestamp?: number;
-  clientId?: string; // Identifier for the sender
-  rtt?: number;      // Reported RTT from client
-  drift?: number;    // Reported drift from client
+}
+
+export interface SyncResponseMessage extends SyncMessageBase, MasterSyncFields {
+  type: 'sync-response';
+  clientTimestamp?: number;
+}
+
+export interface HeartbeatMessage extends SyncMessageBase, MasterSyncFields {
+  type: 'heartbeat';
+}
+
+export interface ReportMessage extends SyncMessageBase {
+  type: 'report';
+  rtt?: number;
+  drift?: number;
+}
+
+/**
+ * Discriminated union: each message type carries only the fields it actually
+ * uses, so senders no longer pad unused fields with dummy values and
+ * receivers get real optionality instead of `msg.rtt || 0` fallbacks.
+ */
+export type SyncMessage =
+  | SyncRequestMessage
+  | SyncResponseMessage
+  | HeartbeatMessage
+  | ReportMessage;
+
+const SYNC_MESSAGE_TYPES = new Set(['sync-request', 'sync-response', 'heartbeat', 'report']);
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null;
+}
+
+function hasMasterFields(m: Record<string, unknown>): boolean {
+  return typeof m.masterTimecode === 'string'
+    && typeof m.masterTimestamp === 'number'
+    && typeof m.fps === 'number'
+    && typeof m.isDropFrame === 'boolean'
+    && typeof m.isRunning === 'boolean';
+}
+
+/**
+ * Runtime guard for data arriving over the P2P DataConnection. PeerJS hands
+ * us `unknown`; anything that doesn't match a known message shape is dropped
+ * at the boundary instead of flowing into the sync handler unvalidated.
+ */
+export function isSyncMessage(data: unknown): data is SyncMessage {
+  if (!isRecord(data)) return false;
+  const type = data.type;
+  if (typeof type !== 'string' || !SYNC_MESSAGE_TYPES.has(type)) return false;
+  switch (type) {
+    case 'sync-request':
+    case 'report':
+      return true;
+    case 'sync-response':
+    case 'heartbeat':
+      return hasMasterFields(data);
+    default:
+      return false;
+  }
 }
 
 /** Factory used to create the underlying Peer — overridable for tests. */
@@ -191,6 +261,15 @@ export class PeerSync {
 
   public connect(peerId: string) {
     if (!this.peer) return;
+    // peer.connect() opens a NEW DataConnection every call — repeated
+    // join/reconnect attempts would otherwise stack parallel connections to
+    // the same peer and deliver every message multiple times. Closed
+    // connections are removed from this.connections on 'close', so any entry
+    // still listed for this peer is live or still connecting.
+    if (this.connections.some(c => c.peer === peerId)) {
+      debug(`connect(${peerId}) skipped — connection already exists`);
+      return;
+    }
     const conn = this.peer.connect(peerId, {
       reliable: false // Use unreliable (UDP-style) for low latency TC
     });
@@ -207,15 +286,13 @@ export class PeerSync {
     });
 
     conn.on('data', (data: unknown) => {
-      const msg = data as SyncMessage;
-      msg.clientId = conn.peer; // Identify the sender
-
-      // Master logic: Answer to sync-request automatically
-      if (msg.type === 'sync-request' && this.onMessageCallback) {
-        this.onMessageCallback({ ...msg, clientTimestamp: msg.clientTimestamp });
-      } else {
-        this.onMessageCallback(msg);
+      if (!isSyncMessage(data)) {
+        debug('Discarding malformed P2P message:', data);
+        return;
       }
+      // Stamp the sender id from the transport, then hand off — the master
+      // answers sync-requests inside the message handler itself.
+      this.onMessageCallback({ ...data, clientId: conn.peer });
     });
 
     conn.on('close', () => {
@@ -228,7 +305,7 @@ export class PeerSync {
     this.lossRate = Math.max(0, Math.min(1, rate));
   }
 
-  /** Current simulated packet-loss rate in [0, 1]. */
+  /** Current simulated packet-loss rate in [0, 1] (dev tooling). */
   public getLossRate(): number {
     return this.lossRate;
   }

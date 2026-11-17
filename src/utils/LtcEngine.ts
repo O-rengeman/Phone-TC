@@ -7,7 +7,7 @@ export interface LtcSettings {
   volume: number;
   isDropFrame: boolean;
   userBits: string; // 8 hex digits, e.g. "AABBCCDD"
-  outputMode: 'stereo' | 'mono-l' | 'mono-r'; // stereo means TC on both, mono-l means TC on L only
+  outputMode: 'stereo' | 'mono-l'; // stereo means TC on both, mono-l means TC on L only
   // NTSC exact rational representation: fps = fpsNum / fpsDen
   // e.g. 29.97 = 30000/1001, 23.976 = 24000/1001
   fpsNum?: number;
@@ -70,14 +70,14 @@ export class LtcEngine {
     this.settings.sampleRate = sr;
   }
 
-  public setFps(fps: number, isDrop: boolean, fpsNum?: number, fpsDen?: number) {
+  public setFps(fps: number, isDrop: boolean) {
     this.settings.fps = fps;
     this.settings.isDropFrame = isDrop;
     const currentStr = this.currentTimecode.toString();
     this.currentTimecode = Timecode(currentStr, fps, isDrop);
 
-    this.fpsNum = fpsNum || this.deriveNumerator(fps);
-    this.fpsDen = fpsDen || this.deriveDenominator(fps);
+    this.fpsNum = this.deriveNumerator(fps);
+    this.fpsDen = this.deriveDenominator(fps);
   }
 
   public setUserBits(hex: string) {
@@ -86,16 +86,6 @@ export class LtcEngine {
 
   public getTimecodeString(): string {
     return this.currentTimecode.toString();
-  }
-
-  /** Returns the current timecode split into [h, m, s, f]. */
-  public getTimecodeParts(): { h: number; m: number; s: number; f: number } {
-    const tc = this.currentTimecode;
-    return { h: tc.hours, m: tc.minutes, s: tc.seconds, f: tc.frames };
-  }
-
-  public resetToSystemTime() {
-    this.currentTimecode = Timecode(new Date(), this.settings.fps, this.settings.isDropFrame);
   }
 
   public syncWithOffset(offset: number) {
@@ -114,14 +104,6 @@ export class LtcEngine {
 
   public setManualTimecode(tcStr: string) {
     this.currentTimecode = Timecode(tcStr, this.settings.fps, this.settings.isDropFrame);
-  }
-
-  /**
-   * Directly sync to master's timecode, compensating for one-way network latency.
-   * Uses performance.now()-based timing for sub-millisecond precision.
-   */
-  public jamSyncDirect(masterTcStr: string, oneWayLatencyMs: number, isMasterRunning: boolean) {
-    this.currentTimecode = this.computeCorrectedTimecode(masterTcStr, oneWayLatencyMs, isMasterRunning);
   }
 
   /**
@@ -174,38 +156,4 @@ export class LtcEngine {
     }
   }
 
-  /**
-   * Smooth sync: instant jump for large drift (>0.5s), frame-by-frame nudge for small drift.
-   * Avoids audible discontinuities when drift is minor.
-   */
-  public softSync(masterTcStr: string, oneWayLatencyMs: number, isMasterRunning: boolean): void {
-    const diff = this.getDiffSeconds(masterTcStr);
-    if (diff > 0.5) {
-      this.jamSyncDirect(masterTcStr, oneWayLatencyMs, isMasterRunning);
-      return;
-    }
-    try {
-      const masterTc = this.computeCorrectedTimecode(masterTcStr, oneWayLatencyMs, isMasterRunning);
-      const frameDiff = masterTc.frameCount - this.currentTimecode.frameCount;
-      if (frameDiff !== 0) {
-        this.currentTimecode.add(frameDiff > 0 ? 1 : -1);
-      }
-    } catch {
-      this.jamSyncDirect(masterTcStr, oneWayLatencyMs, isMasterRunning);
-    }
-  }
-
-  /**
-   * Only applies jamSync if the difference exceeds the given threshold in seconds.
-   * Returns true if sync was applied.
-   */
-  public jamSyncIfNeeded(masterTcStr: string, oneWayLatencyMs: number, isMasterRunning: boolean, thresholdSec: number): boolean {
-    const masterTc = this.computeCorrectedTimecode(masterTcStr, oneWayLatencyMs, isMasterRunning);
-    const diff = this.getDiffSeconds(masterTc.toString());
-    if (diff >= thresholdSec) {
-      this.currentTimecode = masterTc;
-      return true;
-    }
-    return false;
-  }
 }

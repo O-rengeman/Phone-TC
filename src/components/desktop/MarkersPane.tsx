@@ -62,7 +62,7 @@ export function MarkersPane() {
           </div>
         </DesktopSection>
 
-        <DesktopSection title="EXPORT">
+        <DesktopSection title={tr('dt.export')}>
           <div className="dt-export-row">
             <button type="button" className="dt-btn" onClick={exportToEDL} disabled={markers.length === 0}>
               EDL
@@ -92,8 +92,8 @@ export function MarkersPane() {
               <tr>
                 <th>#</th>
                 <th>TC</th>
-                <th>SC / TK</th>
-                <th>COLOR</th>
+                <th>{tr('dt.scTk')}</th>
+                <th>{tr('dt.color')}</th>
                 <th>{tr('label.comment')}</th>
                 <th aria-label="remove" />
               </tr>
@@ -103,7 +103,7 @@ export function MarkersPane() {
                 <tr key={marker.id}>
                   <td className="dt-mono">{idx + 1}</td>
                   <td className="dt-mono dt-marker-tc">{marker.tc}</td>
-                  <td className="dt-mono">Sc.{marker.sceneName || '001'} Tk.{marker.take}</td>
+                  <td className="dt-mono">{tr('marker.sceneTake', { scene: marker.sceneName || '001', take: marker.take })}</td>
                   <td>
                     <span className={`dt-marker-dot ${marker.color.toLowerCase()}`} />
                     {marker.color}

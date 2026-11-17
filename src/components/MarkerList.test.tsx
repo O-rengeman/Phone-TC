@@ -24,7 +24,8 @@ describe('MarkerList', () => {
     exportToEDL: vi.fn(),
     exportToALE: vi.fn(),
     isMobile: false,
-    tr: (key: string) => key,
+    tr: (key: string, vars?: Record<string, string | number>) =>
+      key === 'marker.sceneTake' ? `Sc.${vars?.scene} Tk.${vars?.take}` : key,
   };
 
   it('shows empty message when no markers', () => {

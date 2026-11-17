@@ -1,3 +1,5 @@
+import { STORAGE_KEYS } from './storage';
+
 // ICE server list for PeerJS (src/utils/PeerSync.ts).
 //
 // STUN alone lets two peers discover their public IP/port, but cannot
@@ -38,7 +40,7 @@ export const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
 ];
 
 /** localStorage key holding a per-device TURN override, as JSON. */
-export const TURN_STORAGE_KEY = 'ltc-turn-config';
+export const TURN_STORAGE_KEY = STORAGE_KEYS.turnConfig;
 
 export interface TurnConfigInput {
   /** One or more TURN/STUN URLs; multiple entries are comma-separated. */

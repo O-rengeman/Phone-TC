@@ -3,6 +3,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLTC } from '../../LTCSyncContext';
 import { VideoPlayer } from '../../VideoPlayer';
 import { formatSyncAge } from '../../utils/DriftMonitor';
+import { isClientOffline } from '../../utils/clients';
+import { formatP2pStatus } from '../../utils/p2pStatus';
+import { JAM_THRESHOLD_SEC } from '../../constants';
 import {
   DESKTOP_TAB_STORAGE_KEY,
   desktopTabForHotkey,
@@ -42,7 +45,7 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
   const {
     isHost, isRunning, isPreparing, syncMode, driftStatus, p2pRole,
     peerId, p2pStatus, masterDrift, clients, nowTick,
-    tr,
+    lang, tr,
   } = useLTC();
 
   const [requestedTab, setRequestedTab] = useState<string | null>(readStoredTab);
@@ -74,7 +77,7 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
     return () => window.removeEventListener('keydown', handleHotkey);
   }, [isHost, selectTab]);
 
-  const onlineCount = Object.values(clients).filter(c => nowTick - c.lastSeen <= 30000).length;
+  const onlineCount = Object.values(clients).filter(c => !isClientOffline(c, nowTick)).length;
   const clientCount = Object.keys(clients).length;
 
   return (
@@ -89,13 +92,13 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
         <div className="dt-readout-right">
         <div className="dt-readout-side">
           <div className="dt-readout-stat">
-            <span className="dt-stat-label">STATE</span>
+            <span className="dt-stat-label">{tr('dt.state')}</span>
             <strong className={isRunning ? 'live' : isPreparing ? 'prep' : ''}>
               {isRunning ? tr('status.live') : isPreparing ? tr('status.syncing') : tr('status.ready')}
             </strong>
           </div>
           <div className="dt-readout-stat">
-            <span className="dt-stat-label">SOURCE</span>
+            <span className="dt-stat-label">{tr('dt.source')}</span>
             <strong>{syncMode === 'freerun' ? tr('mode.freerun') : syncMode.toUpperCase()}</strong>
           </div>
           <div className="dt-readout-stat">
@@ -106,7 +109,7 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
             <span className="dt-stat-label">{p2pRole === 'client' ? 'MASTER δ' : tr('dt.clients')}</span>
             <strong className={
               p2pRole === 'client'
-                ? (masterDrift !== null && Math.abs(masterDrift) >= 0.5 ? 'warn' : '')
+                ? (masterDrift !== null && Math.abs(masterDrift) >= JAM_THRESHOLD_SEC ? 'warn' : '')
                 : (clientCount > 0 && onlineCount < clientCount ? 'warn' : '')
             }>
               {p2pRole === 'client'
@@ -115,9 +118,9 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
             </strong>
           </div>
           <div className="dt-readout-stat">
-            <span className="dt-stat-label">{p2pRole === 'master' ? 'SESSION ID' : 'LINK'}</span>
+            <span className="dt-stat-label">{p2pRole === 'master' ? tr('dt.sessionId') : tr('dt.link')}</span>
             <strong className="dt-mono dt-readout-link">
-              {p2pRole === 'master' ? (peerId || '—') : (p2pRole ? p2pStatus : '—')}
+              {p2pRole === 'master' ? (peerId || '—') : (p2pRole ? formatP2pStatus(p2pStatus, lang) : '—')}
             </strong>
           </div>
         </div>

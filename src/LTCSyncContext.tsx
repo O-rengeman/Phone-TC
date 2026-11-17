@@ -1,11 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import Timecode from 'smpte-timecode';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 
 import { LtcEngine } from './utils/LtcEngine';
-import type { SyncMessage } from './utils/PeerSync';
+import type { SyncMessage, SyncResponseMessage } from './utils/PeerSync';
 import { TimecodeNativeBridge } from './utils/TimecodeNativeBridge';
 import { DriftMonitor } from './utils/DriftMonitor';
 import { t as translate, getInitialLang, persistLang } from './utils/i18n';
@@ -14,7 +13,22 @@ import toast from 'react-hot-toast';
 import type { DriftStatus } from './utils/DriftMonitor';
 import type { Marker } from './utils/export';
 import { debug } from './utils/log';
-import { FPS_OPTIONS } from './constants';
+import {
+  FPS_OPTIONS,
+  MAX_SYNC_INTERVAL_MS,
+  DRIFT_RESYNC_THRESHOLD_SEC,
+  HEARTBEAT_RESYNC_THRESHOLD_SEC,
+  JAM_THRESHOLD_SEC,
+  MAX_VALID_RTT_MS,
+  RTT_HISTORY_LEN,
+  RTT_SPIKE_FACTOR,
+  RTT_STABLE_FLOOR_MS,
+  HEARTBEAT_ASSUMED_LATENCY_MS,
+  CLIENT_REPORT_WINDOW_MS,
+  CLIENT_REPORT_WINDOW_SLACK_MS,
+} from './constants';
+import { STORAGE_KEYS, readStored, writeStoredString } from './utils/storage';
+import { shiftTimecode } from './utils/timecode';
 import { useBatteryMonitor } from './hooks/useBatteryMonitor';
 import { useWakeLock } from './hooks/useWakeLock';
 import { useAudioContextRecovery } from './hooks/useAudioContextRecovery';
@@ -23,6 +37,7 @@ import { useNetworkSync } from './hooks/useNetworkSync';
 import { useP2P } from './hooks/useP2P';
 import { useLtcEngine } from './hooks/useLtcEngine';
 import { shouldUseMobileLayout } from './utils/layout';
+import { SlateTimeContext } from './slateTimeContext';
 
 export type SyncMode = 'system' | 'network' | 'p2p' | 'freerun';
 export type ToastLevel = 'info' | 'warn' | 'error';
@@ -79,8 +94,6 @@ interface LTCStateType {
   isSlateFlashing: boolean;
   isVisualSlate: boolean;
   setIsVisualSlate: React.Dispatch<React.SetStateAction<boolean>>;
-  slateTime: string;
-  setSlateTime: React.Dispatch<React.SetStateAction<string>>;
   nowTick: number;
   userBits: string;
   setUserBits: React.Dispatch<React.SetStateAction<string>>;
@@ -104,8 +117,6 @@ interface LTCStateType {
   setP2pSyncSource: React.Dispatch<React.SetStateAction<'manual' | 'network'>>;
   showGuide: boolean;
   setShowGuide: React.Dispatch<React.SetStateAction<boolean>>;
-  cameraLabels: Record<string, string>;
-  setCameraLabels: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   isResyncing: boolean;
   lang: Lang;
   setLang: React.Dispatch<React.SetStateAction<Lang>>;
@@ -138,6 +149,11 @@ interface LTCActionsType {
 
   tr: (key: string, vars?: Record<string, string | number>) => string;
   addToast: (msg: string, level?: ToastLevel) => void;
+  // setSlateTime lives here (not in state) because the dispatch identity is
+  // stable — consumers never re-render from it. The slate *value* is exposed
+  // via SlateTimeContext (slateTimeContext.ts) so ~30fps TC updates only
+  // re-render <VisualSlate>.
+  setSlateTime: React.Dispatch<React.SetStateAction<string>>;
   addMarker: (color: 'Red' | 'Blue' | 'Green' | 'Yellow') => void;
   removeMarker: (id: number) => void;
   updateMarkerComment: (id: number, comment: string) => void;
@@ -162,12 +178,14 @@ const LTCActionsContext = createContext<LTCActionsType | null>(null);
 
 export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [isRunning, setIsRunning] = useState(false);
-  const [fpsIndex, setFpsIndex] = useState(() => {
-    try { const saved = localStorage.getItem('ltc-fps'); return saved ? parseInt(saved, 10) : 2; } catch { return 2; }
-  });
-  const [volume, setVolume] = useState(() => {
-    try { const saved = localStorage.getItem('ltc-vol'); return saved ? parseFloat(saved) : 0.5; } catch { return 0.5; }
-  });
+  const [fpsIndex, setFpsIndex] = useState(() => readStored(STORAGE_KEYS.fps, 2, (raw) => {
+    const n = parseInt(raw, 10);
+    return Number.isInteger(n) && n >= 0 && n < FPS_OPTIONS.length ? n : undefined;
+  }));
+  const [volume, setVolume] = useState(() => readStored(STORAGE_KEYS.volume, 0.5, (raw) => {
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : undefined;
+  }));
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [syncMode, setSyncMode] = useState<SyncMode>('network');
   const [isPreparing, setIsPreparing] = useState(false);
@@ -176,12 +194,12 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [activeTab, setActiveTab] = useState<'main' | 'sync' | 'tools'>('main');
   const [isMobile, setIsMobile] = useState(getIsMobileLayout);
   
-  const [outputMode, setOutputMode] = useState<'stereo' | 'mono-l'>(() => {
-    try { const saved = localStorage.getItem('ltc-outmode'); return (saved === 'stereo' || saved === 'mono-l') ? saved : 'stereo'; } catch { return 'stereo'; }
-  });
-  const [autoUserBits, setAutoUserBits] = useState(() => {
-    try { const saved = localStorage.getItem('ltc-autoub'); return saved ? saved === 'true' : true; } catch { return true; }
-  });
+  const [outputMode, setOutputMode] = useState<'stereo' | 'mono-l'>(() =>
+    readStored(STORAGE_KEYS.outputMode, 'stereo' as const, (raw) =>
+      raw === 'stereo' || raw === 'mono-l' ? raw : undefined));
+  const [autoUserBits, setAutoUserBits] = useState(() =>
+    readStored(STORAGE_KEYS.autoUserBits, true, (raw) =>
+      raw === 'true' ? true : raw === 'false' ? false : undefined));
   const [isSlateFlashing, setIsSlateFlashing] = useState(false);
   const [slateTime, setSlateTime] = useState('00:00:00:00');
 
@@ -205,31 +223,28 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   }, [slateTime]);
 
   const [defaultReelName, setDefaultReelName] = useState('A001');
-  const [sceneName, setSceneName] = useState(() => {
-    try { const saved = localStorage.getItem('ltc-scene'); return saved || '001'; } catch { return '001'; }
-  });
-  const [outputLevel, setOutputLevel] = useState<'mic' | 'line'>(() => {
-    try { const saved = localStorage.getItem('ltc-outlevel'); return (saved === 'mic' || saved === 'line') ? saved : 'line'; } catch { return 'line'; }
-  });
-  const [outputOffset, setOutputOffset] = useState(() => {
-    try { const saved = localStorage.getItem('ltc-out-offset'); return saved ? parseInt(saved, 10) : 0; } catch { return 0; }
-  });
+  const [sceneName, setSceneName] = useState(() =>
+    readStored(STORAGE_KEYS.scene, '001', (raw) => raw.length > 0 ? raw : undefined));
+  const [outputLevel, setOutputLevel] = useState<'mic' | 'line'>(() =>
+    readStored(STORAGE_KEYS.outputLevel, 'line' as const, (raw) =>
+      raw === 'mic' || raw === 'line' ? raw : undefined));
+  const [outputOffset, setOutputOffset] = useState(() =>
+    readStored(STORAGE_KEYS.outputOffset, 0, (raw) => {
+      const n = parseInt(raw, 10);
+      return Number.isInteger(n) ? Math.min(10, Math.max(-10, n)) : undefined;
+    }));
 
   useEffect(() => {
-    try {
-      localStorage.setItem('ltc-scene', sceneName);
-    } catch { /* ignore */ }
+    writeStoredString(STORAGE_KEYS.scene, sceneName);
   }, [sceneName]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('ltc-fps', fpsIndex.toString());
-      localStorage.setItem('ltc-vol', volume.toString());
-      localStorage.setItem('ltc-outmode', outputMode);
-      localStorage.setItem('ltc-outlevel', outputLevel);
-      localStorage.setItem('ltc-autoub', autoUserBits.toString());
-      localStorage.setItem('ltc-out-offset', outputOffset.toString());
-    } catch { /* ignore */ }
+    writeStoredString(STORAGE_KEYS.fps, fpsIndex.toString());
+    writeStoredString(STORAGE_KEYS.volume, volume.toString());
+    writeStoredString(STORAGE_KEYS.outputMode, outputMode);
+    writeStoredString(STORAGE_KEYS.outputLevel, outputLevel);
+    writeStoredString(STORAGE_KEYS.autoUserBits, autoUserBits.toString());
+    writeStoredString(STORAGE_KEYS.outputOffset, outputOffset.toString());
   }, [fpsIndex, volume, outputMode, outputLevel, autoUserBits, outputOffset]);
 
   const lastNetworkOffsetRef = useRef<number | null>(null);
@@ -237,13 +252,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const [isPaused, setIsPaused] = useState(false);
   const [stopHoldPct, setStopHoldPct] = useState(0);
   const [showGuide, setShowGuide] = useState(false);
-
-  const [cameraLabels, setCameraLabels] = useState<Record<string, string>>(() => {
-    try {
-      const saved = localStorage.getItem('ltc-camera-labels');
-      return saved ? (JSON.parse(saved) as Record<string, string>) : {};
-    } catch { return {}; }
-  });
 
   const [lang, setLang] = useState<Lang>(() => getInitialLang());
   const langRef = useRef<Lang>(lang);
@@ -345,21 +353,15 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     const engine = engineRef.current;
     if (!engine) return;
     let corrected = engine.getCorrectedTc(masterTcStr, oneWayLatencyMs, isMasterRunning);
-    
+
     if (outputOffset !== 0) {
-      try {
-        const tc = Timecode(corrected, FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
-        tc.add(outputOffset);
-        corrected = tc.toString();
-      } catch (e) {
-        console.warn('Failed to apply output offset:', e);
-      }
+      corrected = shiftTimecode(corrected, outputOffset, FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
     }
 
     const node = workletNodeRef.current;
     if (isRunning && node) {
       const diff = engine.getDiffSeconds(corrected);
-      if (diff > 0.5) {
+      if (diff > JAM_THRESHOLD_SEC) {
         const parts = corrected.split(':').map(Number);
         node.port.postMessage({ type: 'jam', h: parts[0], m: parts[1], s: parts[2], f: parts[3] });
       } else {
@@ -416,181 +418,136 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
   const getUnshiftedTc = useCallback((tcStr: string) => {
     if (outputOffset === 0) return tcStr;
-    try {
-      const tc = Timecode(tcStr, FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
-      tc.add(-outputOffset);
-      return tc.toString();
-    } catch { return tcStr; }
+    return shiftTimecode(tcStr, -outputOffset, FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
   }, [outputOffset, fpsIndex]);
+
+  // Shared by the sync-response and heartbeat branches below — both carry the
+  // same master state and must reconcile fps/playback identically.
+  const syncMasterFps = useCallback((fps: number, isDropFrame: boolean) => {
+    const idx = FPS_OPTIONS.findIndex(o => o.value === fps && o.drop === isDropFrame);
+    if (idx !== -1 && idx !== fpsIndex) setFpsIndex(idx);
+  }, [fpsIndex]);
+
+  const reconcilePlaybackWithMaster = useCallback((masterRunning: boolean, masterPaused: boolean, source: string) => {
+    debug(`[DEBUG-SYNC] ${source}: masterRunning:`, masterRunning, 'masterPaused:', masterPaused, 'clientRunning:', isRunning, 'clientPaused:', isPaused);
+    if (masterRunning === isRunning && masterPaused === isPaused) return;
+    debug(`[DEBUG-SYNC] State mismatch detected in ${source}. Resolving...`);
+    if (masterRunning && !isRunning) {
+      debug('[DEBUG-SYNC] Triggering handleStartStop to START');
+      void handleStartStop();
+    } else if (!masterRunning) {
+      if (masterPaused && isRunning) {
+        debug('[DEBUG-SYNC] Triggering handlePause to PAUSE');
+        handlePause();
+      } else if (!masterPaused && (isRunning || isPaused)) {
+        syncClientToStoppedMaster();
+      }
+    }
+  }, [isRunning, isPaused, handleStartStop, handlePause, syncClientToStoppedMaster]);
 
   useEffect(() => {
     messageHandlerRef.current = (msg: SyncMessage) => {
-      if (engineRef.current) {
-        if (msg.type === 'sync-request' && isHost) {
-          const response: SyncMessage = {
-            type: 'sync-response',
-            masterTimecode: getUnshiftedTc(isRunning ? currentTcRef.current : engineRef.current.getTimecodeString()),
-            masterTimestamp: performance.now(),
-            fps: FPS_OPTIONS[fpsIndex].value,
-            isDropFrame: FPS_OPTIONS[fpsIndex].drop,
-            isRunning: isRunning,
-            isPaused: isPaused,
-            clientTimestamp: msg.clientTimestamp
-          };
-          peerSyncRef.current?.send(response);
-          
-          if (msg.clientId) {
-             setClients(prev => ({
-               ...prev,
-               [msg.clientId!]: {
-                 ...prev[msg.clientId!] || { drift: 0 },
-                 lastSeen: Date.now(),
-                 rtt: msg.rtt || 0
-               }
-             }));
-          }
-        } else if (msg.type === 'report' && isHost) {
-          if (msg.clientId) {
-            setClients(prev => ({
-              ...prev,
-              [msg.clientId!]: {
-                rtt: msg.rtt || 0,
-                drift: msg.drift || 0,
-                lastSeen: Date.now()
-              }
-            }));
-          }
-        } else if (msg.type === 'sync-response' && !isHost) {
-          lastMasterContactTimeRef.current = Date.now();
-          const now = performance.now();
-          const rtt = now - (msg.clientTimestamp || now);
-          
-          if (rtt < 0 || rtt > 5000) {
-            setP2pStatus(`SKIP (bad RTT ${rtt.toFixed(0)}ms)`);
-            return;
-          }
-          
-          const oneWayLatency = rtt / 2;
-          const history = [...rttHistoryRef.current, rtt].slice(-15);
-          rttHistoryRef.current = history;
+      if (!engineRef.current) return;
 
-          const diff = engineRef.current.getDiffSeconds(msg.masterTimecode);
-          setMasterDrift(diff);
+      if (msg.type === 'sync-request' && isHost) {
+        const response: SyncResponseMessage = {
+          type: 'sync-response',
+          masterTimecode: getUnshiftedTc(isRunning ? currentTcRef.current : engineRef.current.getTimecodeString()),
+          masterTimestamp: performance.now(),
+          fps: FPS_OPTIONS[fpsIndex].value,
+          isDropFrame: FPS_OPTIONS[fpsIndex].drop,
+          isRunning: isRunning,
+          isPaused: isPaused,
+          clientTimestamp: msg.clientTimestamp
+        };
+        peerSyncRef.current?.send(response);
 
-          const avgRtt = history.length > 0 ? history.reduce((a, b) => a + b, 0) / history.length : rtt;
-          const isRttStable = rtt <= avgRtt * 1.5 || rtt < 80;
-
-          const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
-          const shouldSync = (Math.abs(diff) >= 0.03 && isRttStable) || timeSinceLastSync >= 15000;
-
-          // FPSの同期
-          const masterFpsVal = msg.fps;
-          const masterDrop = msg.isDropFrame;
-          const matchedFpsIdx = FPS_OPTIONS.findIndex(opt => opt.value === masterFpsVal && opt.drop === masterDrop);
-          if (matchedFpsIdx !== -1 && matchedFpsIdx !== fpsIndex) {
-            setFpsIndex(matchedFpsIdx);
-          }
-
-          // 再生状態の同期
-          const masterRunning = msg.isRunning;
-          const masterPaused = msg.isPaused ?? false;
-
-          debug('[DEBUG-SYNC] sync-response: masterRunning:', masterRunning, 'masterPaused:', masterPaused, 'clientRunning:', isRunning, 'clientPaused:', isPaused);
-
-          if (masterRunning !== isRunning || masterPaused !== isPaused) {
-            debug('[DEBUG-SYNC] State mismatch detected in sync-response. Resolving...');
-            if (masterRunning && !isRunning) {
-              debug('[DEBUG-SYNC] Triggering handleStartStop to START');
-              void handleStartStop();
-            } else if (!masterRunning) {
-              if (masterPaused && isRunning) {
-                debug('[DEBUG-SYNC] Triggering handlePause to PAUSE');
-                handlePause();
-              } else if (!masterPaused && (isRunning || isPaused)) {
-                syncClientToStoppedMaster();
-              }
+        if (msg.clientId) {
+          // sync-request carries no rtt/drift — preserve whatever the client's
+          // 'report' messages last reported instead of zeroing it out.
+          setClients(prev => {
+            const existing = prev[msg.clientId!] ?? { rtt: 0, drift: 0 };
+            return { ...prev, [msg.clientId!]: { ...existing, lastSeen: Date.now() } };
+          });
+        }
+      } else if (msg.type === 'report' && isHost) {
+        if (msg.clientId) {
+          setClients(prev => ({
+            ...prev,
+            [msg.clientId!]: {
+              rtt: msg.rtt ?? 0,
+              drift: msg.drift ?? 0,
+              lastSeen: Date.now()
             }
-          }
+          }));
+        }
+      } else if (msg.type === 'sync-response' && !isHost) {
+        lastMasterContactTimeRef.current = Date.now();
+        const now = performance.now();
+        const rtt = now - (msg.clientTimestamp || now);
 
-          if (shouldSync && msg.isRunning) {
-            applySyncToWorklet(
-              msg.masterTimecode,
-              oneWayLatency,
-              msg.isRunning
-            );
-            lastSyncTimeRef.current = Date.now();
-          }
+        if (rtt < 0 || rtt > MAX_VALID_RTT_MS) {
+          setP2pStatus(`SKIP (bad RTT ${rtt.toFixed(0)}ms)`);
+          return;
+        }
 
-          const bestRtt = history.length > 0 ? Math.min(...history, rtt) : rtt;
-          setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (RTT ${rtt.toFixed(0)}ms / MIN ${bestRtt.toFixed(0)}ms)`);
+        const oneWayLatency = rtt / 2;
+        const history = [...rttHistoryRef.current, rtt].slice(-RTT_HISTORY_LEN);
+        rttHistoryRef.current = history;
 
+        const diff = engineRef.current.getDiffSeconds(msg.masterTimecode);
+        setMasterDrift(diff);
+
+        const avgRtt = history.length > 0 ? history.reduce((a, b) => a + b, 0) / history.length : rtt;
+        const isRttStable = rtt <= avgRtt * RTT_SPIKE_FACTOR || rtt < RTT_STABLE_FLOOR_MS;
+
+        const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
+        const shouldSync = (Math.abs(diff) >= DRIFT_RESYNC_THRESHOLD_SEC && isRttStable)
+          || timeSinceLastSync >= MAX_SYNC_INTERVAL_MS;
+
+        syncMasterFps(msg.fps, msg.isDropFrame);
+        reconcilePlaybackWithMaster(msg.isRunning, msg.isPaused ?? false, 'sync-response');
+
+        if (shouldSync && msg.isRunning) {
+          applySyncToWorklet(msg.masterTimecode, oneWayLatency, msg.isRunning);
+          lastSyncTimeRef.current = Date.now();
+        }
+
+        const bestRtt = history.length > 0 ? Math.min(...history, rtt) : rtt;
+        setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (RTT ${rtt.toFixed(0)}ms / MIN ${bestRtt.toFixed(0)}ms)`);
+
+        peerSyncRef.current?.send({
+          type: 'report',
+          rtt: bestRtt,
+          drift: diff
+        });
+      } else if (msg.type === 'heartbeat' && !isHost) {
+        lastMasterContactTimeRef.current = Date.now();
+        const diff = engineRef.current.getDiffSeconds(msg.masterTimecode);
+        setMasterDrift(diff);
+
+        const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
+        const shouldSync = Math.abs(diff) >= HEARTBEAT_RESYNC_THRESHOLD_SEC
+          || timeSinceLastSync >= MAX_SYNC_INTERVAL_MS;
+
+        syncMasterFps(msg.fps, msg.isDropFrame);
+        reconcilePlaybackWithMaster(msg.isRunning, msg.isPaused ?? false, 'heartbeat');
+
+        if (shouldSync && msg.isRunning) {
+          // Heartbeats carry no RTT sample — apply the assumed one-way latency.
+          applySyncToWorklet(msg.masterTimecode, HEARTBEAT_ASSUMED_LATENCY_MS, msg.isRunning);
+          lastSyncTimeRef.current = Date.now();
+        }
+        setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (HB)`);
+
+        lastHeartbeatTimeRef.current = Date.now();
+
+        if (Date.now() % CLIENT_REPORT_WINDOW_MS < CLIENT_REPORT_WINDOW_SLACK_MS) {
           peerSyncRef.current?.send({
             type: 'report',
-            masterTimecode: '',
-            masterTimestamp: 0,
-            fps: 0,
-            isDropFrame: false,
-            isRunning: false,
-            rtt: bestRtt,
+            rtt: rttHistoryRef.current.length > 0 ? Math.min(...rttHistoryRef.current) : 0,
             drift: diff
           });
-        } else if (msg.type === 'heartbeat' && !isHost) {
-          lastMasterContactTimeRef.current = Date.now();
-          const diff = engineRef.current.getDiffSeconds(msg.masterTimecode);
-          setMasterDrift(diff);
-
-          const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
-          const shouldSync = Math.abs(diff) >= 0.05 || timeSinceLastSync >= 15000;
-
-          // FPSの同期
-          const masterFpsVal = msg.fps;
-          const masterDrop = msg.isDropFrame;
-          const matchedFpsIdx = FPS_OPTIONS.findIndex(opt => opt.value === masterFpsVal && opt.drop === masterDrop);
-          if (matchedFpsIdx !== -1 && matchedFpsIdx !== fpsIndex) {
-            setFpsIndex(matchedFpsIdx);
-          }
-
-          // 再生状態の同期
-          const masterRunning = msg.isRunning;
-          const masterPaused = msg.isPaused ?? false;
-
-          debug('[DEBUG-SYNC] heartbeat: masterRunning:', masterRunning, 'masterPaused:', masterPaused, 'clientRunning:', isRunning, 'clientPaused:', isPaused);
-
-          if (masterRunning !== isRunning || masterPaused !== isPaused) {
-            debug('[DEBUG-SYNC] State mismatch detected in heartbeat. Resolving...');
-            if (masterRunning && !isRunning) {
-              debug('[DEBUG-SYNC] Triggering handleStartStop to START');
-              void handleStartStop();
-            } else if (!masterRunning) {
-              if (masterPaused && isRunning) {
-                debug('[DEBUG-SYNC] Triggering handlePause to PAUSE');
-                handlePause();
-              } else if (!masterPaused && (isRunning || isPaused)) {
-                syncClientToStoppedMaster();
-              }
-            }
-          }
-
-          if (shouldSync && msg.isRunning) {
-            applySyncToWorklet(msg.masterTimecode, 0.03, msg.isRunning);
-            lastSyncTimeRef.current = Date.now();
-          }
-          setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (HB)`);
-
-          lastHeartbeatTimeRef.current = Date.now();
-
-          if (Date.now() % 5000 < 500) {
-             peerSyncRef.current?.send({
-                type: 'report',
-                masterTimecode: '',
-                masterTimestamp: 0,
-                fps: 0,
-                isDropFrame: false,
-                isRunning: false,
-                rtt: rttHistoryRef.current.length > 0 ? Math.min(...rttHistoryRef.current) : 0,
-                drift: diff
-             });
-          }
         }
       }
     };
@@ -618,13 +575,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     }
   }, [userBits]);
 
-  useEffect(() => {
-    if (engineRef.current) {
-      const vol = outputLevel === 'line' ? volume : volume * 0.1;
-      engineRef.current.setVolume(vol);
-    }
-  }, [outputLevel, volume]);
-
   const handleSlateClick = useCallback(() => {
     setIsSlateFlashing(true);
     const beepDuration = 1 / FPS_OPTIONS[fpsIndex].value;
@@ -649,17 +599,12 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       if (!isHost && p2pRole === 'client') {
         const diff = masterDrift !== null ? Math.abs(masterDrift) : 0;
         const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
-        
-        if (diff >= 0.03 || timeSinceLastSync >= 15000) {
+
+        if (diff >= DRIFT_RESYNC_THRESHOLD_SEC || timeSinceLastSync >= MAX_SYNC_INTERVAL_MS) {
           const sendSync = (delay = 0) => {
             setTimeout(() => {
               peerSyncRef.current?.broadcast({
                 type: 'sync-request',
-                masterTimecode: '',
-                masterTimestamp: 0,
-                fps: 0,
-                isDropFrame: false,
-                isRunning: false,
                 clientTimestamp: performance.now()
               });
             }, delay);
@@ -697,10 +642,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   // useVuMeter() + <VuMeter>, consuming analyserRef directly, so its ~60Hz
   // state updates don't force this whole context's consumers to re-render.
 
-  useEffect(() => {
-    try { localStorage.setItem('ltc-camera-labels', JSON.stringify(cameraLabels)); } catch { /* ignore */ }
-  }, [cameraLabels]);
-
   const stateValue = useMemo<LTCStateType>(() => ({
     isRunning, setIsRunning,
     fpsIndex, setFpsIndex,
@@ -716,7 +657,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     autoUserBits, setAutoUserBits,
     isVisualSlate, setIsVisualSlate,
     isSlateFlashing,
-    slateTime, setSlateTime,
     userBits, setUserBits,
     markers, setMarkers,
     defaultReelName, setDefaultReelName,
@@ -731,7 +671,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     stopHoldPct,
     p2pSyncSource, setP2pSyncSource,
     showGuide, setShowGuide,
-    cameraLabels, setCameraLabels,
     isResyncing,
     lang, setLang,
     batteryLevel,
@@ -745,16 +684,16 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     nowTick,
   }), [
     isRunning, fpsIndex, volume, syncStatus, syncMode, isPreparing, manualTimecode, p2pRole,
-    activeTab, isMobile, outputMode, autoUserBits, isVisualSlate, isSlateFlashing, slateTime,
+    activeTab, isMobile, outputMode, autoUserBits, isVisualSlate, isSlateFlashing,
     userBits, markers, defaultReelName, outputLevel, outputOffset,
     peerId, targetId, p2pStatus, isHost, driftStatus, isPaused, stopHoldPct, p2pSyncSource,
-    showGuide, cameraLabels,
+    showGuide,
     isResyncing, lang, batteryLevel, isCharging, batteryEta, markerFlash, masterDrift, clients,
     packetLossRate, sceneName, nowTick,
     setIsRunning, setFpsIndex, setVolume, setSyncMode, setManualTimecode, setActiveTab, setOutputMode,
-    setAutoUserBits, setIsVisualSlate, setSlateTime, setUserBits, setMarkers, setDefaultReelName,
+    setAutoUserBits, setIsVisualSlate, setUserBits, setMarkers, setDefaultReelName,
     setOutputLevel, setOutputOffset, setTargetId, setP2pSyncSource, setShowGuide,
-    setCameraLabels, setLang, setPacketLossRate, setSceneName,
+    setLang, setPacketLossRate, setSceneName,
   ]);
 
   const actionsValue = useMemo<LTCActionsType>(() => ({
@@ -769,6 +708,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     stopHoldRafRef,
     tr,
     addToast,
+    setSlateTime,
     addMarker,
     removeMarker,
     updateMarkerComment,
@@ -787,7 +727,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   }), [
     analyserRef, canvasRef, engineRef, currentTcRef, isVisualSlateRef, slateTimeRef,
     holdStoppedRef, stopHoldStartRef, stopHoldRafRef,
-    tr, addToast, addMarker, removeMarker, updateMarkerComment, exportToEDL,
+    tr, addToast, setSlateTime, addMarker, removeMarker, updateMarkerComment, exportToEDL,
     exportToALE, handleSlateClick, resetP2P, setupP2PMaster, setupP2PClient, joinSession,
     handleStartStop, handlePause, beginStopHold, cancelStopHold, handleManualResync,
   ]);
@@ -795,7 +735,9 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   return (
     <LTCStateContext.Provider value={stateValue}>
       <LTCActionsContext.Provider value={actionsValue}>
-        {children}
+        <SlateTimeContext.Provider value={slateTime}>
+          {children}
+        </SlateTimeContext.Provider>
       </LTCActionsContext.Provider>
     </LTCStateContext.Provider>
   );

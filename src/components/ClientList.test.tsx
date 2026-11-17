@@ -7,6 +7,7 @@ describe('ClientList', () => {
     clients: {} as Record<string, { lastSeen: number; rtt: number; drift: number }>,
     nowTick: 1000,
     isHost: true,
+    tr: (key: string) => key,
   };
 
   it('returns null when not host', () => {

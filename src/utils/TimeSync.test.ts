@@ -107,6 +107,40 @@ describe('TimeSync', () => {
     await expect(TimeSync.sync(1)).rejects.toThrow('All time servers failed');
   });
 
+  it('parses dateTime values that already carry a numeric zone offset', async () => {
+    // Regression: '2025-…+09:00' used to get a 'Z' appended → Invalid Date →
+    // NaN offset accepted as the best sample. A wall time labelled +09:00
+    // that equals "now" should yield a near-zero, finite offset.
+    const wallAsPlus9 = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '+09:00');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ dateTime: wallAsPlus9 }),
+    }));
+
+    const result = await TimeSync.sync(1);
+    expect(Number.isFinite(result.offset)).toBe(true);
+    expect(Math.abs(result.offset)).toBeLessThan(60_000);
+  });
+
+  it('skips unparseable timestamps instead of caching a NaN offset', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ dateTime: 'not-a-real-date' }),
+    }));
+
+    await expect(TimeSync.sync(1)).rejects.toThrow('All time servers failed');
+    expect(localStorage.getItem(NTP_CACHE_KEY)).toBeNull();
+  });
+
+  it('rejects offsets beyond the 24h sanity bound', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ dateTime: '2100-01-01T00:00:00Z' }),
+    }));
+
+    await expect(TimeSync.sync(1)).rejects.toThrow('All time servers failed');
+  });
+
   it('aborts and recovers when a request exceeds the timeout', async () => {
     // fetch rejects as if aborted; with a fresh cache we fall back to it.
     localStorage.setItem(NTP_CACHE_KEY, JSON.stringify({
