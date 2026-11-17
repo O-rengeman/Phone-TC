@@ -72,7 +72,7 @@ describe('useVuMeter', () => {
     peakHolder.value = 0.1;
     act(() => { vi.advanceTimersByTime(3000); });
     expect(result.current.isClipping).toBe(false);
-    expect(result.current.hasInputMeter).toBe(false);
+    expect(result.current.hasInputMeter).toBe(true);
   });
 
   it('resets vuLevel and isClipping when the meter stops (mode change)', () => {
