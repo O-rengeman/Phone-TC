@@ -288,16 +288,10 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const {
-    markers, setMarkers, markerFlash,
-    addMarker, removeMarker, updateMarkerComment,
-    exportToEDL, exportToALE,
-  } = useMarkers({ engineRef, fpsIndex, defaultReelName, sceneName, langRef, addToast });
-
-  const {
     peerId, targetId, setTargetId, p2pStatus, setP2pStatus, isHost,
     masterDrift, setMasterDrift, clients, setClients,
     packetLossRate, setPacketLossRate,
-    peerSyncRef, messageHandlerRef, rttHistoryRef, lastSyncTimeRef, lastHeartbeatTimeRef, lastMasterContactTimeRef,
+    peerSyncRef, messageHandlerRef, rttHistoryRef, lastSyncTimeRef, lastP2pSyncTimeRef, lastHeartbeatTimeRef, lastMasterContactTimeRef,
     resetP2P, setupP2PMaster, setupP2PClient, joinSession,
   } = useP2P({
     syncMode,
@@ -384,6 +378,15 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     syncMode, isRunning, p2pRole, fpsIndex, outputOffset,
     engineRef, driftMonitorRef, lastNetworkOffsetRef,
     applySyncToWorklet, langRef, addToast,
+  });
+
+  const {
+    markers, setMarkers, markerFlash,
+    addMarker, removeMarker, updateMarkerComment,
+    exportToEDL, exportToALE,
+  } = useMarkers({ engineRef, fpsIndex, defaultReelName, sceneName, langRef, addToast,
+    syncMode, driftMonitorRef, p2pDriftSeconds: p2pRole === 'client' ? masterDrift : null,
+    p2pLastSyncRef: lastP2pSyncTimeRef,
   });
 
   const {
@@ -513,6 +516,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
         if (shouldSync && msg.isRunning) {
           applySyncToWorklet(msg.masterTimecode, oneWayLatency, msg.isRunning);
           lastSyncTimeRef.current = Date.now();
+          lastP2pSyncTimeRef.current = lastSyncTimeRef.current;
         }
 
         const bestRtt = history.length > 0 ? Math.min(...history, rtt) : rtt;
@@ -539,6 +543,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
           // Heartbeats carry no RTT sample — apply the assumed one-way latency.
           applySyncToWorklet(msg.masterTimecode, HEARTBEAT_ASSUMED_LATENCY_MS, msg.isRunning);
           lastSyncTimeRef.current = Date.now();
+          lastP2pSyncTimeRef.current = lastSyncTimeRef.current;
         }
         setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (HB)`);
 
