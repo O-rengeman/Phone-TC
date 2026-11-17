@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { LTCSyncProvider, useLTC } from './LTCSyncContext';
 import { FPS_OPTIONS } from './constants';
 import { VideoPlayer } from './VideoPlayer';
@@ -13,12 +13,14 @@ import { FooterControls } from './components/FooterControls';
 import { MarkerList } from './components/MarkerList';
 import { ClientList } from './components/ClientList';
 import { PwaRegister } from './components/PwaRegister';
+import { LivePreflightScreen } from './components/PreflightScreen';
 import './App.css';
 
 const DesktopShell = lazy(() => import('./components/desktop/DesktopShell').then(m => ({ default: m.DesktopShell })));
 const VisualSlate = lazy(() => import('./components/VisualSlate').then(m => ({ default: m.VisualSlate })));
 
 function MainApp() {
+  const [showPreflight, setShowPreflight] = useState(false);
   const {
     isRunning,
     fpsIndex,
@@ -127,6 +129,7 @@ function MainApp() {
         setLang={setLang}
         setShowGuide={setShowGuide}
         tr={tr}
+        onOpenPreflight={() => setShowPreflight(true)}
       />
 
       {isMobile && (
@@ -357,6 +360,7 @@ function MainApp() {
       )}
 
       <GuideOverlay showGuide={showGuide} setShowGuide={setShowGuide} tr={tr} />
+      {showPreflight && <LivePreflightScreen onClose={() => setShowPreflight(false)} />}
     </div>
   );
 }
