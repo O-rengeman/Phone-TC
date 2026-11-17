@@ -54,6 +54,7 @@ describe('useP2P — thin state-transition coverage', () => {
     expect(result.current.p2pStatus).toBe('P2P DISCONNECTED');
     expect(result.current.peerId).toBe('');
     expect(result.current.isHost).toBe(false);
+    expect(result.current.lastP2pSyncTimeRef.current).toBe(0);
   });
 
   it('setupP2PMaster initializes a peer and marks this device as host', async () => {
@@ -92,11 +93,15 @@ describe('useP2P — thin state-transition coverage', () => {
     const { result } = renderHook(() => useP2P(makeParams({ setP2pRole })));
     await act(async () => { await result.current.setupP2PMaster(); });
 
+    result.current.lastP2pSyncTimeRef.current = Date.now();
+    act(() => result.current.setMasterDrift(0.01));
     act(() => result.current.resetP2P());
 
     expect(destroy).toHaveBeenCalled();
     expect(setP2pRole).toHaveBeenCalledWith(null);
     expect(result.current.p2pStatus).toBe('P2P RESET');
+    expect(result.current.lastP2pSyncTimeRef.current).toBe(0);
+    expect(result.current.masterDrift).toBeNull();
   });
 
   it('joinSession connects to the current targetId and switches syncMode to p2p', async () => {

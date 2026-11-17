@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useMarkers } from './useMarkers';
 import type { LtcEngine } from '../utils/LtcEngine';
 import type { Lang } from '../utils/i18n';
+import { DriftMonitor } from '../utils/DriftMonitor';
 
 // vi.mock factories are hoisted above regular const declarations — anything
 // referenced inside one must be created via vi.hoisted() or the factory
@@ -66,6 +67,49 @@ describe('useMarkers', () => {
     expect(addToast).toHaveBeenLastCalledWith(expect.any(String), 'error');
   });
 
+
+  it('does not log stopped heartbeat drift or an age until a P2P sync is applied', () => {
+    const lastSyncRef = { current: 0 };
+    const { result } = renderHook(() => useMarkers(makeParams({ syncMode: 'p2p', p2pDriftSeconds: 0.012, p2pLastSyncRef: lastSyncRef })));
+    act(() => result.current.addMarker('Red'));
+    expect(result.current.markers[0].sync).toEqual({ method: 'p2p', driftMs: null, driftFrames: null, msSinceSync: null, confidence: 'none' });
+    lastSyncRef.current = Date.now() - 1000;
+    act(() => result.current.addMarker('Blue'));
+    expect(result.current.markers[0].sync).toMatchObject({ method: 'p2p', driftMs: 12, driftFrames: 0.3 });
+    expect(result.current.markers[0].sync?.msSinceSync).toBeGreaterThanOrEqual(1000);
+    lastSyncRef.current = 0;
+    act(() => result.current.addMarker('Green'));
+    expect(result.current.markers[0].sync?.msSinceSync).toBeNull();
+    expect(result.current.markers[0].sync?.driftMs).toBeNull();
+  });
+  it('snapshots current mode and measured P2P seconds in milliseconds without changing earlier takes', () => {
+    const { result, rerender } = renderHook(({ mode, drift }: { mode: 'p2p' | 'system'; drift: number | null }) => useMarkers(makeParams({ syncMode: mode, p2pDriftSeconds: drift, p2pLastSyncRef: { current: Date.now() - 1000 } })), { initialProps: { mode: 'p2p', drift: 0.01234 } });
+    act(() => result.current.addMarker('Red'));
+    const first = result.current.markers[0];
+    expect(first.sync).toMatchObject({ method: 'p2p', driftMs: 12.34, driftFrames: 0.309, confidence: 'none' });
+    rerender({ mode: 'system', drift: null });
+    act(() => result.current.addMarker('Blue'));
+    expect(result.current.markers[0].sync).toEqual({ method: 'system', driftMs: null, driftFrames: null, msSinceSync: null, confidence: 'none' });
+    expect(first.sync?.driftMs).toBe(12.34);
+  });
+
+  it('reads the live monitor after a stopped resync without a state update, using current time and fps', () => {
+    vi.useFakeTimers();
+    const monitor = new DriftMonitor();
+    const { result, rerender } = renderHook(({ fpsIndex }) => useMarkers(makeParams({ driftMonitorRef: { current: monitor }, fpsIndex })), { initialProps: { fpsIndex: 2 } });
+    act(() => result.current.addMarker('Red'));
+    expect(result.current.markers[0].sync?.driftMs).toBeNull();
+    monitor.addSync(10);
+    vi.setSystemTime(Date.now() + 41152);
+    rerender({ fpsIndex: 5 });
+    act(() => result.current.addMarker('Red'));
+    expect(result.current.markers[0].sync).toEqual({ method: 'network', driftMs: 1.235, driftFrames: 0.037, msSinceSync: 41152, confidence: 'medium' });
+    monitor.reset();
+    act(() => result.current.addMarker('Blue'));
+    expect(result.current.markers[0].sync?.driftMs).toBeNull();
+    expect(result.current.markers[0].sync?.confidence).toBe('none');
+    vi.useRealTimers();
+  });
   it('starts empty when localStorage has no saved markers', () => {
     const { result } = renderHook(() => useMarkers(makeParams()));
     expect(result.current.markers).toEqual([]);
