@@ -47,6 +47,7 @@ interface UseP2PResult {
   messageHandlerRef: React.MutableRefObject<((msg: SyncMessage) => void) | null>;
   rttHistoryRef: React.MutableRefObject<number[]>;
   lastSyncTimeRef: React.MutableRefObject<number>;
+  lastP2pSyncTimeRef: React.MutableRefObject<number>;
   lastHeartbeatTimeRef: React.MutableRefObject<number>;
   lastMasterContactTimeRef: React.MutableRefObject<number>;
   resetP2P: () => void;
@@ -91,6 +92,7 @@ export function useP2P({
   const messageHandlerRef = useRef<((msg: SyncMessage) => void) | null>(null);
   const rttHistoryRef = useRef<number[]>([]);
   const lastSyncTimeRef = useRef<number>(0);
+  const lastP2pSyncTimeRef = useRef<number>(0);
   const lastHeartbeatTimeRef = useRef<number>(0);
   const lastMasterContactTimeRef = useRef<number>(0);
   const masterTimeoutHandledRef = useRef(false);
@@ -108,6 +110,8 @@ export function useP2P({
     setP2pRole(null);
     setIsHost(false);
     setPeerId('');
+    lastP2pSyncTimeRef.current = 0;
+    setMasterDrift(null);
     if (syncMode === 'p2p') setSyncMode('network');
     setP2pStatus('P2P RESET');
   }, [syncMode, setP2pRole, setSyncMode]);
@@ -250,7 +254,7 @@ export function useP2P({
     peerId, targetId, setTargetId, p2pStatus, setP2pStatus, isHost,
     masterDrift, setMasterDrift, clients, setClients,
     packetLossRate, setPacketLossRate,
-    peerSyncRef, messageHandlerRef, rttHistoryRef, lastSyncTimeRef, lastHeartbeatTimeRef, lastMasterContactTimeRef,
+    peerSyncRef, messageHandlerRef, rttHistoryRef, lastSyncTimeRef, lastP2pSyncTimeRef, lastHeartbeatTimeRef, lastMasterContactTimeRef,
     resetP2P, setupP2PMaster, setupP2PClient, joinSession,
   };
 }
