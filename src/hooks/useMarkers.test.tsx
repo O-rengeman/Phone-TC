@@ -64,7 +64,7 @@ describe('useMarkers', () => {
     const status = { hasSync: true, msSinceSync: 1200, estimatedDriftMs: 1.23456, estimatedDriftFrames: 0.030864, confidence: 'medium' as const, measured: false, driftRatePpm: 30, rejamRecommended: false };
     const { result, rerender } = renderHook(({ driftStatus }) => useMarkers(makeParams({ driftStatus })), { initialProps: { driftStatus: status } });
     act(() => result.current.addMarker('Red'));
-    expect(result.current.markers[0].sync).toEqual({ method: 'ntp', driftMs: 1.235, driftFrames: 0.031, msSinceSync: 1200, confidence: 'medium' });
+    expect(result.current.markers[0].sync).toEqual({ method: 'network', driftMs: 1.235, driftFrames: 0.031, msSinceSync: 1200, confidence: 'medium' });
     rerender({ driftStatus: { ...status, hasSync: false, estimatedDriftMs: Infinity } });
     act(() => result.current.addMarker('Blue'));
     expect(result.current.markers[0].sync?.driftMs).toBeNull();

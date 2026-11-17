@@ -6,7 +6,7 @@ import type { DriftConfidence } from './DriftMonitor';
 export type MarkerColor = 'Red' | 'Blue' | 'Green' | 'Yellow';
 
 export interface MarkerSync {
-  method: 'ntp' | 'p2p' | 'system' | 'freerun';
+  method: 'network' | 'p2p' | 'system' | 'freerun';
   driftMs: number | null;
   driftFrames: number | null;
   msSinceSync: number | null;

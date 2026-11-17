@@ -116,7 +116,7 @@ export function useMarkers({
 
   const addMarker = (color: MarkerColor) => {
     const current = syncRef.current;
-    const sync: MarkerSync = { method: current.syncMode === 'network' ? 'ntp' : current.syncMode, driftMs: null, driftFrames: null, msSinceSync: null, confidence: 'none' };
+    const sync: MarkerSync = { method: current.syncMode, driftMs: null, driftFrames: null, msSinceSync: null, confidence: 'none' };
     const round = (value: number) => Number.isFinite(value) ? Math.round(value * 1000) / 1000 : null;
     if (current.syncMode === 'network' && current.driftStatus?.hasSync) {
       sync.driftMs = round(current.driftStatus.estimatedDriftMs);
