@@ -30,8 +30,8 @@ jobs:
         run: npm ci
 
       - name: Build
-        # GitHub Pages serves the project site under /Phone-TC/, so base must match.
-        run: npx tsc -b && npx vite build --base=/Phone-TC/
+        # GitHub Pages lowercases the repo name in the site path; base must match.
+        run: npx tsc -b && npx vite build --base=/phone-tc/
 
       - uses: actions/configure-pages@v5
 
