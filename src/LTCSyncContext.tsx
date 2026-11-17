@@ -286,12 +286,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const {
-    markers, setMarkers, markerFlash,
-    addMarker, removeMarker, updateMarkerComment,
-    exportToEDL, exportToALE,
-  } = useMarkers({ engineRef, fpsIndex, defaultReelName, sceneName, langRef, addToast });
-
-  const {
     peerId, targetId, setTargetId, p2pStatus, setP2pStatus, isHost,
     masterDrift, setMasterDrift, clients, setClients,
     packetLossRate, setPacketLossRate,
@@ -382,6 +376,15 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     syncMode, isRunning, p2pRole, fpsIndex, outputOffset,
     engineRef, driftMonitorRef, lastNetworkOffsetRef,
     applySyncToWorklet, langRef, addToast,
+  });
+
+  const {
+    markers, setMarkers, markerFlash,
+    addMarker, removeMarker, updateMarkerComment,
+    exportToEDL, exportToALE,
+  } = useMarkers({ engineRef, fpsIndex, defaultReelName, sceneName, langRef, addToast,
+    syncMode, driftStatus, p2pDriftSeconds: p2pRole === 'client' ? masterDrift : null,
+    p2pLastSyncRef: lastSyncTimeRef,
   });
 
   const {

@@ -48,6 +48,22 @@ describe('buildEdl', () => {
 });
 
 describe('buildAle', () => {
+  it('appends five sync columns, keeps legacy fields blank and sanitizes rows', () => {
+    const ale = buildAle([{ ...markers[0], sceneName: 'a\tb\nc', comment: 'x\ry', sync: { method: 'ntp', driftMs: 1.2, driftFrames: 0.03, msSinceSync: 1500, confidence: 'high' } }, markers[1]], '25\n');
+    const columns = ale.split('Column\n')[1].split('\n')[0].split('\t');
+    expect(columns.slice(7)).toEqual(['Sync_Method', 'Sync_Drift_ms', 'Sync_Drift_Frames', 'Sync_Age_s', 'Sync_Confidence']);
+    const rows = ale.split('Data\n')[1].split('\n').filter(Boolean).map(row => row.split('\t'));
+    expect(rows.map(row => row.length)).toEqual([12, 12]);
+    expect(rows[0].slice(7)).toEqual(['ntp', '1.2', '0.03', '1.5', 'high']);
+    expect(rows[1].slice(7)).toEqual(['', '', '', '', '']);
+    expect(rows[0][4]).toBe('abc');
+    expect(rows[0][6]).toContain('xy');
+  });
+
+  it('leaves unknown and nonfinite numeric sync fields blank', () => {
+    const ale = buildAle([{ ...markers[0], sync: { method: 'p2p', driftMs: Infinity, driftFrames: NaN, msSinceSync: null, confidence: 'none' } }], '25');
+    expect(ale).toContain('\tp2p\t\t\t\tnone\n');
+  });
   it('includes the FPS label and a heading block', () => {
     const ale = buildAle(markers, '23.976');
     expect(ale).toContain('FPS\t23.976');

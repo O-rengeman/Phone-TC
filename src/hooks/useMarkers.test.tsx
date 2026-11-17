@@ -49,6 +49,27 @@ afterEach(() => {
 });
 
 describe('useMarkers', () => {
+  it('snapshots current mode and measured P2P seconds in milliseconds without changing earlier takes', () => {
+    const { result, rerender } = renderHook(({ mode, drift }: { mode: 'p2p' | 'system'; drift: number | null }) => useMarkers(makeParams({ syncMode: mode, p2pDriftSeconds: drift, p2pLastSyncRef: { current: Date.now() - 1000 } })), { initialProps: { mode: 'p2p', drift: 0.01234 } });
+    act(() => result.current.addMarker('Red'));
+    const first = result.current.markers[0];
+    expect(first.sync).toMatchObject({ method: 'p2p', driftMs: 12.34, driftFrames: 0.309, confidence: 'none' });
+    rerender({ mode: 'system', drift: null });
+    act(() => result.current.addMarker('Blue'));
+    expect(result.current.markers[0].sync).toEqual({ method: 'system', driftMs: null, driftFrames: null, msSinceSync: null, confidence: 'none' });
+    expect(first.sync?.driftMs).toBe(12.34);
+  });
+
+  it('captures rounded network drift and rejects nonfinite measurements', () => {
+    const status = { hasSync: true, msSinceSync: 1200, estimatedDriftMs: 1.23456, estimatedDriftFrames: 0.030864, confidence: 'medium' as const, measured: false, driftRatePpm: 30, rejamRecommended: false };
+    const { result, rerender } = renderHook(({ driftStatus }) => useMarkers(makeParams({ driftStatus })), { initialProps: { driftStatus: status } });
+    act(() => result.current.addMarker('Red'));
+    expect(result.current.markers[0].sync).toEqual({ method: 'ntp', driftMs: 1.235, driftFrames: 0.031, msSinceSync: 1200, confidence: 'medium' });
+    rerender({ driftStatus: { ...status, hasSync: false, estimatedDriftMs: Infinity } });
+    act(() => result.current.addMarker('Blue'));
+    expect(result.current.markers[0].sync?.driftMs).toBeNull();
+    expect(result.current.markers[0].sync?.confidence).toBe('none');
+  });
   it('starts empty when localStorage has no saved markers', () => {
     const { result } = renderHook(() => useMarkers(makeParams()));
     expect(result.current.markers).toEqual([]);
