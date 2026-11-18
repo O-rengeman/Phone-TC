@@ -1,21 +1,14 @@
-import { useCallback, useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { LTCSyncProvider, useLTC } from './LTCSyncContext';
-import { FPS_OPTIONS } from './constants';
-import { VideoPlayer } from './VideoPlayer';
-import { ConnectionManager } from './ConnectionManager';
-import type { SyncMode } from './LTCSyncContext';
-import { formatSyncAge } from './utils/DriftMonitor';
 import { Toaster, toast } from 'react-hot-toast';
 import { GuideOverlay } from './components/GuideOverlay';
 import { HeaderBar } from './components/HeaderBar';
-import { HelpButton } from './components/HelpButton';
 import { FooterControls } from './components/FooterControls';
-import { MarkerList } from './components/MarkerList';
-import { ClientList } from './components/ClientList';
-import { PresetsPanel } from './components/PresetsPanel';
 import { PwaRegister } from './components/PwaRegister';
-import { VuMeter } from './components/VuMeter';
 import { LivePreflightScreen } from './components/PreflightScreen';
+import { MobileMainPane } from './components/mobile/MainPane';
+import { MobileSyncPane } from './components/mobile/SyncPane';
+import { MobileToolsPane } from './components/mobile/ToolsPane';
 import './App.css';
 import './mobile-shell.css';
 
@@ -27,74 +20,39 @@ function MainApp() {
   const {
     isRunning,
     fpsIndex,
-    setFpsIndex,
-    syncStatus,
     syncMode,
-    setSyncMode,
     isPreparing,
-    manualTimecode,
-    setManualTimecode,
     p2pRole,
     activeTab,
     setActiveTab,
     isMobile,
-    outputMode,
     setOutputMode,
-    autoUserBits,
-    setAutoUserBits,
     isSlateFlashing,
     isVisualSlate,
     setIsVisualSlate,
     userBits,
-    setUserBits,
     markers,
     defaultReelName,
-    setDefaultReelName,
-    outputOffset,
-    setOutputOffset,
-    isHost,
-    driftStatus,
     isPaused,
     stopHoldPct,
     showGuide,
     setShowGuide,
-    isResyncing,
     lang,
     setLang,
     batteryLevel,
     isCharging,
     batteryEta,
     markerFlash,
-    clients,
-    nowTick,
     sceneName,
-    setSceneName,
     tr,
     addMarker,
-    removeMarker,
-    updateMarkerComment,
-    exportToEDL,
-    exportToALE,
-    exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO,
-    recallTimecode,
     handleSlateClick,
     handleStartStop,
     handlePause,
     beginStopHold,
     cancelStopHold,
-    handleManualResync,
     holdStoppedRef,
-    engineRef,
-    currentTcRef,
   } = useLTC();
-
-  // Live TC for the marker-timeline playhead — same source VideoPlayer uses:
-  // the worklet-fed ref while running, the engine's TC while idle.
-  const getCurrentTc = useCallback(() => {
-    const engine = engineRef.current;
-    if (!engine) return '';
-    return isRunning ? currentTcRef.current : engine.getTimecodeString();
-  }, [isRunning, engineRef, currentTcRef]);
 
   const handleOutputModeChange = (mode: 'stereo' | 'mono-l') => {
     // Output routing is fixed for the session: mono-L acquires the mic stream
@@ -133,7 +91,7 @@ function MainApp() {
   }, []);
 
   return (
-    <div className={`app-container ${isMobile ? 'mobile-view mobile-shell-v2' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
+    <div className={`app-container ${isMobile ? 'mobile-view mobile-shell-v2 mobile-noscroll' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
       <PwaRegister />
       <HeaderBar
         isRunning={isRunning}
@@ -166,182 +124,14 @@ function MainApp() {
       )}
 
       {isMobile && (
-      <main className="tab-content tab-content-v2">
-        {activeTab === 'main' && (
-          <div className="tab-pane main-pane">
-            <VideoPlayer />
-
-            {syncMode === 'network' && (
-              <div className="main-sync-bar main-sync-bar-v2">
-                <div className="msb-info">
-                  <span className="msb-label">{tr('sync.label')}</span>
-                  <span className="msb-mode">{tr('sync.network')}</span>
-                  {isRunning && driftStatus && driftStatus.hasSync && (
-                    <span className="msb-age">{formatSyncAge(driftStatus.msSinceSync)}</span>
-                  )}
-                </div>
-                <button type="button" className="msb-resync" onClick={() => void handleManualResync()} disabled={isResyncing}>
-                  {isResyncing ? tr('sync.resyncing') : tr('sync.resync')}
-                </button>
-              </div>
-            )}
-
-            <div className="control-section control-section-v2">
-              <label className="section-label">
-                {tr('label.frameRate')}
-                <HelpButton topic="timecode" tr={tr} variant="inline" />
-              </label>
-              <div className="fps-grid-compact">
-                {FPS_OPTIONS.map((opt, i) => (
-                  <button
-                    key={opt.label}
-                    className={`btn-pill ${fpsIndex === i ? 'active' : ''}`}
-                    onClick={() => setFpsIndex(i)}
-                    disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="control-section control-section-v2">
-              <label className="section-label">{tr('label.outputMode')}</label>
-              <div className="sync-toggle-pro">
-                <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')} disabled={isRunning}>{tr('out.stereoTc')}</button>
-                <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')} disabled={isRunning}>{tr('out.ltcRaudio')}</button>
-              </div>
-              {/* Mono-L routes the mic into the output, so the input level and
-                  clip badge matter exactly while it is running. */}
-              {isRunning && outputMode === 'mono-l' && <VuMeter />}
-            </div>
-
-            <div className="control-section control-section-v2">
-              <label className="section-label">{tr('cm.tcOffset')}</label>
-              <div className="offset-control">
-                <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} aria-label={tr('cm.tcOffset')} />
-                <span className="offset-value">{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'sync' && (
-          <div className="tab-pane sync-pane">
-            <div className="control-section control-section-v2">
-              <label className="section-label">
-                {tr('label.syncMethod')}
-                <HelpButton topic="sync" tr={tr} variant="inline" />
-              </label>
-              <div className="sync-toggle-pro">
-                {(['system', 'network', 'p2p', 'freerun'] as SyncMode[]).map((m) => (
-                  <button
-                    key={m}
-                    className={syncMode === m ? 'active' : ''}
-                    onClick={() => setSyncMode(m)}
-                    disabled={isRunning || (m === 'p2p' && !p2pRole)}
-                  >
-                    {m === 'freerun' ? tr('mode.freerun') : m.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-              {syncStatus && syncMode === 'network' && (
-                <div className="sync-detail">{tr('cm.latencyOffset', { latency: syncStatus.latency.toFixed(1), offset: syncStatus.offset.toFixed(1) })}</div>
-              )}
-              {syncMode === 'network' && isRunning && driftStatus && driftStatus.hasSync && (
-                <div className="drift-panel">
-                  <div className="drift-row">
-                    <span>{tr('drift.lastSync')}</span>
-                    <span>{formatSyncAge(driftStatus.msSinceSync)} {tr('drift.ago')}</span>
-                  </div>
-                  {driftStatus.rejamRecommended && (
-                    <div className="drift-rejam">⚠️ {tr('drift.rejam')}</div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {syncMode === 'freerun' && (
-              <div className="control-section control-section-v2">
-                <label className="section-label">{tr('label.startTc')}</label>
-                <div className="section-content">
-                  <input
-                    className="tc-input"
-                    value={manualTimecode}
-                    onChange={(e) => setManualTimecode(e.target.value)}
-                    disabled={isRunning}
-                    placeholder="HH:MM:SS:FF"
-                    inputMode="numeric"
-                    maxLength={11}
-                  />
-                </div>
-              </div>
-            )}
-
-            <ConnectionManager />
-          </div>
-        )}
-
-        {activeTab === 'tools' && (
-          <div className="tab-pane tools-pane">
-            <section className="tool-section-shell tool-section-shell-meta tool-section-shell-meta-v2">
-              <div className="tools-grid-pro tools-grid-meta">
-                <div className="tool-card tool-card-userbits span-2">
-                  <label>{tr('label.userBits')}</label>
-                  <div className="userbits-row">
-                    <input value={userBits} onChange={e => setUserBits(e.target.value.toUpperCase().replace(/[^0-9A-F]/g, ''))} maxLength={8} disabled={autoUserBits} />
-                    <button className={`btn-pill ${autoUserBits ? 'active' : ''}`} onClick={() => setAutoUserBits(!autoUserBits)}>{tr('btn.auto')}</button>
-                  </div>
-                </div>
-                <div className="tool-card tool-card-meta">
-                  <label>{tr('label.defaultReel')}</label>
-                  <input
-                    value={defaultReelName}
-                    onChange={e => setDefaultReelName(e.target.value.toUpperCase())}
-                    maxLength={8}
-                    placeholder="A001"
-                  />
-                </div>
-                <div className="tool-card tool-card-meta">
-                  <label>{tr('label.defaultScene')}</label>
-                  <input
-                    value={sceneName}
-                    onChange={e => setSceneName(e.target.value.toUpperCase())}
-                    maxLength={8}
-                    placeholder="001"
-                  />
-                </div>
-              </div>
-            </section>
-
-            <PresetsPanel />
-
-            <MarkerList
-              markers={markers}
-              addMarker={addMarker}
-              removeMarker={removeMarker}
-              updateMarkerComment={updateMarkerComment}
-              exportToEDL={exportToEDL}
-              exportToALE={exportToALE}
-              exportToFCPXML={exportToFCPXML}
-              exportToResolve={exportToResolve}
-              exportToCSV={exportToCSV}
-              exportToOTIO={exportToOTIO}
-              recallTimecode={recallTimecode}
-              fpsIndex={fpsIndex}
-              getCurrentTc={getCurrentTc}
-              isMobile={isMobile}
-              tr={tr}
-            />
-
-            <ClientList
-              clients={clients}
-              nowTick={nowTick}
-              isHost={isHost}
-              tr={tr}
-            />
-          </div>
-        )}
+      <main className="tab-content tab-content-v3">
+        {/* The pane bodies are owned by the mobile-panes packages; this shell
+            only switches them on activeTab. `tab-content` is kept for the
+            legacy selectors, `tab-content-v3` fixes it to a no-scroll flex
+            region (see mobile-shell.css). */}
+        {activeTab === 'main' && <MobileMainPane onOutputModeChange={handleOutputModeChange} />}
+        {activeTab === 'sync' && <MobileSyncPane />}
+        {activeTab === 'tools' && <MobileToolsPane />}
       </main>
       )}
 

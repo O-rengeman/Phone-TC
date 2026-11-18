@@ -113,8 +113,9 @@
 .mobile-view .quick-marks-v2 .btn-mark-large.yellow:active { background: rgba(245, 158, 11, 0.22); }
 
 /* ─────────────────────────────────────────────────────────────
-   Take log header — label on top, export chips in a single
-   horizontally-scrollable row so narrow widths never crush them.
+   Take log header — label on top, export chips in a no-scroll grid
+   (3 columns × 2 rows; 6 columns on short landscape phones) so all
+   six exporters are visible without horizontal scrolling.
    ───────────────────────────────────────────────────────────── */
 .mobile-view .tool-section-shell.take-log-v2 {
   gap: 10px;
@@ -128,27 +129,23 @@
 }
 
 .mobile-view .take-log-v2 .export-chips-v2 {
-  display: flex;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-top: 0;
-  padding-bottom: 2px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-.mobile-view .take-log-v2 .export-chips-v2::-webkit-scrollbar {
-  display: none;
 }
 
 .mobile-view .take-log-v2 .export-chips-v2 .btn-export-pro {
-  flex: 0 0 auto;
+  min-width: 0;
   min-height: 36px;
-  padding: 8px 15px;
+  padding: 8px 6px;
   border-radius: 999px;
   font-size: 0.66rem;
   letter-spacing: 0.8px;
   background: var(--panel-elevated);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .mobile-view .take-log-v2 .export-chips-v2 .btn-export-pro:active {
   border-color: var(--primary);
@@ -205,14 +202,14 @@
 }
 
 /* `.marker-scroll` in the chain beats App.css's
-   `.mobile-view .tool-section-shell .marker-scroll` (0-3-0, later order). */
+   `.mobile-view .tool-section-shell .marker-scroll` (0-3-0, later order).
+   The box is bounded and clipped — the no-scroll UI pages marker rows
+   through MobilePager (take-log-v3) instead of scrolling this region. */
 .mobile-view .take-log-v2 .marker-scroll.marker-scroll-v2 {
   height: auto;
   min-height: 110px;
   max-height: min(320px, 36dvh);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -332,7 +329,9 @@
 
 .mobile-view .preset-panel-v2 .preset-list {
   gap: 8px;
-  max-height: min(300px, 32dvh);
+  /* No scroll region: MobilePager pages the list; presets.css clips it. */
+  max-height: none;
+  overflow: hidden;
 }
 
 .mobile-view .preset-panel-v2 .preset-empty {

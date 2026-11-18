@@ -18,6 +18,15 @@ describe('t', () => {
     expect(t('btn.start', 'en', { unused: 1 })).toBe('START');
   });
 
+  it('exposes the mobile pager strings in both languages', () => {
+    expect(t('pager.prev', 'en')).toBe('PREV');
+    expect(t('pager.next', 'en')).toBe('NEXT');
+    expect(t('pager.prev', 'ja')).toBe('前へ');
+    expect(t('pager.next', 'ja')).toBe('次へ');
+    expect(t('pager.status', 'en', { page: 2, total: 5 })).toBe('2 / 5');
+    expect(t('pager.status', 'ja', { page: 2, total: 5 })).toBe('2 / 5');
+  });
+
   it('has Japanese parity for every English key', () => {
     const testKeys = [
       'tab.main', 'status.ready', 'label.frameRate', 'btn.start',

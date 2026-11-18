@@ -1,11 +1,42 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { MobilePager } from './mobile/MobilePager';
 
 interface GuideOverlayProps {
   showGuide: boolean;
   setShowGuide: (v: boolean) => void;
-  tr: (key: string) => string;
-  /** Mobile renders the guide as a bottom sheet (v2 chrome). */
+  tr: (key: string, vars?: Record<string, string | number>) => string;
+  /** Mobile renders the guide as a fixed-height bottom sheet whose
+      five steps are split across two pager pages (1-3 / 4-5 + tip)
+      instead of scrolling. */
   isMobile?: boolean;
+}
+
+/** Paged guide body — mounted only while the sheet is open, so its page
+    state naturally resets to step 1 every time the guide opens. */
+function GuidePages({ tr }: { tr: GuideOverlayProps['tr'] }) {
+  const [page, setPage] = useState(0);
+  return (
+    <>
+      <div className="guide-pages">
+        {page === 0 ? (
+          <ol className="guide-steps">
+            <li>{tr('guide.step1')}</li>
+            <li>{tr('guide.step2')}</li>
+            <li>{tr('guide.step3')}</li>
+          </ol>
+        ) : (
+          <>
+            <ol className="guide-steps" start={4}>
+              <li>{tr('guide.step4')}</li>
+              <li>{tr('guide.step5')}</li>
+            </ol>
+            <div className="guide-tip">{tr('guide.tip')}</div>
+          </>
+        )}
+      </div>
+      <MobilePager page={page} pageCount={2} onPage={setPage} tr={tr} />
+    </>
+  );
 }
 
 export function GuideOverlay({ showGuide, setShowGuide, tr, isMobile = false }: GuideOverlayProps) {
@@ -31,7 +62,7 @@ export function GuideOverlay({ showGuide, setShowGuide, tr, isMobile = false }: 
     <div className={`guide-overlay${isMobile ? ' guide-overlay-v2' : ''}`} onClick={() => setShowGuide(false)} role="presentation">
       <div
         ref={cardRef}
-        className={`guide-card${isMobile ? ' guide-card-v2' : ''}`}
+        className={`guide-card${isMobile ? ' guide-card-v2 guide-card-v3' : ''}`}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -42,15 +73,24 @@ export function GuideOverlay({ showGuide, setShowGuide, tr, isMobile = false }: 
           <span className="guide-title">{tr('guide.title')}</span>
           <button type="button" className="guide-x" onClick={() => setShowGuide(false)} aria-label={tr('help.close')}>✕</button>
         </div>
-        <ol className="guide-steps">
-          <li>{tr('guide.step1')}</li>
-          <li>{tr('guide.step2')}</li>
-          <li>{tr('guide.step3')}</li>
-          <li>{tr('guide.step4')}</li>
-          <li>{tr('guide.step5')}</li>
-        </ol>
-        <div className="guide-tip">{tr('guide.tip')}</div>
-        <button type="button" className="guide-done" onClick={() => setShowGuide(false)}>{tr('btn.gotIt')}</button>
+        {isMobile ? (
+          <>
+            <GuidePages tr={tr} />
+            <button type="button" className="guide-done" onClick={() => setShowGuide(false)}>{tr('btn.gotIt')}</button>
+          </>
+        ) : (
+          <>
+            <ol className="guide-steps">
+              <li>{tr('guide.step1')}</li>
+              <li>{tr('guide.step2')}</li>
+              <li>{tr('guide.step3')}</li>
+              <li>{tr('guide.step4')}</li>
+              <li>{tr('guide.step5')}</li>
+            </ol>
+            <div className="guide-tip">{tr('guide.tip')}</div>
+            <button type="button" className="guide-done" onClick={() => setShowGuide(false)}>{tr('btn.gotIt')}</button>
+          </>
+        )}
       </div>
     </div>
   );

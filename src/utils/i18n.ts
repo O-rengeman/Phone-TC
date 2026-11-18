@@ -336,6 +336,9 @@ const en: Dict = {
   'vp.lvl': 'LVL',
   'vp.ubit': 'UBIT',
   'tab.aria': 'App sections',
+  'pager.prev': 'PREV',
+  'pager.next': 'NEXT',
+  'pager.status': '{page} / {total}',
 };
 
 const ja: Dict = {
@@ -658,6 +661,9 @@ const ja: Dict = {
   'vp.lvl': 'レベル',
   'vp.ubit': 'UBIT',
   'tab.aria': 'アプリセクション',
+  'pager.prev': '前へ',
+  'pager.next': '次へ',
+  'pager.status': '{page} / {total}',
 };
 
 const DICTS: Record<Lang, Dict> = { en, ja };

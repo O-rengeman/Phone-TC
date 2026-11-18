@@ -1,9 +1,15 @@
 import { useState } from 'react';
 import { useLTC } from '../LTCSyncContext';
 import { FPS_OPTIONS } from '../constants';
+import { MobilePager } from './mobile/MobilePager';
 import { PRESET_NAME_MAX, deletePreset, listPresets, savePreset } from '../utils/presets';
 import type { Preset, PresetSettings } from '../utils/presets';
 import './presets.css';
+
+// No-scroll mobile tools pane: the preset list is paged two rows at a time
+// instead of scrolled, so the whole panel fits the viewport on a 320x568
+// phone. The desktop console keeps its own scroll region unchanged.
+const MOBILE_PRESETS_PER_PAGE = 2;
 
 /**
  * Setup presets: named snapshots of the timecode/output/sync settings,
@@ -32,8 +38,17 @@ export function PresetsPanel() {
 
   const [presets, setPresets] = useState<Preset[]>(() => listPresets());
   const [name, setName] = useState('');
+  const [requestedPage, setRequestedPage] = useState(0);
 
   const refresh = () => setPresets(listPresets());
+
+  // Page is clamped at render time so a deleted preset folds the view back
+  // to the last page without a state write.
+  const pageCount = isMobile ? Math.ceil(presets.length / MOBILE_PRESETS_PER_PAGE) : 1;
+  const page = Math.min(requestedPage, Math.max(0, pageCount - 1));
+  const visiblePresets = isMobile
+    ? presets.slice(page * MOBILE_PRESETS_PER_PAGE, page * MOBILE_PRESETS_PER_PAGE + MOBILE_PRESETS_PER_PAGE)
+    : presets;
 
   const captureSettings = (): PresetSettings => ({
     fpsIndex, volume, outputLevel, outputMode, outputOffset,
@@ -120,10 +135,10 @@ export function PresetsPanel() {
         </button>
       </form>
       <div className="preset-list">
-        {presets.length === 0 ? (
+        {visiblePresets.length === 0 ? (
           <div className="empty-msg preset-empty">{tr('preset.empty')}</div>
         ) : (
-          presets.map((preset) => (
+          visiblePresets.map((preset) => (
             <div key={preset.id} className="preset-row">
               <div className="preset-row-info">
                 <span className="preset-row-name">{preset.name}</span>
@@ -150,6 +165,15 @@ export function PresetsPanel() {
           ))
         )}
       </div>
+      {isMobile && (
+        <MobilePager
+          page={page}
+          pageCount={pageCount}
+          onPage={setRequestedPage}
+          tr={tr}
+          className="preset-pager"
+        />
+      )}
     </section>
   );
 }

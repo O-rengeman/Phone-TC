@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { ClientList } from './ClientList';
 
 describe('ClientList', () => {
@@ -56,5 +56,31 @@ describe('ClientList', () => {
     render(<ClientList {...baseProps} clients={clients} />);
     expect(screen.getByText('client1')).toBeTruthy();
     expect(screen.getByText('client2')).toBeTruthy();
+  });
+
+  it('mobilePaged pages the cards four at a time', () => {
+    const clients = Object.fromEntries(
+      Array.from({ length: 5 }, (_, i) => [`cam-${i + 1}`, { lastSeen: 1000, rtt: 50, drift: 0.1 }]),
+    );
+    render(<ClientList {...baseProps} clients={clients} mobilePaged />);
+
+    expect(document.querySelectorAll('.client-card')).toHaveLength(4);
+    expect(screen.getByText('cam-4')).toBeTruthy();
+    expect(screen.queryByText('cam-5')).toBeNull();
+    expect(document.querySelector('.mobile-pager')).toBeTruthy();
+
+    fireEvent.click(document.querySelector<HTMLButtonElement>('.mobile-page-next')!);
+    expect(document.querySelectorAll('.client-card')).toHaveLength(1);
+    expect(screen.getByText('cam-5')).toBeTruthy();
+  });
+
+  it('mobilePaged renders no pager for a single page', () => {
+    const clients = {
+      cam1: { lastSeen: 1000, rtt: 50, drift: 0.1 },
+      cam2: { lastSeen: 1000, rtt: 50, drift: 0.2 },
+    };
+    render(<ClientList {...baseProps} clients={clients} mobilePaged />);
+    expect(document.querySelectorAll('.client-card')).toHaveLength(2);
+    expect(document.querySelector('.mobile-pager')).toBeNull();
   });
 });

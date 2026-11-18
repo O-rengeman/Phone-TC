@@ -515,3 +515,290 @@
 .preflight-v2 .preflight-return {
   min-height: 50px;
 }
+
+/* ============================================================
+   Mobile shell v3 — fixed-height, no-scroll layout.
+
+   `.mobile-noscroll` on .app-container turns the shell into a
+   header / tab-bar / content / footer column where only the
+   middle region flexes, and nothing on the page scrolls — not the
+   root, not .tab-content, not any inner list. Content that cannot
+   fit is split by pane-local tabs (.mobile-pane-tabs) or the shared
+   MobilePager (.mobile-pager), so every piece of information stays
+   reachable without scroll.
+
+   Scroll kills below are scoped to `.mobile-view.mobile-noscroll`
+   (in-pane containers) or the `*-v3` sheet classes (portalled
+   overlays cannot see .mobile-view), and never touch desktop-view
+   or the v2 selector families — App.css itself is unchanged and
+   simply loses the cascade here.
+   ============================================================ */
+
+/* ── Frame: header / tab-bar / footer fixed, content flexes ──── */
+.mobile-view.mobile-noscroll {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mobile-view.mobile-noscroll > header,
+.mobile-view.mobile-noscroll > .tab-bar,
+.mobile-view.mobile-noscroll > .fixed-footer {
+  flex: 0 0 auto;
+}
+
+.mobile-view.mobile-noscroll > .tab-content-v3 {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 12px 14px calc(10px + env(safe-area-inset-bottom));
+  scroll-padding-bottom: 0;
+}
+
+/* ── Common pane contract (used by the per-tab pane packages) ── */
+.mobile-view .mobile-pane {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.mobile-view .mobile-pane-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+}
+
+.mobile-view .mobile-pane-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.mobile-view .mobile-pane-tab.active {
+  background: var(--primary);
+  color: #000;
+  border-color: var(--primary);
+}
+
+.mobile-view .mobile-pane-tab:active {
+  transform: scale(0.97);
+}
+
+.mobile-view .mobile-pane-tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.mobile-view .mobile-pane-body {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* One page of a pane body — fills the body, never scrolls. */
+.mobile-view .mobile-pane-view {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Shared MobilePager ──────────────────────────────────────
+   The pager also lives inside the portalled v3 sheets (guide /
+   feature-help / preflight), which have no .mobile-view ancestor —
+   hence the grouped scoping. The light preflight sheet re-themes
+   the buttons in preflight.css. */
+.mobile-view .mobile-pager,
+.guide-card-v3 .mobile-pager,
+.fhelp-sheet-v3 .mobile-pager,
+.preflight-v3 .mobile-pager {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mobile-view .mobile-page-btn,
+.guide-card-v3 .mobile-page-btn,
+.fhelp-sheet-v3 .mobile-page-btn {
+  flex: 0 0 auto;
+  min-width: 52px;
+  min-height: 40px;
+  padding: 6px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--panel-elevated);
+  color: var(--text-bright);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mobile-view .mobile-page-btn:disabled,
+.guide-card-v3 .mobile-page-btn:disabled,
+.fhelp-sheet-v3 .mobile-page-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.mobile-view .mobile-page-btn:not(:disabled):active,
+.guide-card-v3 .mobile-page-btn:not(:disabled):active,
+.fhelp-sheet-v3 .mobile-page-btn:not(:disabled):active {
+  transform: scale(0.95);
+  border-color: var(--primary);
+}
+
+.mobile-view .mobile-page-btn:focus-visible,
+.guide-card-v3 .mobile-page-btn:focus-visible,
+.fhelp-sheet-v3 .mobile-page-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.mobile-view .mobile-page-status,
+.guide-card-v3 .mobile-page-status,
+.fhelp-sheet-v3 .mobile-page-status,
+.preflight-v3 .mobile-page-status {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── No leftovers: every legacy scroll region inside the mobile
+   shell is clipped; unreachable content is paged instead. ────── */
+.mobile-view.mobile-noscroll .tab-content-v3 .marker-scroll,
+.mobile-view.mobile-noscroll .tab-content-v3 .clients-list-section,
+.mobile-view.mobile-noscroll .tab-content-v3 .preset-list,
+.mobile-view.mobile-noscroll .tab-content-v3 .export-chips-v2,
+.mobile-view.mobile-noscroll .slate-content {
+  overflow: hidden;
+}
+
+/* ── v3 overlays: fixed-height sheets, paged content ───────────
+   Guide and feature-help portal to <body>, so they key off their
+   own v3 classes rather than .mobile-view. */
+.guide-card.guide-card-v3 {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.guide-card-v3 .guide-pages {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.guide-card-v3 .guide-pages .guide-steps {
+  margin-bottom: 0;
+  overflow: hidden;
+}
+
+.guide-card-v3 .guide-pages .guide-tip {
+  margin-top: 12px;
+  margin-bottom: 0;
+}
+
+.guide-card-v3 .mobile-pager {
+  margin-bottom: 14px;
+}
+
+.fhelp-sheet.fhelp-sheet-v3 {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fhelp-sheet-v3 .fhelp-pages {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.fhelp-sheet-v3 .fhelp-pages .fhelp-steps {
+  margin-bottom: 0;
+  overflow: hidden;
+}
+
+.fhelp-sheet-v3 .fhelp-pages .fhelp-tips {
+  margin-top: 12px;
+  margin-bottom: 0;
+  overflow: hidden;
+}
+
+.fhelp-sheet-v3 .mobile-pager {
+  margin-bottom: 14px;
+}
+
+/* Short landscape sheets: tighten so each page still fits. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-view.mobile-noscroll .fixed-footer {
+    /* App.css pins the footer out of flow on landscape phones; in the
+       v3 frame it is the last flex row instead. */
+    position: static;
+    left: auto;
+    right: auto;
+    bottom: auto;
+  }
+  .mobile-view.mobile-noscroll > .tab-content-v3 {
+    padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
+  }
+  .mobile-view .mobile-pane {
+    gap: 6px;
+  }
+  .mobile-view .mobile-pane-tab {
+    min-height: 30px;
+    padding: 5px 6px;
+    font-size: 0.56rem;
+    letter-spacing: 1px;
+  }
+  .mobile-view .mobile-page-btn,
+  .guide-card-v3 .mobile-page-btn,
+  .fhelp-sheet-v3 .mobile-page-btn,
+  .preflight-v3 .mobile-page-btn {
+    min-height: 30px;
+    min-width: 44px;
+    padding: 4px 10px;
+    font-size: 0.85rem;
+  }
+  .guide-card-v3 .guide-steps li,
+  .fhelp-sheet-v3 .fhelp-steps li {
+    font-size: 0.78rem;
+    line-height: 1.4;
+  }
+  .guide-card-v3 .guide-steps,
+  .fhelp-sheet-v3 .fhelp-steps {
+    gap: 6px;
+  }
+}

@@ -41,4 +41,27 @@ describe('PreflightScreen', () => {
     expect(document.activeElement).toBe(opener);
     opener.remove();
   });
+
+  it('shows one check per pager page on mobile and reaches all five', () => {
+    render(<PreflightScreen state={healthyPreflight} outputLevel="line" batteryEta={45} tr={(k, vars) => t(k, 'en', vars)} onClose={vi.fn()} isMobile />);
+    expect(document.querySelector('.preflight-v3')).toBeTruthy();
+    expect(document.querySelector('.mobile-pager')).toBeTruthy();
+    expect(document.querySelectorAll('.preflight-check')).toHaveLength(1);
+    expect(screen.getByText('Output level')).toBeTruthy();
+    expect(document.querySelector('.mobile-page-status')!.textContent).toBe('1 / 5');
+
+    fireEvent.click(screen.getByRole('button', { name: 'NEXT' }));
+    expect(screen.getByText('Clipping')).toBeTruthy();
+    expect(document.querySelectorAll('.preflight-check')).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'NEXT' }));
+    fireEvent.click(screen.getByRole('button', { name: 'NEXT' }));
+    fireEvent.click(screen.getByRole('button', { name: 'NEXT' }));
+    expect(screen.getByText('Keep screen awake')).toBeTruthy();
+    expect(document.querySelector('.mobile-page-status')!.textContent).toBe('5 / 5');
+    expect(screen.getByRole('button', { name: 'NEXT' }).hasAttribute('disabled')).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'PREV' }));
+    expect(screen.getByText('Sync state')).toBeTruthy();
+  });
 });

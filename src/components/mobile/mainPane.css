@@ -1,0 +1,227 @@
+/* ============================================================
+   MAIN pane v3 — no-scroll two-view mobile layout (TIMECODE /
+   CONTROL).
+
+   Package scope rule: every selector carries `.mobile-view` plus a
+   v3 class, so these rules win on specificity even though this file
+   can load before App.css, and they can never match `desktop-view`
+   or another package's selector family.
+
+   Palette is inherited, not redefined: white = primary/text,
+   grey = muted/border, same semantic colours as App.css.
+   ============================================================ */
+
+/* ── Pane frame: fill the tab content, clip — never scroll ───── */
+.mobile-view .mobile-pane.main-pane-v3 {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  gap: 8px;
+  overflow: hidden;
+}
+
+/* In-pane view switcher — same pill language as .tab-bar-v2. */
+.mobile-view .main-pane-v3 .mobile-pane-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.mobile-view .main-pane-v3 .mobile-pane-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 1.6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mobile-view .main-pane-v3 .mobile-pane-tab.active {
+  background: var(--primary);
+  color: #000;
+  border-color: var(--primary);
+  box-shadow: 0 0 10px var(--primary-dim);
+}
+
+.mobile-view .main-pane-v3 .mobile-pane-tab:active {
+  transform: scale(0.97);
+}
+
+.mobile-view .main-pane-v3 .mobile-pane-tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Body hosts exactly one view at a time and never scrolls. */
+.mobile-view .main-pane-v3 .mobile-pane-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mobile-view .main-pane-v3 .mobile-pane-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── TIMECODE view: card flexes, sync strip + VU keep auto rows ── */
+.mobile-view .main-pane-v3 .tc-view-v3 {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  gap: 10px;
+}
+
+/* The hero card must follow the grid row instead of its width-driven
+   aspect-ratio — the canvas re-measures its own rect every frame, so
+   the digits auto-fit whatever height the row resolves to. The
+   `.tc-card-v2` fourth class keeps this ahead of the v2 rules in
+   timecodeSurface.css regardless of stylesheet order. */
+.mobile-view .tc-view-v3 .timecode-card-pro.tc-card-v2 {
+  aspect-ratio: auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+}
+
+.mobile-view .tc-view-v3 .main-sync-bar-v2 {
+  min-width: 0;
+}
+
+.mobile-view .tc-view-v3 .vu-meter-row {
+  width: 100%;
+  min-width: 0;
+}
+
+/* ── CONTROL view: three settings, no scroll ───────────────────
+   Portrait: FPS spans the full width (3×2 pills); output mode and
+   TC offset share a row of half-width cells — the output toggle
+   stacks so "L-TC / R-AUDIO" never truncates inside ~150px. */
+.mobile-view .main-pane-v3 .controls-view-v3 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+
+.mobile-view .controls-view-v3 .control-section-v2 {
+  min-width: 0;
+  min-height: 0;
+  padding: 8px 10px;
+  gap: 6px;
+}
+
+.mobile-view .controls-view-v3 .cs-fps-v3 {
+  grid-column: 1 / -1;
+}
+
+.mobile-view .controls-view-v3 .section-label {
+  margin-bottom: 0;
+}
+
+.mobile-view .controls-view-v3 .fps-grid-compact {
+  gap: 4px;
+}
+
+.mobile-view .controls-view-v3 .btn-pill {
+  min-height: 32px;
+  padding: 7px 4px;
+  font-size: 0.62rem;
+}
+
+.mobile-view .controls-view-v3 .sync-toggle-pro {
+  flex-direction: column;
+  padding: 4px;
+  gap: 4px;
+}
+
+.mobile-view .controls-view-v3 .sync-toggle-pro button {
+  flex: none;
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 4px;
+  font-size: 0.58rem;
+}
+
+.mobile-view .controls-view-v3 .offset-control {
+  gap: 8px;
+}
+
+.mobile-view .controls-view-v3 .offset-control input[type="range"] {
+  height: 22px;
+  min-width: 0;
+}
+
+.mobile-view .controls-view-v3 .offset-value {
+  min-width: 34px;
+  font-size: 0.85rem;
+}
+
+/* ── Landscape phone (e.g. 932x430): three side-by-side columns ── */
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-view .mobile-pane.main-pane-v3 {
+    gap: 6px;
+  }
+  .mobile-view .main-pane-v3 .mobile-pane-tab {
+    min-height: 28px;
+    padding: 4px 8px;
+    font-size: 0.56rem;
+    letter-spacing: 1.2px;
+  }
+  .mobile-view .main-pane-v3 .tc-view-v3 {
+    gap: 6px;
+  }
+  .mobile-view .main-pane-v3 .controls-view-v3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .mobile-view .controls-view-v3 .cs-fps-v3 {
+    grid-column: auto;
+  }
+  .mobile-view .controls-view-v3 .fps-grid-compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .mobile-view .controls-view-v3 .btn-pill {
+    min-height: 30px;
+    padding: 6px 3px;
+    font-size: 0.56rem;
+  }
+  .mobile-view .controls-view-v3 .sync-toggle-pro button {
+    min-height: 28px;
+    font-size: 0.54rem;
+  }
+}
+
+/* ── 320px-class portrait: squeeze the last few px ────────────── */
+@media (max-width: 360px) {
+  .mobile-view .main-pane-v3 .mobile-pane-tab {
+    min-height: 34px;
+    padding: 6px 8px;
+    font-size: 0.58rem;
+    letter-spacing: 1.2px;
+  }
+  .mobile-view .controls-view-v3 .control-section-v2 {
+    padding: 6px 8px;
+  }
+  .mobile-view .controls-view-v3 .btn-pill {
+    min-height: 30px;
+    font-size: 0.58rem;
+  }
+}

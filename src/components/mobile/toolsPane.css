@@ -1,0 +1,144 @@
+/*
+ * toolsPane.css — no-scroll layout for the mobile TOOLS pane (v3).
+ *
+ * Imported from ToolsPane.tsx, which lands in the bundle AFTER App.css —
+ * every rule is still gated on `.mobile-view` plus the package-owned
+ * `tools-pane-v3` class so nothing bleeds into `.desktop-view` or the other
+ * mobile panes. The shared chrome classes (.mobile-pane*, .mobile-pager*)
+ * are owned by the shell package; rules here only pin the pane's own
+ * geometry: a fixed flex column that can neither scroll internally nor
+ * overflow horizontally — content that doesn't fit is split across tabs and
+ * MobilePager pages instead.
+ *
+ * No `overflow: auto | scroll` appears in this file by design.
+ */
+
+/* ─────────────────────────────────────────────────────────────
+   Pane frame — fills .tab-content without scrolling.
+   ───────────────────────────────────────────────────────────── */
+.mobile-view .tools-pane-v3 {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 8px;
+  overflow: hidden;
+}
+
+/* Section tabs + body chrome come from mobile-shell.css
+   (.mobile-pane-tabs / .mobile-pane-tab / .mobile-pane-body). This file only
+   adds the gap rhythm between stacked views. */
+.mobile-view .tools-pane-v3 .mobile-pane-view {
+  gap: 8px;
+}
+
+/* Section cards inside a view stack from the top and keep their own
+   borders; they never grow a scroll region of their own. */
+.mobile-view .tools-pane-v3 .mobile-pane-view > .tool-section-shell {
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   MARK view — quick marks + timeline.
+   ───────────────────────────────────────────────────────────── */
+.mobile-view .tools-pane-v3 .quick-marks-v2 {
+  flex: 0 0 auto;
+}
+
+.mobile-view .tools-pane-v3 .marks-timeline-v3 {
+  flex: 0 0 auto;
+}
+
+.mobile-view .tools-pane-v3 .marks-timeline-head-v3 {
+  margin-bottom: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TAKES view — the section owns the column; the paged row area flexes and
+   clips, the pager pins to the bottom.
+   ───────────────────────────────────────────────────────────── */
+.mobile-view .tools-pane-v3 .take-log-v3 {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.mobile-view .tools-pane-v3 .take-log-v3 .marker-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  max-height: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.mobile-view .tools-pane-v3 .take-log-pager,
+.mobile-view .tools-pane-v3 .preset-pager,
+.mobile-view .tools-pane-v3 .clients-pager {
+  flex: 0 0 auto;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   CAMERAS view — 2x2 card page; ids clip instead of overflowing.
+   ───────────────────────────────────────────────────────────── */
+.mobile-view .tools-pane-v3 .clients-v3 {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+}
+
+.mobile-view .tools-pane-v3 .clients-v3 .clients-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mobile-view .tools-pane-v3 .clients-v3 .client-id {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Compact variants — short landscape phones (e.g. 932x430) and very
+   narrow screens (320px). Everything shrinks; nothing scrolls.
+   ───────────────────────────────────────────────────────────── */
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-view .tools-pane-v3 {
+    gap: 6px;
+  }
+  .mobile-view .tools-pane-v3 .mobile-pane-view {
+    gap: 6px;
+  }
+  .mobile-view .tools-pane-v3 .mobile-pane-view > .tool-section-shell {
+    padding: 8px;
+    gap: 6px;
+  }
+  .mobile-view .tools-pane-v3 .take-log-v3 .marker-scroll {
+    gap: 6px;
+    padding: 6px;
+  }
+  .mobile-view .tools-pane-v3 .take-log-v3 .marker-row-pro {
+    padding: 6px 10px;
+    gap: 4px;
+  }
+  .mobile-view .tools-pane-v3 .take-log-v3 .marker-row-v2 .m-comment-v2 .marker-comment-input {
+    min-height: 30px;
+    padding: 5px 8px;
+  }
+  .mobile-view .tools-pane-v3 .take-log-v3 .export-chips-v2 {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .mobile-view .tools-pane-v3 .client-card-v2 {
+    padding: 8px;
+    gap: 4px;
+  }
+}
+

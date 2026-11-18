@@ -127,4 +127,54 @@ describe('MarkerList', () => {
     render(<MarkerList {...baseProps} isMobile={false} />);
     expect(screen.queryByText('color.red')).toBeNull();
   });
+
+  it("mobileView='marks' shows quick marks and the timeline but no export chips or rows", () => {
+    render(
+      <MarkerList {...baseProps} isMobile mobileView="marks" markers={[makeMarker()]} />,
+    );
+    expect(screen.getByText('color.red')).toBeTruthy();
+    expect(document.querySelector('.mtl')).toBeTruthy();
+    expect(screen.queryByText('EDL')).toBeNull();
+    expect(document.querySelectorAll('.marker-row-pro')).toHaveLength(0);
+  });
+
+  it("mobileView='log' hides quick marks and pages the rows two at a time", () => {
+    const markers = [1, 2, 3].map((id) => makeMarker({ id, tc: `01:00:0${id}:00` }));
+    render(<MarkerList {...baseProps} isMobile mobileView="log" markers={markers} />);
+
+    expect(screen.queryByText('color.red')).toBeNull();
+    expect(screen.getByText('EDL')).toBeTruthy();
+    expect(document.querySelectorAll('.marker-row-pro')).toHaveLength(2);
+    expect(screen.getByText('01:00:01:00')).toBeTruthy();
+    expect(screen.queryByText('01:00:03:00')).toBeNull();
+
+    fireEvent.click(document.querySelector<HTMLButtonElement>('.mobile-page-next')!);
+    expect(document.querySelectorAll('.marker-row-pro')).toHaveLength(1);
+    expect(screen.getByText('01:00:03:00')).toBeTruthy();
+  });
+
+  it("clamps the page when markers shrink in mobileView='log'", () => {
+    const { rerender } = render(
+      <MarkerList
+        {...baseProps}
+        isMobile
+        mobileView="log"
+        markers={[1, 2, 3, 4].map((id) => makeMarker({ id, tc: `01:00:0${id}:00` }))}
+      />,
+    );
+    fireEvent.click(document.querySelector<HTMLButtonElement>('.mobile-page-next')!);
+    expect(screen.getByText('01:00:03:00')).toBeTruthy();
+
+    // Dropping to a single page while on page 2 clamps back to page 1.
+    rerender(
+      <MarkerList
+        {...baseProps}
+        isMobile
+        mobileView="log"
+        markers={[makeMarker({ id: 1, tc: '01:00:01:00' })]}
+      />,
+    );
+    expect(document.querySelector('.mobile-pager')).toBeNull();
+    expect(screen.getByText('01:00:01:00')).toBeTruthy();
+  });
 });
