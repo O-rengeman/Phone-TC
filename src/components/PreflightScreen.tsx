@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useLTC } from '../LTCSyncContext';
+import { useMasterDrift } from '../masterDriftContext';
 import { useVuMeter } from '../hooks/useVuMeter';
 import { getPreflightChecks } from '../utils/preflight';
 import type { PreflightState } from '../utils/preflight';
@@ -73,9 +74,12 @@ export function PreflightScreen({ state, outputLevel, batteryEta, tr, onClose }:
 
 export function LivePreflightScreen({ onClose }: { onClose: () => void }) {
   const ltc = useLTC();
+  // masterDrift lives on its own context (heartbeat-rate updates) — pull it
+  // in explicitly so the sync check still sees the live value.
+  const masterDrift = useMasterDrift();
   const { isClipping, hasInputMeter } = useVuMeter(ltc.analyserRef, ltc.isRunning, ltc.outputMode);
   return <PreflightScreen
-    state={{ ...ltc, isClipping, hasInputMeter }}
+    state={{ ...ltc, masterDrift, isClipping, hasInputMeter }}
     outputLevel={ltc.outputLevel}
     batteryEta={ltc.batteryEta}
     tr={ltc.tr}

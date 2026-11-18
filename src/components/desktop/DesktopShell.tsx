@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useLTC } from '../../LTCSyncContext';
+import { useMasterDrift } from '../../masterDriftContext';
 import { VideoPlayer } from '../../VideoPlayer';
 import { formatSyncAge } from '../../utils/DriftMonitor';
 import { isClientOffline } from '../../utils/clients';
@@ -58,10 +59,11 @@ function readStoredTab(): string | null {
 export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
   const {
     isHost, isRunning, isPreparing, syncMode, driftStatus, p2pRole,
-    peerId, p2pStatus, masterDrift, clients, nowTick,
+    peerId, p2pStatus, clients, nowTick,
     lang, tr,
     handleStartStop, beginStopHold, cancelStopHold, addMarker, holdStoppedRef,
   } = useLTC();
+  const masterDrift = useMasterDrift();
 
   const [requestedTab, setRequestedTab] = useState<string | null>(readStoredTab);
   const activeTab = resolveDesktopTab(requestedTab, isHost);

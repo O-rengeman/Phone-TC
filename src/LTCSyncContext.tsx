@@ -39,6 +39,7 @@ import { useP2P } from './hooks/useP2P';
 import { useLtcEngine } from './hooks/useLtcEngine';
 import { shouldUseMobileLayout } from './utils/layout';
 import { SlateTimeContext } from './slateTimeContext';
+import { MasterDriftContext } from './masterDriftContext';
 
 export type SyncMode = 'system' | 'network' | 'p2p' | 'freerun';
 export type ToastLevel = 'info' | 'warn' | 'error';
@@ -132,7 +133,6 @@ interface LTCStateType {
   batteryEta: number | null;
   wakeLockStatus: WakeLockStatus;
   markerFlash: { tc: string; color: string; count: number } | null;
-  masterDrift: number | null;
   clients: Record<string, { rtt: number; drift: number; lastSeen: number }>;
   packetLossRate: number;
   setPacketLossRate: React.Dispatch<React.SetStateAction<number>>;
@@ -841,7 +841,6 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     batteryEta,
     wakeLockStatus,
     markerFlash,
-    masterDrift,
     clients,
     packetLossRate, setPacketLossRate,
     sceneName, setSceneName,
@@ -852,7 +851,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     userBits, markers, defaultReelName, outputLevel, outputOffset,
     peerId, targetId, p2pStatus, isHost, driftStatus, isPaused, stopHoldPct, p2pSyncSource,
     showGuide,
-    isResyncing, lang, batteryLevel, isCharging, batteryEta, wakeLockStatus, markerFlash, masterDrift, clients,
+    isResyncing, lang, batteryLevel, isCharging, batteryEta, wakeLockStatus, markerFlash, clients,
     packetLossRate, sceneName, nowTick,
     setIsRunning, setFpsIndex, setVolume, setSyncModeGuarded, setManualTimecode, setActiveTab, setOutputMode,
     setAutoUserBits, setIsVisualSlate, setUserBits, setMarkers, setDefaultReelName,
@@ -902,7 +901,9 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     <LTCStateContext.Provider value={stateValue}>
       <LTCActionsContext.Provider value={actionsValue}>
         <SlateTimeContext.Provider value={slateTime}>
-          {children}
+          <MasterDriftContext.Provider value={masterDrift}>
+            {children}
+          </MasterDriftContext.Provider>
         </SlateTimeContext.Provider>
       </LTCActionsContext.Provider>
     </LTCStateContext.Provider>

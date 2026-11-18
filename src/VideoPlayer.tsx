@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useLTC } from "./LTCSyncContext";
+import { useMasterDrift } from "./masterDriftContext";
 import { FPS_OPTIONS, JAM_THRESHOLD_SEC } from "./constants";
 
 export function VideoPlayer() {
@@ -10,7 +11,6 @@ export function VideoPlayer() {
     outputLevel,
     userBits,
     p2pRole,
-    masterDrift,
     setIsVisualSlate,
     canvasRef,
     engineRef,
@@ -20,6 +20,9 @@ export function VideoPlayer() {
     setSlateTime,
     tr,
   } = useLTC();
+  // Drift updates arrive ~10Hz while a client is synced — keep them on the
+  // dedicated context so the rest of the tree doesn't reconcile at that rate.
+  const masterDrift = useMasterDrift();
 
   useEffect(() => {
     let rafId: number;
