@@ -55,6 +55,11 @@ const getIsMobileLayout = () => {
   });
 };
 
+// Native lock-screen/notification TC freshness — ~2Hz is plenty for a
+// display that only needs to look live; the bridge call crosses IPC so it
+// must not run at RAF rate.
+const PLAYBACK_STATUS_INTERVAL_MS = 500;
+
 // Split into two contexts so that a consumer reading only stable actions/refs
 // doesn't re-render on every volatile state tick (masterDrift, clients,
 // nowTick, ...). useLTC() below merges both back into one object so every
@@ -119,6 +124,7 @@ interface LTCStateType {
   showGuide: boolean;
   setShowGuide: React.Dispatch<React.SetStateAction<boolean>>;
   isResyncing: boolean;
+  isP2PSetupPending: boolean;
   lang: Lang;
   setLang: React.Dispatch<React.SetStateAction<Lang>>;
   batteryLevel: number | null;
@@ -297,11 +303,20 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Stable identity for useP2P's heartbeat-timeout watchdog — an inline arrow
+  // here would get a new identity every provider render and churn the 500ms
+  // interval effect inside useP2P.
+  const onMasterHeartbeatTimeoutStable = useCallback(() => {
+    onMasterHeartbeatTimeoutRef.current?.();
+  }, []);
+
   const {
     peerId, targetId, setTargetId, p2pStatus, setP2pStatus, isHost,
     masterDrift, setMasterDrift, clients, setClients,
     packetLossRate, setPacketLossRate,
-    peerSyncRef, messageHandlerRef, rttHistoryRef, lastSyncTimeRef, lastP2pSyncTimeRef, lastHeartbeatTimeRef, lastMasterContactTimeRef,
+    peerSyncRef, messageHandlerRef, rttHistoryRef, lastSyncTimeRef, lastP2pSyncTimeRef, lastMasterContactTimeRef,
+    connectAttemptedForRef,
+    isP2PSetupPending,
     resetP2P, setupP2PMaster, setupP2PClient, joinSession,
   } = useP2P({
     syncMode,
@@ -312,8 +327,32 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     isPaused,
     langRef,
     addToast,
-    onMasterHeartbeatTimeout: () => onMasterHeartbeatTimeoutRef.current?.(),
+    onMasterHeartbeatTimeout: onMasterHeartbeatTimeoutStable,
   });
+
+  // Switching the sync source away from P2P must tear the session down —
+  // otherwise the PeerJS peer, heartbeat broadcast and client watchdog keep
+  // running underneath a different sync mode. Consumers get this guarded
+  // setter; useP2P's own internal transitions keep the raw dispatch.
+  const syncModeRef = useRef(syncMode);
+  const p2pRoleRef = useRef(p2pRole);
+  useEffect(() => {
+    syncModeRef.current = syncMode;
+    p2pRoleRef.current = p2pRole;
+  }, [syncMode, p2pRole]);
+
+  const setSyncModeGuarded = useCallback<React.Dispatch<React.SetStateAction<SyncMode>>>(
+    (action) => {
+      const next = typeof action === 'function'
+        ? action(syncModeRef.current)
+        : action;
+      if (next !== 'p2p' && p2pRoleRef.current !== null) {
+        resetP2P();
+      }
+      setSyncMode(next);
+    },
+    [resetP2P],
+  );
 
   useEffect(() => {
     if (!p2pRole) return;
@@ -342,7 +381,9 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    TimecodeNativeBridge.addInterruptionListener((state) => {
+    // Returns the unsubscribe handle — StrictMode double-mount and tab
+    // switches used to stack duplicate native listeners (double toasts).
+    return TimecodeNativeBridge.addInterruptionListener((state) => {
       if (state === 'began') {
         addToast(translate('toast.interruptBegan', langRef.current), 'error');
       } else {
@@ -358,7 +399,10 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const applySyncToWorklet = useCallback((masterTcStr: string, oneWayLatencyMs: number, isMasterRunning: boolean) => {
     const engine = engineRef.current;
     if (!engine) return;
+    // getCorrectedTc returns null when the peer-supplied TC can't be parsed —
+    // skip the correction rather than jamming a garbage label into the worklet.
     let corrected = engine.getCorrectedTc(masterTcStr, oneWayLatencyMs, isMasterRunning);
+    if (corrected === null) return;
 
     if (outputOffset !== 0) {
       corrected = shiftTimecode(corrected, outputOffset, FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
@@ -463,6 +507,24 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     setSyncStatus, setDriftStatus, langRef, addToast,
   });
 
+  // Lock-screen / notification TC pump. This MUST live at provider level:
+  // <VideoPlayer> unmounts whenever the operator leaves the main tab (and
+  // DesktopShell keeps it mounted, but mobile tab switches don't), which
+  // used to freeze the native playback status mid-take. setInterval rather
+  // than RAF so it keeps ticking while the page is hidden — RAF stops
+  // entirely then, which is exactly when the lock-screen TC matters.
+  useEffect(() => {
+    const pushPlaybackStatus = () => {
+      const engine = engineRef.current;
+      if (!engine) return;
+      const tc = isRunning ? currentTcRef.current : engine.getTimecodeString();
+      void TimecodeNativeBridge.updatePlaybackStatus(isRunning, tc);
+    };
+    pushPlaybackStatus();
+    const id = setInterval(pushPlaybackStatus, PLAYBACK_STATUS_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [isRunning, engineRef, currentTcRef]);
+
   const syncClientToStoppedMaster = useCallback(() => {
     if (isRunning) {
       debug('[DEBUG-SYNC] Triggering handleStartStop to STOP');
@@ -527,9 +589,12 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
           isPaused: isPaused,
           clientTimestamp: msg.clientTimestamp
         };
-        peerSyncRef.current?.send(response);
-
         if (msg.clientId) {
+          // Answer ONLY the requester — broadcast send() would hand every
+          // connected client a response echoing somebody else's
+          // clientTimestamp (garbage RTT + a sync they never asked for).
+          peerSyncRef.current?.sendTo(msg.clientId, response);
+
           // sync-request carries no rtt/drift — preserve whatever the client's
           // 'report' messages last reported instead of zeroing it out.
           setClients(prev => {
@@ -549,6 +614,13 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
           }));
         }
       } else if (msg.type === 'sync-response' && !isHost) {
+        // Auth: only trust sync data from the master this device actually
+        // DIALED — connectAttemptedForRef, not the editable targetId field
+        // (retyping the field mid-session must not orphan the live conn).
+        // clientId is stamped from the transport peer id, so a message from
+        // any other peer (stray inbound conn, wrong session) is dropped
+        // before it can move our timecode.
+        if (msg.clientId !== connectAttemptedForRef.current) return;
         lastMasterContactTimeRef.current = Date.now();
         const now = performance.now();
         const rtt = now - (msg.clientTimestamp || now);
@@ -562,14 +634,19 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
         const history = [...rttHistoryRef.current, rtt].slice(-RTT_HISTORY_LEN);
         rttHistoryRef.current = history;
 
-        const diff = engineRef.current.getDiffSeconds(msg.masterTimecode);
+        // getDiffSeconds returns Infinity when the peer TC can't be parsed —
+        // that's missing data, not a drift measurement. Store null so the
+        // badge doesn't render "Infinity" and 'report' messages stay valid
+        // (drift must be a finite number or absent per isSyncMessage).
+        const rawDiff = engineRef.current.getDiffSeconds(msg.masterTimecode);
+        const diff = Number.isFinite(rawDiff) ? rawDiff : null;
         setMasterDrift(diff);
 
         const avgRtt = history.length > 0 ? history.reduce((a, b) => a + b, 0) / history.length : rtt;
         const isRttStable = rtt <= avgRtt * RTT_SPIKE_FACTOR || rtt < RTT_STABLE_FLOOR_MS;
 
         const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
-        const shouldSync = (Math.abs(diff) >= DRIFT_RESYNC_THRESHOLD_SEC && isRttStable)
+        const shouldSync = ((diff !== null && Math.abs(diff) >= DRIFT_RESYNC_THRESHOLD_SEC) && isRttStable)
           || timeSinceLastSync >= MAX_SYNC_INTERVAL_MS;
 
         syncMasterFps(msg.fps, msg.isDropFrame);
@@ -587,15 +664,17 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
         peerSyncRef.current?.send({
           type: 'report',
           rtt: bestRtt,
-          drift: diff
+          ...(diff !== null ? { drift: diff } : {})
         });
       } else if (msg.type === 'heartbeat' && !isHost) {
+        if (msg.clientId !== connectAttemptedForRef.current) return;
         lastMasterContactTimeRef.current = Date.now();
-        const diff = engineRef.current.getDiffSeconds(msg.masterTimecode);
+        const rawDiff = engineRef.current.getDiffSeconds(msg.masterTimecode);
+        const diff = Number.isFinite(rawDiff) ? rawDiff : null;
         setMasterDrift(diff);
 
         const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
-        const shouldSync = Math.abs(diff) >= HEARTBEAT_RESYNC_THRESHOLD_SEC
+        const shouldSync = (diff !== null && Math.abs(diff) >= HEARTBEAT_RESYNC_THRESHOLD_SEC)
           || timeSinceLastSync >= MAX_SYNC_INTERVAL_MS;
 
         syncMasterFps(msg.fps, msg.isDropFrame);
@@ -609,13 +688,11 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
         }
         setP2pStatus(`${shouldSync ? 'SYNCED' : 'OK'} (HB)`);
 
-        lastHeartbeatTimeRef.current = Date.now();
-
         if (Date.now() % CLIENT_REPORT_WINDOW_MS < CLIENT_REPORT_WINDOW_SLACK_MS) {
           peerSyncRef.current?.send({
             type: 'report',
             rtt: rttHistoryRef.current.length > 0 ? Math.min(...rttHistoryRef.current) : 0,
-            drift: diff
+            ...(diff !== null ? { drift: diff } : {})
           });
         }
       }
@@ -661,12 +738,21 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     }
   }, [manualTimecode, p2pRole, isRunning, isPaused]);
 
+  // masterDrift updates ~10Hz (every heartbeat) — reading it through a ref
+  // inside the interval keeps the 1s watchdog from being torn down and
+  // recreated on every heartbeat, which used to starve it of ticks entirely.
+  const masterDriftRef = useRef<number | null>(null);
+  useEffect(() => {
+    masterDriftRef.current = masterDrift;
+  }, [masterDrift]);
+
   useEffect(() => {
     if (!peerSyncRef.current) return;
 
     const interval = setInterval(() => {
       if (!isHost && p2pRole === 'client') {
-        const diff = masterDrift !== null ? Math.abs(masterDrift) : 0;
+        const drift = masterDriftRef.current;
+        const diff = drift !== null ? Math.abs(drift) : 0;
         const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
 
         if (diff >= DRIFT_RESYNC_THRESHOLD_SEC || timeSinceLastSync >= MAX_SYNC_INTERVAL_MS) {
@@ -705,7 +791,14 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       clearInterval(interval);
       if (hbInterval) clearInterval(hbInterval);
     };
-  }, [isHost, p2pRole, fpsIndex, masterDrift, isRunning, isPaused, getUnshiftedTc, lastSyncTimeRef, peerSyncRef]);
+    // masterDrift intentionally absent — it changes ~10Hz and is read via
+    // masterDriftRef inside the interval; listing it would recreate both
+    // intervals on every heartbeat and the 1s watchdog would never tick.
+    // peerId IS required: setup assigns peerSyncRef.current only after
+    // initialize() resolves, in the same batch that sets peerId — without it
+    // this effect early-returns on the still-null ref and never re-runs, so
+    // the heartbeat/watchdog intervals would never arm after P2P setup.
+  }, [isHost, p2pRole, peerId, fpsIndex, isRunning, isPaused, getUnshiftedTc, lastSyncTimeRef, peerSyncRef]);
 
   // VU meter (peak level + clip detection for mono-L mic input) now lives in
   // useVuMeter() + <VuMeter>, consuming analyserRef directly, so its ~60Hz
@@ -716,8 +809,9 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     fpsIndex, setFpsIndex,
     volume, setVolume,
     syncStatus,
-    syncMode, setSyncMode,
+    syncMode, setSyncMode: setSyncModeGuarded,
     isPreparing,
+    isP2PSetupPending,
     manualTimecode, setManualTimecode,
     p2pRole,
     activeTab, setActiveTab,
@@ -753,14 +847,14 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     sceneName, setSceneName,
     nowTick,
   }), [
-    isRunning, fpsIndex, volume, syncStatus, syncMode, isPreparing, manualTimecode, p2pRole,
+    isRunning, fpsIndex, volume, syncStatus, syncMode, isPreparing, isP2PSetupPending, manualTimecode, p2pRole,
     activeTab, isMobile, outputMode, autoUserBits, isVisualSlate, isSlateFlashing,
     userBits, markers, defaultReelName, outputLevel, outputOffset,
     peerId, targetId, p2pStatus, isHost, driftStatus, isPaused, stopHoldPct, p2pSyncSource,
     showGuide,
     isResyncing, lang, batteryLevel, isCharging, batteryEta, wakeLockStatus, markerFlash, masterDrift, clients,
     packetLossRate, sceneName, nowTick,
-    setIsRunning, setFpsIndex, setVolume, setSyncMode, setManualTimecode, setActiveTab, setOutputMode,
+    setIsRunning, setFpsIndex, setVolume, setSyncModeGuarded, setManualTimecode, setActiveTab, setOutputMode,
     setAutoUserBits, setIsVisualSlate, setUserBits, setMarkers, setDefaultReelName,
     setOutputLevel, setOutputOffset, setTargetId, setP2pSyncSource, setShowGuide,
     setLang, setPacketLossRate, setSceneName,

@@ -112,10 +112,19 @@ export class LtcEngine {
 
   /**
    * Builds the latency-compensated master timecode (smpte-timecode instance)
-   * without mutating internal state.
+   * without mutating internal state. Returns null when the peer-supplied TC
+   * string can't be parsed — Timecode() throws on malformed labels, and a
+   * hostile/buggy peer must not be able to crash the PeerJS 'data' handler
+   * on every heartbeat. Mirrors getDiffSeconds' parse-failure contract:
+   * "cannot compute" is reported to the caller, which skips the correction.
    */
-  private computeCorrectedTimecode(masterTcStr: string, oneWayLatencyMs: number, isMasterRunning: boolean): TimecodeInstance {
-    const masterTc = Timecode(masterTcStr, this.settings.fps, this.settings.isDropFrame);
+  private computeCorrectedTimecode(masterTcStr: string, oneWayLatencyMs: number, isMasterRunning: boolean): TimecodeInstance | null {
+    let masterTc: TimecodeInstance;
+    try {
+      masterTc = Timecode(masterTcStr, this.settings.fps, this.settings.isDropFrame);
+    } catch {
+      return null;
+    }
     if (isMasterRunning && oneWayLatencyMs > 0) {
       // Use rational FPS for precise frame calculation
       const elapsedFrames = Math.round(oneWayLatencyMs * this.fpsNum / (1000 * this.fpsDen));
@@ -127,9 +136,11 @@ export class LtcEngine {
   /**
    * Returns the latency-compensated master timecode as a "HH:MM:SS:FF" string.
    * Used by the main thread to push a jam target into the AudioWorklet.
+   * Returns null when the master TC can't be parsed (see
+   * computeCorrectedTimecode) — callers must skip the correction.
    */
-  public getCorrectedTc(masterTcStr: string, oneWayLatencyMs: number, isMasterRunning: boolean): string {
-    return this.computeCorrectedTimecode(masterTcStr, oneWayLatencyMs, isMasterRunning).toString();
+  public getCorrectedTc(masterTcStr: string, oneWayLatencyMs: number, isMasterRunning: boolean): string | null {
+    return this.computeCorrectedTimecode(masterTcStr, oneWayLatencyMs, isMasterRunning)?.toString() ?? null;
   }
 
   /**

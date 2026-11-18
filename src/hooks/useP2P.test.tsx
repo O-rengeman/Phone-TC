@@ -6,21 +6,62 @@ import type { Lang } from '../utils/i18n';
 // vi.mock factories are hoisted above regular const declarations, so any
 // mock fn referenced inside must itself be created via vi.hoisted() —
 // otherwise the factory closes over stale/undefined bindings.
-const { initialize, connect, destroy, setLossRate } = vi.hoisted(() => ({
-  initialize: vi.fn().mockResolvedValue('PEER123'),
-  connect: vi.fn(),
-  destroy: vi.fn(),
-  setLossRate: vi.fn(),
+const { initialize, connect, destroy, setLossRate, peerSyncInstances } = vi.hoisted(() => ({
+  initialize: vi.fn<() => Promise<string>>().mockResolvedValue('PEER123'),
+  connect: vi.fn<(id: string) => void>(),
+  destroy: vi.fn<() => void>(),
+  setLossRate: vi.fn<(rate: number) => void>(),
+  // Every `new PeerSync(...)` pushes one entry here so tests can reach that
+  // instance's constructor options (onConnectionChange) and per-instance
+  // spies — the shared spies above still record calls across instances.
+  peerSyncInstances: [] as Array<{
+    initialize: ReturnType<typeof vi.fn>;
+    connect: ReturnType<typeof vi.fn>;
+    destroy: ReturnType<typeof vi.fn>;
+    setLossRate: ReturnType<typeof vi.fn>;
+    options?: {
+      acceptInboundConnections?: boolean;
+      onConnectionChange?: (connected: boolean, peerId: string) => void;
+    };
+  }>,
 }));
 
 vi.mock('../utils/PeerSync', () => ({
   // Arrow functions can't be invoked with `new` — PeerSync is constructed via
   // `new PeerSync(...)` in the hook, so the mock implementation must be a
   // regular function.
-  PeerSync: vi.fn().mockImplementation(function () {
-    return { initialize, connect, destroy, setLossRate };
+  PeerSync: vi.fn().mockImplementation(function (
+    _onMessage: unknown,
+    _onStatus: unknown,
+    _peerFactory: unknown,
+    options?: {
+      acceptInboundConnections?: boolean;
+      onConnectionChange?: (connected: boolean, peerId: string) => void;
+    },
+  ) {
+    const inst = {
+      initialize: vi.fn(() => initialize()),
+      connect: vi.fn((id: string) => connect(id)),
+      destroy: vi.fn(() => destroy()),
+      setLossRate: vi.fn((rate: number) => setLossRate(rate)),
+      options,
+    };
+    peerSyncInstances.push(inst);
+    return inst;
   }),
 }));
+
+/** The PeerSync instance created by the most recent setup call. */
+function lastPeerSync() {
+  return peerSyncInstances[peerSyncInstances.length - 1];
+}
+
+/** Fires PeerSync's onConnectionChange hook inside act(). */
+function emitConnChange(connected: boolean, peerId: string) {
+  const cb = lastPeerSync()?.options?.onConnectionChange;
+  if (!cb) throw new Error('PeerSync was constructed without onConnectionChange');
+  cb(connected, peerId);
+}
 
 function makeParams(overrides: Partial<Parameters<typeof useP2P>[0]> = {}) {
   return {
@@ -41,6 +82,7 @@ beforeEach(() => {
   connect.mockClear();
   destroy.mockClear();
   setLossRate.mockClear();
+  peerSyncInstances.length = 0;
 });
 
 afterEach(() => {
@@ -156,32 +198,75 @@ describe('useP2P — thin state-transition coverage', () => {
   it('re-links a dropped client connection without operator input', async () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useP2P(makeParams({ p2pRole: 'client' })));
-    await act(async () => { await result.current.setupP2PClient(); });
-    act(() => result.current.setTargetId('MASTERID'));
+    await act(async () => { await result.current.setupP2PClient('MASTERID'); });
     connect.mockClear();
 
-    act(() => result.current.setP2pStatus('CONNECTION CLOSED'));
+    // The link was established, then the DataConnection closed — the hook
+    // learns both facts via PeerSync's onConnectionChange, not p2pStatus.
+    act(() => emitConnChange(true, 'MASTERID'));
+    act(() => emitConnChange(false, 'MASTERID'));
     act(() => { vi.advanceTimersByTime(2000); });
 
     expect(connect).toHaveBeenCalledWith('MASTERID');
     expect(result.current.p2pStatus).toBe('RECONNECTING...');
   });
 
+  it('keeps re-linking when the status string changes mid-backoff (signaling flap)', async () => {
+    // Regression: the old effect keyed off p2pStatus.includes('CLOSED'), so
+    // a signaling 'disconnected' -> 'RECONNECTING...' status overwrote the
+    // display string, cancelled the pending retry timer, and the dead
+    // DataConnection was never re-dialed.
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useP2P(makeParams({ p2pRole: 'client' })));
+    await act(async () => { await result.current.setupP2PClient('MASTERID'); });
+    connect.mockClear();
+
+    act(() => emitConnChange(true, 'MASTERID'));
+    act(() => emitConnChange(false, 'MASTERID'));
+
+    // Signaling flap churns the display status while the conn stays dead —
+    // none of this may cancel the scheduled re-link.
+    act(() => result.current.setP2pStatus('RECONNECTING...'));
+    act(() => result.current.setP2pStatus('READY: ID PEER123'));
+    act(() => { vi.advanceTimersByTime(2000); });
+
+    expect(connect).toHaveBeenCalledWith('MASTERID');
+  });
+
+  it('keeps retrying while the connection stays down instead of giving up after one attempt', async () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useP2P(makeParams({ p2pRole: 'client' })));
+    await act(async () => { await result.current.setupP2PClient('MASTERID'); });
+    connect.mockClear();
+
+    act(() => emitConnChange(true, 'MASTERID'));
+    act(() => emitConnChange(false, 'MASTERID'));
+
+    // First attempt fires, the conn never opens (no further events) — the
+    // loop must schedule the next attempt on its own.
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(connect).toHaveBeenCalledTimes(1);
+
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(connect.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
   it('spaces successive re-link attempts further apart', async () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useP2P(makeParams({ p2pRole: 'client' })));
-    await act(async () => { await result.current.setupP2PClient(); });
-    act(() => result.current.setTargetId('MASTERID'));
+    await act(async () => { await result.current.setupP2PClient('MASTERID'); });
     connect.mockClear();
 
-    // First attempt: base delay of 1.5s (±20% jitter).
-    act(() => result.current.setP2pStatus('CONNECTION CLOSED'));
+    act(() => emitConnChange(true, 'MASTERID'));
+    act(() => emitConnChange(false, 'MASTERID'));
+
+    // First attempt: base delay of 1.5s (±20% jitter) — fires inside 2s.
     act(() => { vi.advanceTimersByTime(2000); });
     expect(connect).toHaveBeenCalledTimes(1);
 
     // The re-link failed and the connection closed again — the next attempt
-    // must wait ~3s rather than another 1.5s.
-    act(() => result.current.setP2pStatus('CONNECTION CLOSED'));
+    // must wait ~3s (grown backoff), not another ~1.5s base delay.
+    act(() => emitConnChange(false, 'MASTERID'));
     act(() => { vi.advanceTimersByTime(2000); });
     expect(connect).toHaveBeenCalledTimes(1);
 
@@ -192,18 +277,17 @@ describe('useP2P — thin state-transition coverage', () => {
   it('resets the re-link backoff after the connection comes back', async () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useP2P(makeParams({ p2pRole: 'client' })));
-    await act(async () => { await result.current.setupP2PClient(); });
-    act(() => result.current.setTargetId('MASTERID'));
+    await act(async () => { await result.current.setupP2PClient('MASTERID'); });
     connect.mockClear();
 
-    act(() => result.current.setP2pStatus('CONNECTION CLOSED'));
+    act(() => emitConnChange(true, 'MASTERID'));
+    act(() => emitConnChange(false, 'MASTERID'));
     act(() => { vi.advanceTimersByTime(2000); });
     expect(connect).toHaveBeenCalledTimes(1);
 
-    act(() => result.current.setP2pStatus('CONNECTED TO MASTERID'));
-
-    // A later drop starts from the base delay again, not the grown one.
-    act(() => result.current.setP2pStatus('CONNECTION CLOSED'));
+    // Link restored, then drops again — backoff restarts from the base delay.
+    act(() => emitConnChange(true, 'MASTERID'));
+    act(() => emitConnChange(false, 'MASTERID'));
     act(() => { vi.advanceTimersByTime(2000); });
     expect(connect).toHaveBeenCalledTimes(2);
   });
@@ -214,7 +298,21 @@ describe('useP2P — thin state-transition coverage', () => {
     await act(async () => { await result.current.setupP2PClient(); });
     connect.mockClear();
 
-    act(() => result.current.setP2pStatus('CONNECTION CLOSED'));
+    act(() => emitConnChange(false, 'MASTERID'));
+    act(() => { vi.advanceTimersByTime(60_000); });
+
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('does not auto-dial a typed-but-never-joined master id', async () => {
+    // Typing an id is not consent to connect — only joinSession (LINK) or
+    // the auto-join path marks the target as attempted.
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useP2P(makeParams({ p2pRole: 'client' })));
+    await act(async () => { await result.current.setupP2PClient(); });
+    act(() => result.current.setTargetId('MASTERID'));
+    connect.mockClear();
+
     act(() => { vi.advanceTimersByTime(60_000); });
 
     expect(connect).not.toHaveBeenCalled();
@@ -230,12 +328,104 @@ describe('useP2P — thin state-transition coverage', () => {
     })));
 
     act(() => {
-      result.current.lastHeartbeatTimeRef.current = 0;
       result.current.lastMasterContactTimeRef.current = Date.now() - 5000;
     });
     act(() => { vi.advanceTimersByTime(1000); });
 
     expect(result.current.p2pStatus).toBe('MASTER TIMEOUT');
     expect(onMasterHeartbeatTimeout).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useP2P — setup lifecycle (ghost-peer guard)', () => {
+  it('discards a stale in-flight setup instead of installing a ghost peer', async () => {
+    // Double-tap / reset-then-recreate while initialize() is still awaiting
+    // the signaling 'open': the loser's late resolution must be destroyed,
+    // not installed over the winner's peerSyncRef.
+    const resolvers: Array<(id: string) => void> = [];
+    initialize.mockImplementation(() => new Promise<string>((res) => { resolvers.push(res); }));
+    const { result } = renderHook(() => useP2P(makeParams()));
+
+    act(() => { void result.current.setupP2PMaster(); });
+    act(() => { void result.current.setupP2PClient(); });
+    expect(peerSyncInstances).toHaveLength(2);
+
+    await act(async () => {
+      resolvers[0]('GHOST1'); // stale master init lands first
+      resolvers[1]('LIVE12'); // fresh client init lands second
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(result.current.peerId).toBe('LIVE12'));
+    expect(peerSyncInstances[0].destroy).toHaveBeenCalledTimes(1);
+    expect(peerSyncInstances[1].destroy).not.toHaveBeenCalled();
+    expect(result.current.isP2PSetupPending).toBe(false);
+  });
+
+  it('resetP2P during in-flight setup prevents the late peer from being installed', async () => {
+    let resolveInit: (id: string) => void = () => {};
+    initialize.mockImplementationOnce(() => new Promise<string>((res) => { resolveInit = res; }));
+    const { result } = renderHook(() => useP2P(makeParams()));
+
+    act(() => { void result.current.setupP2PMaster(); });
+    act(() => result.current.resetP2P());
+
+    await act(async () => { resolveInit('GHOST1'); await Promise.resolve(); });
+
+    await waitFor(() => expect(peerSyncInstances[0].destroy).toHaveBeenCalledTimes(1));
+    expect(result.current.peerId).toBe('');
+    expect(result.current.isP2PSetupPending).toBe(false);
+  });
+
+  it('reports isP2PSetupPending while initialize() is in flight and clears it after', async () => {
+    let resolveInit: (id: string) => void = () => {};
+    initialize.mockImplementationOnce(() => new Promise<string>((res) => { resolveInit = res; }));
+    const { result } = renderHook(() => useP2P(makeParams()));
+
+    expect(result.current.isP2PSetupPending).toBe(false);
+    act(() => { void result.current.setupP2PMaster(); });
+    expect(result.current.isP2PSetupPending).toBe(true);
+
+    await act(async () => { resolveInit('PEER123'); await Promise.resolve(); });
+    expect(result.current.isP2PSetupPending).toBe(false);
+  });
+
+  it('does not surface a stale setup failure over a newer setup', async () => {
+    const resolvers: Array<(id: string) => void> = [];
+    const rejects: Array<(e: unknown) => void> = [];
+    initialize.mockImplementation(() => new Promise<string>((res, rej) => {
+      resolvers.push(res);
+      rejects.push(rej);
+    }));
+    const addToast = vi.fn();
+    const { result } = renderHook(() => useP2P(makeParams({ addToast })));
+
+    act(() => { void result.current.setupP2PMaster(); });
+    act(() => { void result.current.setupP2PClient(); });
+
+    await act(async () => {
+      rejects[0](new Error('stale failure')); // loser's init fails late
+      resolvers[1]('LIVE12');
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(result.current.peerId).toBe('LIVE12'));
+    // The stale failure must not toast/clobber the live session's status.
+    expect(addToast).not.toHaveBeenCalled();
+    expect(result.current.p2pStatus).not.toBe('PEER INIT FAILED');
+  });
+});
+
+describe('useP2P — PeerSync role options', () => {
+  it('rejects inbound DataConnections for the client role', async () => {
+    const { result } = renderHook(() => useP2P(makeParams()));
+    await act(async () => { await result.current.setupP2PClient(); });
+    expect(lastPeerSync()?.options?.acceptInboundConnections).toBe(false);
+  });
+
+  it('accepts inbound DataConnections for the master role', async () => {
+    const { result } = renderHook(() => useP2P(makeParams()));
+    await act(async () => { await result.current.setupP2PMaster(); });
+    expect(lastPeerSync()?.options?.acceptInboundConnections).toBe(true);
   });
 });

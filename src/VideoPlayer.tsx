@@ -1,13 +1,6 @@
 import { useEffect } from "react";
 import { useLTC } from "./LTCSyncContext";
 import { FPS_OPTIONS, JAM_THRESHOLD_SEC } from "./constants";
-import { TimecodeNativeBridge } from "./utils/TimecodeNativeBridge";
-
-// The native bridge call crosses into iOS/Android IPC — at 60fps RAF that is
-// a bridge round-trip every frame for a value (lock-screen TC) that only
-// needs ~2Hz freshness. Throttle to this interval; isRunning flips still go
-// through immediately because the effect restarts on that dep.
-const PLAYBACK_STATUS_INTERVAL_MS = 500;
 
 export function VideoPlayer() {
   const {
@@ -30,7 +23,6 @@ export function VideoPlayer() {
 
   useEffect(() => {
     let rafId: number;
-    let lastStatusSentAt = -PLAYBACK_STATUS_INTERVAL_MS;
 
     const render = () => {
       const canvas = canvasRef.current;
@@ -42,12 +34,11 @@ export function VideoPlayer() {
 
       // 動作中は Worklet がタイムコード（LTC）の発信源となり、停止中はエンジンを使用する
       const tc = isRunning ? currentTcRef.current : engine.getTimecodeString();
-      const now = performance.now();
-      if (now - lastStatusSentAt >= PLAYBACK_STATUS_INTERVAL_MS) {
-        lastStatusSentAt = now;
-        void TimecodeNativeBridge.updatePlaybackStatus(isRunning, tc);
-      }
-      
+
+      // The lock-screen/notification playback status is pumped by a
+      // provider-level effect in LTCSyncContext — this component unmounts
+      // when the operator switches tabs, which used to freeze it mid-take.
+
       // 必要に応じて Slate Time を更新する
       if (isVisualSlateRef.current && slateTimeRef.current !== tc) {
         setSlateTime(tc);

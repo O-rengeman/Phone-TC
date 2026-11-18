@@ -67,6 +67,7 @@ export function ConnectionManager() {
     setTargetId,
     joinSession,
     p2pStatus,
+    isP2PSetupPending,
     packetLossRate,
     setPacketLossRate,
     addToast
@@ -82,9 +83,29 @@ export function ConnectionManager() {
   const copyInviteLink = () => {
     const url = new URL(window.location.href);
     url.searchParams.set('join', peerId);
-    navigator.clipboard.writeText(url.toString())
-      .then(() => addToast(tr('toast.inviteCopied'), 'info'))
-      .catch(() => addToast(tr('toast.copyFailed'), 'error'));
+    const text = url.toString();
+    // navigator.clipboard is undefined on insecure contexts (plain HTTP on
+    // set) — guard it and fall back to the legacy selection-based copy.
+    const clipboard = navigator.clipboard;
+    if (clipboard && typeof clipboard.writeText === 'function') {
+      clipboard.writeText(text)
+        .then(() => addToast(tr('toast.inviteCopied'), 'info'))
+        .catch(() => addToast(tr('toast.copyFailed'), 'error'));
+      return;
+    }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      addToast(tr(ok ? 'toast.inviteCopied' : 'toast.copyFailed'), ok ? 'info' : 'error');
+    } catch {
+      addToast(tr('toast.copyFailed'), 'error');
+    }
   };
 
   const handleSaveSignaling = () => {
@@ -137,8 +158,11 @@ export function ConnectionManager() {
         <label className="section-label">{tr('label.p2p')}</label>
         {!p2pRole ? (
           <div className="p2p-init-pro">
-            <button onClick={() => void setupP2PMaster()}>{tr('btn.createMaster')}</button>
-            <button onClick={() => void setupP2PClient()}>{tr('btn.joinClient')}</button>
+            {/* Disabled while a setup initialize() is in flight — a second
+                tap used to spawn a parallel PeerSync whose late resolution
+                installed a ghost peer over the live one. */}
+            <button onClick={() => void setupP2PMaster()} disabled={isP2PSetupPending}>{tr('btn.createMaster')}</button>
+            <button onClick={() => void setupP2PClient()} disabled={isP2PSetupPending}>{tr('btn.joinClient')}</button>
           </div>
         ) : (
           <div className="p2p-panel-pro">

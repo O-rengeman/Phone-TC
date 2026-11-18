@@ -5,7 +5,7 @@ import type { DriftMonitor, DriftStatus } from '../utils/DriftMonitor';
 import { t as translate } from '../utils/i18n';
 import type { Lang } from '../utils/i18n';
 import { FPS_OPTIONS, DRIFT_RESYNC_THRESHOLD_SEC } from '../constants';
-import { offsetMsWithOutputOffset } from '../utils/timecode';
+import { offsetMsWithOutputOffset, shiftTimecode } from '../utils/timecode';
 import type { SyncMode } from '../LTCSyncContext';
 
 type ToastLevel = 'info' | 'warn' | 'error';
@@ -78,7 +78,15 @@ export function useNetworkSync({
         const lastOffset = lastNetworkOffsetRef.current;
         const offsetDelta = lastOffset !== null ? Math.abs(result.offset - lastOffset) : Infinity;
         const targetTc = engine.getTimecodeForOffset(result.offset);
-        const driftSec = engine.getDiffSeconds(targetTc);
+        // engine.currentTimecode already carries the user's outputOffset —
+        // every correction path (applySyncToWorklet's shiftTimecode,
+        // syncWithOffset's offsetMsWithOutputOffset, applyInitialTimecode)
+        // applies it. Comparing against the RAW target made a nonzero
+        // outputOffset read as permanent drift and forced a correction on
+        // every 30s tick, so the drift probe must use the offset-applied TC.
+        const driftTargetTc = shiftTimecode(
+          targetTc, outputOffset, FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
+        const driftSec = engine.getDiffSeconds(driftTargetTc);
         const shouldCorrect = offsetDelta >= OFFSET_DELTA_THRESHOLD_MS || driftSec >= DRIFT_RESYNC_THRESHOLD_SEC;
 
         if (shouldCorrect) {
@@ -124,8 +132,12 @@ export function useNetworkSync({
         if (isRunning) {
           applySyncToWorklet(engine.getTimecodeForOffset(result.offset), 0, true);
         }
+        addToast(translate('toast.resynced', langRef.current), 'info');
       }
-      addToast(translate('toast.resynced', langRef.current), 'info');
+      // p2pRole === 'master': the session master owns the output TC (clients
+      // sync to it), so there is nothing to correct — and no 'RE-SYNCED'
+      // toast, which would falsely claim the output was adjusted. The
+      // syncStatus/drift-monitor updates above still apply.
     } catch {
       addToast(translate('toast.resyncFailed', langRef.current), 'error');
     } finally {
