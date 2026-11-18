@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface GuideOverlayProps {
   showGuide: boolean;
@@ -7,20 +7,30 @@ interface GuideOverlayProps {
 }
 
 export function GuideOverlay({ showGuide, setShowGuide, tr }: GuideOverlayProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const prevFocusRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     if (!showGuide) return;
+    prevFocusRef.current = document.activeElement as HTMLElement | null;
+    cardRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setShowGuide(false);
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      prevFocusRef.current?.focus();
+    };
   }, [showGuide, setShowGuide]);
 
   if (!showGuide) return null;
   return (
     <div className="guide-overlay" onClick={() => setShowGuide(false)} role="presentation">
       <div
+        ref={cardRef}
         className="guide-card"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
