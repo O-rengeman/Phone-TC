@@ -54,6 +54,16 @@ describe('LtcEngine.getCorrectedTc', () => {
     // State must be untouched.
     expect(engine.getTimecodeString()).toBe('00:00:05:00');
   });
+
+  it('returns null instead of throwing on an unparseable master TC', () => {
+    // Peer-supplied strings are untrusted — a malformed heartbeat used to
+    // throw through the PeerJS 'data' handler on every message.
+    const engine = new LtcEngine(settings);
+    expect(engine.getCorrectedTc('not-a-timecode', 100, true)).toBeNull();
+    expect(engine.getCorrectedTc('', 0, false)).toBeNull();
+    // Engine state must be untouched by the rejected parse.
+    expect(engine.getTimecodeString()).toMatch(/^\d{2}:\d{2}:\d{2}:\d{2}$/);
+  });
 });
 
 describe('LtcEngine.signedFrameDiffTo', () => {

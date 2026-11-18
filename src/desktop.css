@@ -265,11 +265,6 @@
   .desktop-view .dt-panel-control .dt-section + .dt-section { padding-top: 6px; }
 }
 
-/* The switcher is one instrument and cannot be split across columns. */
-.desktop-view .dt-pane-switcher {
-  grid-template-columns: minmax(0, 1fr);
-}
-
 /* Titled blocks inside a panel. These replace what used to be separate
    stacked panels: the grid gives each slot exactly one box, so groupings are
    expressed with a rule and a heading rather than another border. */
@@ -524,15 +519,6 @@
   color: var(--text-muted);
 }
 
-.desktop-view .dt-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--dt-text);
-  color: var(--text);
-  cursor: pointer;
-}
-
 .desktop-view .dt-hint {
   margin: 0;
   font-size: var(--dt-label);
@@ -647,76 +633,6 @@
 .desktop-view .dt-marker-dot.green { background: #35d07f; }
 .desktop-view .dt-marker-dot.yellow { background: #f5c542; }
 
-/* ── Tally ────────────────────────────────────────────────────────────── */
-
-.desktop-view .dt-tally-row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.desktop-view .dt-tally-btn {
-  height: var(--dt-control-h);
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid var(--dt-line);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  font-family: var(--font-main);
-  font-size: var(--dt-text);
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-  transition: transform 0.1s, border-color 0.15s;
-}
-
-.desktop-view .dt-tally-btn:hover { border-color: rgba(255, 255, 255, 0.35); }
-.desktop-view .dt-tally-btn:active { transform: scale(0.97); }
-.desktop-view .dt-tally-btn.active { color: #000; }
-.desktop-view .dt-tally-btn-sm { height: clamp(22px, 3vh, 30px); font-size: var(--dt-label); }
-
-.desktop-view .dt-all-tally {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.desktop-view .dt-cam-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(clamp(150px, 13vw, 210px), 1fr));
-  gap: var(--dt-gap);
-  align-content: start;
-}
-
-.desktop-view .dt-cam-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: clamp(8px, 1.1vh, 13px);
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid var(--dt-line);
-  border-radius: var(--radius-sm);
-}
-
-.desktop-view .dt-cam-card.offline { opacity: 0.45; }
-
-.desktop-view .dt-cam-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.desktop-view .dt-cam-head strong {
-  font-size: var(--dt-text);
-  color: var(--text-bright);
-  letter-spacing: 0.05em;
-}
-
-.desktop-view .dt-cam-head span {
-  font-size: var(--dt-label);
-  color: var(--text-muted);
-}
-
 /* ── Log ──────────────────────────────────────────────────────────────── */
 
 .desktop-view .dt-log {
@@ -783,12 +699,6 @@
 
 .desktop-view .dt-empty span { font-size: var(--dt-text); }
 
-.desktop-view .dt-empty-full {
-  height: 100%;
-  border: 1px dashed var(--dt-line);
-  border-radius: var(--dt-radius);
-}
-
 .desktop-view .dt-export-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -836,51 +746,6 @@
 .desktop-view .dt-pane-activity {
   grid-template-columns: minmax(0, 1fr);
 }
-
-/* ── Embedded switcher ────────────────────────────────────────────────── */
-
-/* The director panel is normally a fixed fullscreen overlay; inside the tab
-   it has to become an ordinary block that fills the stage instead. */
-.desktop-view .dt-pane-switcher .dt-embedded-switcher {
-  position: static;
-  inset: auto;
-  z-index: auto;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  border: 1px solid var(--dt-line);
-  border-radius: var(--dt-radius);
-  overflow: hidden;
-}
-
-.desktop-view .dt-pane-switcher .dt-embedded-switcher .atem-workspace-layout {
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* The switcher was drawn for a fullscreen overlay, so on a 720p console its
-   multiview is taller than the tab. Its own sections scroll rather than clip:
-   a camera the director cannot scroll to is a camera they cannot cut to. */
-.desktop-view .dt-pane-switcher .dt-embedded-switcher .atem-multiview-board,
-.desktop-view .dt-pane-switcher .dt-embedded-switcher .creator-camera-section {
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-/* ── OBS link ─────────────────────────────────────────────────────────── */
-
-/* Two short forms and a scene table: the settings column sits at its natural
-   height like the timecode pane rather than being stretched to the stage. */
-.desktop-view .dt-pane-obs { grid-auto-rows: minmax(0, 1fr); }
-
-.desktop-view .dt-table-obs select { width: 100%; }
-.desktop-view .dt-table-obs td:first-child { width: 40%; white-space: normal; }
-
-/* The scene that is actually on air has to be findable at a glance from
-   across the room, which a row of small text is not. */
-.desktop-view .dt-table-obs tr.obs-row-program td { color: #ff5a5a; font-weight: 700; }
-.desktop-view .dt-table-obs tr.obs-row-preview td { color: #35d07f; }
 
 /* ── Keyboard & polish ────────────────────────────────────────────────── */
 

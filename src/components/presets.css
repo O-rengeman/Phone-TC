@@ -1,0 +1,125 @@
+/*
+ * presets.css — setup-preset panel.
+ *
+ * Shared by the mobile TOOLS tab and the desktop TIMECODE pane (where it is
+ * mounted inside a DesktopSection). Layout rides on the app's existing
+ * primitives — tool-section-shell / tool-section-head / section-label /
+ * btn-pill / empty-msg — so only the preset-specific geometry lives here,
+ * keyed off the global theme variables and prefixed `preset-`.
+ */
+
+/* The desktop mount already prints the section title (DesktopSection), so
+   the panel's own mobile-style label would duplicate it. */
+.desktop-view .preset-panel .preset-head {
+  display: none;
+}
+
+.preset-panel .preset-save-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.preset-panel .preset-name-input {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+  background: var(--panel-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+
+.preset-panel .preset-name-input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.preset-panel .preset-name-input:disabled {
+  opacity: 0.4;
+}
+
+.preset-panel .preset-save-btn {
+  flex-shrink: 0;
+  padding: 10px 16px;
+}
+
+.preset-panel .preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.preset-panel .preset-empty {
+  padding: 20px 12px;
+}
+
+.preset-panel .preset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.preset-panel .preset-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.preset-panel .preset-row-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-panel .preset-row-meta {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-panel .preset-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.preset-panel .preset-apply,
+.preset-panel .preset-delete {
+  padding: 7px 12px;
+  font-size: 0.62rem;
+}
+
+.preset-panel .preset-delete {
+  color: var(--text-muted);
+}
+
+/* On the desktop console the panel sits inside a dt-section: match the
+   denser control metrics there instead of the mobile card rhythm. */
+.desktop-view .preset-panel .preset-name-input {
+  height: var(--dt-control-h);
+}
+
+.desktop-view .preset-panel .preset-list {
+  max-height: 180px;
+}

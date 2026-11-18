@@ -7,10 +7,12 @@ import { useLTC } from '../LTCSyncContext';
 export function PwaRegister() {
   const { isRunning, tr } = useLTC();
   const isRunningRef = useRef(isRunning);
+  const trRef = useRef(tr);
 
   useEffect(() => {
     isRunningRef.current = isRunning;
-  }, [isRunning]);
+    trRef.current = tr;
+  }, [isRunning, tr]);
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
@@ -26,7 +28,7 @@ export function PwaRegister() {
         toast(
           (t) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <span>{tr('pwa.updateAvailable')}</span>
+              <span>{trRef.current('pwa.updateAvailable')}</span>
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                 <button
                   type="button"
@@ -44,7 +46,7 @@ export function PwaRegister() {
                     void updateSW(true);
                   }}
                 >
-                  {tr('pwa.update')}
+                  {trRef.current('pwa.update')}
                 </button>
                 <button
                   type="button"
@@ -59,7 +61,7 @@ export function PwaRegister() {
                   }}
                   onClick={() => toast.dismiss(t.id)}
                 >
-                  {tr('pwa.close')}
+                  {trRef.current('pwa.close')}
                 </button>
               </div>
             </div>
@@ -69,7 +71,10 @@ export function PwaRegister() {
       },
       onOfflineReady() {},
     });
-  }, [tr]);
+    // tr is read through trRef inside the callbacks above, so registering the
+    // service worker once ([]) is enough — depending on tr re-registered the
+    // SW on every language toggle.
+  }, []);
 
   return null;
 }

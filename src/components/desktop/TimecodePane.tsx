@@ -1,6 +1,7 @@
 import { useLTC } from '../../LTCSyncContext';
 import { FPS_OPTIONS, OUTPUT_OFFSET_MAX, OUTPUT_OFFSET_MIN } from '../../constants';
 import { DesktopPanel, DesktopSection } from './DesktopPanel';
+import { PresetsPanel } from '../PresetsPanel';
 
 interface TimecodePaneProps {
   onOutputModeChange: (mode: 'stereo' | 'mono-l') => void;
@@ -58,6 +59,7 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
               type="button"
               className={outputMode === 'stereo' ? 'active' : ''}
               onClick={() => onOutputModeChange('stereo')}
+              disabled={isRunning}
             >
               {tr('out.stereoTc')}
             </button>
@@ -65,6 +67,7 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
               type="button"
               className={outputMode === 'mono-l' ? 'active' : ''}
               onClick={() => onOutputModeChange('mono-l')}
+              disabled={isRunning}
             >
               {tr('out.ltcRaudio')}
             </button>
@@ -135,7 +138,12 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
           <p className="dt-hint">{tr('dt.hint.startTc')}</p>
         </DesktopSection>
 
+        <DesktopSection title={tr('preset.title')}>
+          <PresetsPanel />
+        </DesktopSection>
+
         <p className="dt-hint dt-hint-keys">{tr('dt.hint.transport')}</p>
+
       </DesktopPanel>
     </div>
   );

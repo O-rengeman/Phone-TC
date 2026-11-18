@@ -1,4 +1,5 @@
 import { registerPlugin, Capacitor } from '@capacitor/core';
+import type { PluginListenerHandle } from '@capacitor/core';
 import { debug } from './log';
 
 export interface TimecodeNativeBridgePlugin {
@@ -98,16 +99,48 @@ export const TimecodeNativeBridge = {
    * iOS のオーディオセッション割り込み（着信など）を購読します。
    * ネイティブ側は割り込み終了時に自動でセッションを再アクティブ化しますが、
    * UI 警告のためにここで began/ended を通知します。ブラウザ環境では何もしません。
+   *
+   * Returns an unsubscribe function that removes BOTH native listeners —
+   * callers must invoke it on cleanup, otherwise StrictMode double-mounts
+   * and remounts stack duplicate listeners (double toasts, stale closures).
    */
-  addInterruptionListener(callback: (state: 'began' | 'ended') => void): void {
-    if (isNative && nativePlugin) {
-      const plugin = nativePlugin as unknown as
-        | { addListener?: (event: string, handler: () => void) => void }
-        | null;
-      if (plugin && typeof plugin.addListener === 'function') {
-        plugin.addListener('interruptionBegan', () => callback('began'));
-        plugin.addListener('interruptionEnded', () => callback('ended'));
+  addInterruptionListener(callback: (state: 'began' | 'ended') => void): () => void {
+    const noop = () => {};
+    if (!isNative || !nativePlugin) return noop;
+
+    const plugin = nativePlugin as unknown as
+      | { addListener?: (event: string, handler: () => void) => Promise<PluginListenerHandle> }
+      | null;
+    if (!plugin || typeof plugin.addListener !== 'function') return noop;
+
+    // Register each listener independently: if the second addListener throws
+    // after the first succeeded, the first handle must still be tracked for
+    // removal — a single shared try/catch used to leak it permanently.
+    const subs: Promise<PluginListenerHandle>[] = [];
+    for (const [event, state] of [['interruptionBegan', 'began'], ['interruptionEnded', 'ended']] as const) {
+      try {
+        subs.push(plugin.addListener(event, () => callback(state)));
+      } catch (e) {
+        debug(`Failed to register ${event} listener`, e);
       }
     }
+    if (subs.length === 0) return noop;
+
+    let disposed = false;
+    return () => {
+      if (disposed) return;
+      disposed = true;
+      // allSettled at both stages: one rejected addListener result or one
+      // failed remove() must not skip the remaining removals.
+      void Promise.allSettled(subs)
+        .then((results) => Promise.allSettled(
+          results.flatMap(r => (r.status === 'fulfilled' ? [r.value.remove()] : []))
+        ))
+        .then((removals) => {
+          removals.forEach(r => {
+            if (r.status === 'rejected') debug('Failed to remove interruption listener', r.reason);
+          });
+        });
+    };
   }
 };

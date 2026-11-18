@@ -30,6 +30,25 @@ export function normalizeDropFrame(
 }
 
 /**
+ * Re-validates a live frame position after the rate/drop settings change
+ * (the worklet's 'config' message can switch fps mid-run). Applies drop-frame
+ * normalization first, then clamps the result below framesPerSec — a rate
+ * drop can leave the counter above the new maximum. Returns the corrected
+ * frame count.
+ */
+export function sanitizeFramePosition(
+  isDrop: boolean,
+  minutes: number,
+  seconds: number,
+  frames: number,
+  framesPerSec: number,
+): number {
+  if (!Number.isFinite(frames) || frames < 0) return 0;
+  const normalized = normalizeDropFrame(isDrop, minutes, seconds, frames);
+  return normalized >= framesPerSec ? framesPerSec - 1 : normalized;
+}
+
+/**
  * Advances timecode state by exactly one frame, handling second/minute/hour
  * rollover and the SMPTE drop-frame minute-boundary skip (frames 0 and 1 are
  * dropped at the start of every minute except every 10th).
@@ -84,11 +103,12 @@ export function generateLtcBits(
   for (let i = 0; i < 8; i++) setBits(bits, 4 + (i * 8), 4, parseInt(ubit[i], 16) || 0);
   const sync = [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1];
   for (let i = 0; i < 16; i++) bits[64 + i] = sync[i];
-  // Biphase mark polarity correction (SMPTE 12M): set the BPC bit so the
-  // 80-bit frame contains an even number of 0-bits, keeping the sync word
-  // unambiguous regardless of payload. Bit 27 for 25-fps systems, bit 59
-  // otherwise (both positions are otherwise unused).
-  const bpc = framesPerSec === 25 ? 27 : 59;
+  // Biphase mark polarity correction (SMPTE ST 12-1 Table 3): the flag sits at
+  // bit 59 on 25-fps systems and bit 27 on 24/30-fps systems — the positions
+  // are rate-dependent because each rate reserves a different flag slot.
+  // Set it so the 80-bit frame contains an even number of 0-bits, keeping
+  // the sync word unambiguous regardless of payload.
+  const bpc = framesPerSec === 25 ? 59 : 27;
   let zeros = 0;
   for (let i = 0; i < 80; i++) if (bits[i] === 0) zeros++;
   if (zeros % 2 !== 0) bits[bpc] = 1;

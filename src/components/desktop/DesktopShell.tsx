@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useLTC } from '../../LTCSyncContext';
+import { useMasterDrift } from '../../masterDriftContext';
 import { VideoPlayer } from '../../VideoPlayer';
 import { formatSyncAge } from '../../utils/DriftMonitor';
 import { isClientOffline } from '../../utils/clients';
@@ -60,12 +61,13 @@ function readStoredTab(): string | null {
 export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
   const {
     isHost, isRunning, isPreparing, isPaused, syncMode, driftStatus, p2pRole,
-    peerId, p2pStatus, masterDrift, clients, nowTick,
+    peerId, p2pStatus, clients, nowTick,
     lang, tr,
     handleStartStop, handlePause, handleManualResync, beginStopHold, cancelStopHold,
     addMarker, holdStoppedRef, setIsVisualSlate, setShowGuide,
     setOutputOffset, markers, isResyncing,
   } = useLTC();
+  const masterDrift = useMasterDrift();
 
   // Feeds the activity log — mounted for the whole desktop session so the
   // log accumulates even while another tab is on screen.
@@ -90,7 +92,7 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
       const target = event.target as HTMLElement | null;
       if (target?.isContentEditable || target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
 
-      const tab = desktopTabForHotkey(event.key, isHost);
+      const tab = desktopTabForHotkey(event, isHost);
       if (!tab) return;
       event.preventDefault();
       selectTab(tab);
@@ -196,6 +198,7 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
     addMarker, holdStoppedRef, setIsVisualSlate, setShowGuide, setOutputOffset,
   ]);
 
+
   const onlineCount = Object.values(clients).filter(c => !isClientOffline(c, nowTick)).length;
   const clientCount = Object.keys(clients).length;
 
@@ -248,7 +251,7 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
           </div>
         </div>
 
-        <nav className="dt-tabs" aria-label="Console sections">
+        <nav className="dt-tabs" aria-label={tr('tab.aria')}>
           {tabs.map(tab => (
             <button
               key={tab.id}

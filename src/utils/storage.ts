@@ -22,6 +22,8 @@ export const STORAGE_KEYS = {
   desktopTab: 'ltc-desktop-tab',
   ntpCache: 'ltc-ntp-cache',
   turnConfig: 'ltc-turn-config',
+  presets: 'ltc-presets',
+  peerServer: 'ltc-peer-server',
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
