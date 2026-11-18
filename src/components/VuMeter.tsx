@@ -12,7 +12,7 @@ export function VuMeter() {
 
   return (
     <div className="vu-meter-row">
-      <div className="vu-bar-track vu-meter-track">
+      <div className="vu-meter-track">
         <div className="vu-bar-fill" style={{ width: `${Math.min(vuLevel * 120, 100)}%` }} />
       </div>
       <span className={`vu-clip-badge ${isClipping ? '' : 'hidden'}`}>

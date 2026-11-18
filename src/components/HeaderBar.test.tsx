@@ -64,4 +64,11 @@ describe('HeaderBar', () => {
     fireEvent.click(screen.getByText('?'));
     expect(setShowGuide).toHaveBeenCalledOnce();
   });
+
+  it('opens the pre-shoot checklist from the header', () => {
+    const onOpenPreflight = vi.fn();
+    render(<HeaderBar {...baseProps} onOpenPreflight={onOpenPreflight} />);
+    fireEvent.click(screen.getByRole('button', { name: 'preflight.open' }));
+    expect(onOpenPreflight).toHaveBeenCalledOnce();
+  });
 });

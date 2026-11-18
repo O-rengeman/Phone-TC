@@ -142,6 +142,26 @@ describe('useNetworkSync periodic sync effect', () => {
     expect(applySyncToWorklet).not.toHaveBeenCalled();
   });
 
+  it('measures drift against the output-offset-applied target TC', async () => {
+    // engine.currentTimecode already carries outputOffset, so the drift probe
+    // must too — otherwise a nonzero offset reads as permanent drift and
+    // forces a correction every 30s. fpsIndex 2 → 25fps; the mocked engine's
+    // getTimecodeForOffset returns '01:00:00:00', +2 frames → '01:00:00:02'.
+    syncMock.mockResolvedValue({ offset: 100, latency: 5 });
+    const engine = makeEngine({ getDiffSeconds: vi.fn(() => 0) });
+    const lastNetworkOffsetRef = { current: 100 };
+    const params = makeParams({
+      engineRef: { current: engine }, outputOffset: 2, lastNetworkOffsetRef,
+    });
+    renderHook(() => useNetworkSync(params));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30000);
+    });
+
+    expect(engine.getDiffSeconds).toHaveBeenCalledWith('01:00:00:02');
+  });
+
   it('swallows sync errors from the background interval without throwing', async () => {
     syncMock.mockRejectedValue(new Error('network down'));
     const params = makeParams();
@@ -225,6 +245,24 @@ describe('useNetworkSync.handleManualResync', () => {
     });
 
     expect(engine.syncWithOffset).not.toHaveBeenCalled();
+  });
+
+  it('does not claim RE-SYNCED for the P2P master role (nothing was corrected)', async () => {
+    syncMock.mockResolvedValue({ offset: 200, latency: 3 });
+    const addToast = vi.fn();
+    const params = makeParams({ p2pRole: 'master', addToast });
+    const { result } = renderHook(() => useNetworkSync(params));
+
+    await act(async () => {
+      await result.current.handleManualResync();
+    });
+
+    // The master owns the session TC — a network resync must not toast a
+    // success that implies the output was corrected.
+    const claimedResync = addToast.mock.calls.some(
+      (call) => call[0] === 'RE-SYNCED' || call[0] === '再同期しました',
+    );
+    expect(claimedResync).toBe(false);
   });
 
   it('toasts a failure message and resets isResyncing when sync rejects', async () => {

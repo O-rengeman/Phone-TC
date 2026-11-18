@@ -1,0 +1,164 @@
+/*
+ * signaling.css — Advanced P2P signaling settings inside ConnectionManager.
+ *
+ * Covers the collapsed <details> panel holding the custom TURN/STUN relay
+ * fields and the self-hosted PeerServer (signaling) fields. Shared by the
+ * mobile SYNC tab and the desktop SYNC pane because ConnectionManager is
+ * mounted in both. Layout rides on the app's existing primitives
+ * (control-section / section-label / btn-small) and theme variables; only
+ * the sig-* geometry lives here.
+ */
+
+.sig-advanced {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+}
+
+.sig-advanced-summary {
+  cursor: pointer;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+  padding: 4px 2px;
+  user-select: none;
+}
+
+.sig-advanced-summary:hover {
+  color: var(--text);
+}
+
+.sig-advanced-summary::-webkit-details-marker {
+  color: var(--text-muted);
+}
+
+.sig-advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 2px 2px;
+}
+
+.sig-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.sig-group-label {
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 1.5px;
+}
+
+.sig-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sig-field-row {
+  display: flex;
+  gap: 8px;
+}
+
+.sig-field-port {
+  flex: 0 0 96px;
+}
+
+.sig-field-label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  padding-left: 2px;
+}
+
+.sig-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--primary);
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  transition: border-color 0.2s;
+}
+
+.sig-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 8px var(--primary-dim);
+}
+
+.sig-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.sig-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  cursor: pointer;
+  padding: 2px;
+}
+
+.sig-check input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sig-hint {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  padding: 0 2px;
+}
+
+.sig-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.sig-btn {
+  flex: 1;
+  padding: 8px 10px;
+}
+
+/* Desktop pane is narrower than the mobile card was — keep inputs compact. */
+.desktop-view .sig-input {
+  padding: 7px 9px;
+  font-size: 0.72rem;
+}
+
+.desktop-view .sig-advanced-body {
+  gap: 10px;
+}
+
+.desktop-view .sig-group {
+  padding: 6px;
+  gap: 6px;
+}
+
+.desktop-view .sig-btn {
+  padding: 6px 8px;
+}

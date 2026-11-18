@@ -1,55 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
 
-/* ── Design Tokens (shared with App.css) ── */
-:root {
-  /* Backgrounds */
-  --bg: #000000;
-  --bg-subtle: #050505;
-  --panel: #0a0a0a;
-  --panel-bg: #0a0a0a;
-  --panel-elevated: #111111;
-
-  /* Text */
-  --primary: #ffffff;
-  --text: #e0e0e0;
-  --text-muted: #666666;
-  --text-bright: #ffffff;
-
-  /* Borders */
-  --border: #1a1a1a;
-  --border-subtle: #222222;
-  --border-strong: rgba(255, 255, 255, 0.15);
-
-  /* Effects */
-  --primary-glow: rgba(255, 255, 255, 0.2);
-  --primary-dim: rgba(255, 255, 255, 0.15);
-
-  /* Status */
-  --success: #ffffff;
-  --warning: #aaaaaa;
-  --danger: #ffffff;
-
-  /* Typography */
-  --font-main: 'Inter', -apple-system, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Roboto Mono', monospace;
-
-  /* Radius */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-
-  /* Layout */
-  --app-height: 100dvh;
-
-  /* z-index hierarchy (synced with Toaster: 10500) */
-  --z-footer: 10;
-  --z-recording: 8900;
-  --z-overlay-slate: 9000;
-  --z-overlay-director: 9100;
-  --z-overlay-tally: 9200;
-  --z-marker-flash: 9500;
-  --z-guide: 10000;
+.marker-sync-badge {
+  display: inline-block;
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1.6;
+  padding: 1px 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  white-space: nowrap;
+  color: #999;
 }
+.marker-sync-high { color: #22c55e; }
+.marker-sync-medium { color: #f59e0b; }
+.marker-sync-low { color: #ff3b40; }
 
 * {
   margin: 0;

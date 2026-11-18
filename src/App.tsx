@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense } from 'react';
+import { useCallback, useEffect, useState, lazy, Suspense } from 'react';
 import { LTCSyncProvider, useLTC } from './LTCSyncContext';
 import { FPS_OPTIONS } from './constants';
 import { VideoPlayer } from './VideoPlayer';
@@ -12,13 +12,17 @@ import { HelpButton } from './components/HelpButton';
 import { FooterControls } from './components/FooterControls';
 import { MarkerList } from './components/MarkerList';
 import { ClientList } from './components/ClientList';
+import { PresetsPanel } from './components/PresetsPanel';
 import { PwaRegister } from './components/PwaRegister';
+import { VuMeter } from './components/VuMeter';
+import { LivePreflightScreen } from './components/PreflightScreen';
 import './App.css';
 
 const DesktopShell = lazy(() => import('./components/desktop/DesktopShell').then(m => ({ default: m.DesktopShell })));
 const VisualSlate = lazy(() => import('./components/VisualSlate').then(m => ({ default: m.VisualSlate })));
 
 function MainApp() {
+  const [showPreflight, setShowPreflight] = useState(false);
   const {
     isRunning,
     fpsIndex,
@@ -70,6 +74,8 @@ function MainApp() {
     updateMarkerComment,
     exportToEDL,
     exportToALE,
+    exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO,
+    recallTimecode,
     handleSlateClick,
     handleStartStop,
     handlePause,
@@ -77,9 +83,23 @@ function MainApp() {
     cancelStopHold,
     handleManualResync,
     holdStoppedRef,
+    engineRef,
+    currentTcRef,
   } = useLTC();
 
+  // Live TC for the marker-timeline playhead — same source VideoPlayer uses:
+  // the worklet-fed ref while running, the engine's TC while idle.
+  const getCurrentTc = useCallback(() => {
+    const engine = engineRef.current;
+    if (!engine) return '';
+    return isRunning ? currentTcRef.current : engine.getTimecodeString();
+  }, [isRunning, engineRef, currentTcRef]);
+
   const handleOutputModeChange = (mode: 'stereo' | 'mono-l') => {
+    // Output routing is fixed for the session: mono-L acquires the mic stream
+    // only at engine start, so switching mid-run would produce silence and a
+    // dead VU meter. Buttons are also disabled while running.
+    if (isRunning) return;
     setOutputMode(mode);
     if (mode === 'mono-l') {
       toast(`⚠️ ${tr('toast.headphonesRequired')}`, {
@@ -112,7 +132,7 @@ function MainApp() {
   }, []);
 
   return (
-    <div className={`app-container pro-theme ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
+    <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
       <PwaRegister />
       <HeaderBar
         isRunning={isRunning}
@@ -126,13 +146,14 @@ function MainApp() {
         setLang={setLang}
         setShowGuide={setShowGuide}
         tr={tr}
+        onOpenPreflight={() => setShowPreflight(true)}
       />
 
       {isMobile && (
-        <nav className="tab-bar">
-          <button className={activeTab === 'main' ? 'active' : ''} onClick={() => setActiveTab('main')}>{tr('tab.main')}</button>
-          <button className={activeTab === 'sync' ? 'active' : ''} onClick={() => setActiveTab('sync')}>{tr('tab.sync')}</button>
-          <button className={activeTab === 'tools' ? 'active' : ''} onClick={() => setActiveTab('tools')}>{tr('tab.tools')}</button>
+        <nav className="tab-bar" aria-label={tr('tab.aria')}>
+          <button className={activeTab === 'main' ? 'active' : ''} onClick={() => setActiveTab('main')} aria-current={activeTab === 'main' ? 'page' : undefined}>{tr('tab.main')}</button>
+          <button className={activeTab === 'sync' ? 'active' : ''} onClick={() => setActiveTab('sync')} aria-current={activeTab === 'sync' ? 'page' : undefined}>{tr('tab.sync')}</button>
+          <button className={activeTab === 'tools' ? 'active' : ''} onClick={() => setActiveTab('tools')} aria-current={activeTab === 'tools' ? 'page' : undefined}>{tr('tab.tools')}</button>
         </nav>
       )}
 
@@ -185,15 +206,18 @@ function MainApp() {
             <div className="control-section">
               <label className="section-label">{tr('label.outputMode')}</label>
               <div className="sync-toggle-pro">
-                <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')}>{tr('out.stereoTc')}</button>
-                <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')}>{tr('out.ltcRaudio')}</button>
+                <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')} disabled={isRunning}>{tr('out.stereoTc')}</button>
+                <button className={outputMode === 'mono-l' ? 'active' : ''} onClick={() => handleOutputModeChange('mono-l')} disabled={isRunning}>{tr('out.ltcRaudio')}</button>
               </div>
+              {/* Mono-L routes the mic into the output, so the input level and
+                  clip badge matter exactly while it is running. */}
+              {isRunning && outputMode === 'mono-l' && <VuMeter />}
             </div>
 
             <div className="control-section">
               <label className="section-label">{tr('cm.tcOffset')}</label>
               <div className="offset-control">
-                <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} />
+                <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} aria-label={tr('cm.tcOffset')} />
                 <span className="offset-value">{outputOffset > 0 ? '+' : ''}{outputOffset}</span>
               </div>
             </div>
@@ -288,6 +312,8 @@ function MainApp() {
               </div>
             </section>
 
+            <PresetsPanel />
+
             <MarkerList
               markers={markers}
               addMarker={addMarker}
@@ -295,6 +321,13 @@ function MainApp() {
               updateMarkerComment={updateMarkerComment}
               exportToEDL={exportToEDL}
               exportToALE={exportToALE}
+              exportToFCPXML={exportToFCPXML}
+              exportToResolve={exportToResolve}
+              exportToCSV={exportToCSV}
+              exportToOTIO={exportToOTIO}
+              recallTimecode={recallTimecode}
+              fpsIndex={fpsIndex}
+              getCurrentTc={getCurrentTc}
               isMobile={isMobile}
               tr={tr}
             />
@@ -331,6 +364,7 @@ function MainApp() {
         addMarker={addMarker}
         syncMode={syncMode}
         p2pRole={p2pRole}
+        isMobile={isMobile}
         tr={tr}
       />
 
@@ -353,6 +387,7 @@ function MainApp() {
       )}
 
       <GuideOverlay showGuide={showGuide} setShowGuide={setShowGuide} tr={tr} />
+      {showPreflight && <LivePreflightScreen onClose={() => setShowPreflight(false)} />}
     </div>
   );
 }

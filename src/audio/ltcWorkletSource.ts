@@ -1,4 +1,4 @@
-import { normalizeDropFrame, advanceTimecode, generateLtcBits } from './ltcFrame';
+import { normalizeDropFrame, sanitizeFramePosition, advanceTimecode, generateLtcBits } from './ltcFrame';
 
 // LTC AudioWorklet processor source.
 //
@@ -11,12 +11,13 @@ import { normalizeDropFrame, advanceTimecode, generateLtcBits } from './ltcFrame
 // timecode advance, drop-frame handling, bit generation and sample synthesis,
 // and applies jam/nudge/config corrections received from the main thread.
 //
-// The pure timecode/bit-generation logic (normalizeDropFrame, advanceTimecode,
-// generateLtcBits) lives in ltcFrame.ts so it can be unit tested outside the
-// AudioWorklet sandbox. It is re-serialized here via Function.prototype.toString()
-// and spliced into the worklet's script text. Each is bound to an explicit
-// `const <name> = ...` so the class body below can call it by its canonical
-// name even if a minifier renames the function's own internal identifier.
+// The pure timecode/bit-generation logic (normalizeDropFrame, sanitizeFramePosition,
+// advanceTimecode, generateLtcBits) lives in ltcFrame.ts so it can be unit tested
+// outside the AudioWorklet sandbox. It is re-serialized here via
+// Function.prototype.toString() and spliced into the worklet's script text. Each
+// is bound to an explicit `const <name> = ...` so the class body below can call it
+// by its canonical name even if a minifier renames the function's own internal
+// identifier.
 const LTC_PROCESSOR_CLASS_SOURCE = `
       class LtcProcessor extends AudioWorkletProcessor {
         constructor(options) {
@@ -55,6 +56,36 @@ const LTC_PROCESSOR_CLASS_SOURCE = `
               if (typeof d.volume === 'number') this.settings.volume = d.volume;
               if (typeof d.ubit === 'string') this.settings.ubit = d.ubit;
               if (typeof d.mode === 'string') this.settings.mode = d.mode;
+              // Live frame-rate change (manual override or P2P master fps sync):
+              // fpsNum/fpsDen set each frame's sample count, framesPerSec the
+              // frame rollover, isDrop the drop-frame skip. Detect an actual
+              // change first so unrelated config posts don't re-validate.
+              const rateChanged =
+                (typeof d.fps === 'number' && d.fps !== this.settings.fps) ||
+                (typeof d.fpsNum === 'number' && d.fpsNum !== this.settings.fpsNum) ||
+                (typeof d.fpsDen === 'number' && d.fpsDen !== this.settings.fpsDen) ||
+                (typeof d.framesPerSec === 'number' && d.framesPerSec !== this.settings.framesPerSec) ||
+                (typeof d.isDrop === 'boolean' && d.isDrop !== this.settings.isDrop);
+              if (typeof d.fps === 'number') this.settings.fps = d.fps;
+              if (typeof d.fpsNum === 'number') this.settings.fpsNum = d.fpsNum;
+              if (typeof d.fpsDen === 'number') this.settings.fpsDen = d.fpsDen;
+              if (typeof d.framesPerSec === 'number') this.settings.framesPerSec = d.framesPerSec;
+              if (typeof d.isDrop === 'boolean') this.settings.isDrop = d.isDrop;
+              if (rateChanged) {
+                // Re-validate the live label under the new rate/drop rules —
+                // e.g. frames 0/1 at a non-10th minute are illegal in
+                // drop-frame, and a rate drop can leave frames >= the new
+                // framesPerSec. The in-flight buffer is left alone so the
+                // rate transition doesn't click; the next frame uses the new
+                // settings.
+                this.frames = sanitizeFramePosition(
+                  this.settings.isDrop,
+                  this.minutes,
+                  this.seconds,
+                  this.frames,
+                  this.settings.framesPerSec,
+                );
+              }
             }
           };
         }
@@ -136,6 +167,7 @@ const LTC_PROCESSOR_CLASS_SOURCE = `
 
 export const LTC_WORKLET_SOURCE =
   `const normalizeDropFrame = ${normalizeDropFrame.toString()};\n` +
+  `const sanitizeFramePosition = ${sanitizeFramePosition.toString()};\n` +
   `const advanceTimecode = ${advanceTimecode.toString()};\n` +
   `const generateLtcBits = ${generateLtcBits.toString()};\n` +
   LTC_PROCESSOR_CLASS_SOURCE;

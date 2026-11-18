@@ -8,4 +8,5 @@ CAP_PLUGIN(TimecodeNativeBridge, "TimecodeNativeBridge",
     CAP_PLUGIN_METHOD(startBackgroundMode, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(stopBackgroundMode, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(updatePlaybackStatus, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(setTorch, CAPPluginReturnPromise);
 )

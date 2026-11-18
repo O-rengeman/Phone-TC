@@ -1,6 +1,7 @@
 import { useLTC } from '../../LTCSyncContext';
-import { FPS_OPTIONS, OUTPUT_OFFSET_MAX, OUTPUT_OFFSET_MIN } from '../../constants';
+import { FPS_OPTIONS } from '../../constants';
 import { DesktopPanel, DesktopSection } from './DesktopPanel';
+import { PresetsPanel } from '../PresetsPanel';
 
 interface TimecodePaneProps {
   onOutputModeChange: (mode: 'stereo' | 'mono-l') => void;
@@ -58,6 +59,7 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
               type="button"
               className={outputMode === 'stereo' ? 'active' : ''}
               onClick={() => onOutputModeChange('stereo')}
+              disabled={isRunning}
             >
               {tr('out.stereoTc')}
             </button>
@@ -65,6 +67,7 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
               type="button"
               className={outputMode === 'mono-l' ? 'active' : ''}
               onClick={() => onOutputModeChange('mono-l')}
+              disabled={isRunning}
             >
               {tr('out.ltcRaudio')}
             </button>
@@ -101,8 +104,8 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
           <input
             type="range"
             className="dt-range"
-            min={OUTPUT_OFFSET_MIN}
-            max={OUTPUT_OFFSET_MAX}
+            min="-10"
+            max="10"
             step="1"
             value={outputOffset}
             onChange={e => setOutputOffset(parseInt(e.target.value, 10))}
@@ -110,7 +113,7 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
             aria-label={tr('cm.tcOffset')}
           />
           <div className="dt-range-scale">
-            <span>{OUTPUT_OFFSET_MIN}</span><span>0</span><span>+{OUTPUT_OFFSET_MAX}</span>
+            <span>-10</span><span>0</span><span>+10</span>
           </div>
           <p className="dt-hint">{tr('dt.hint.offset')}</p>
         </DesktopSection>
@@ -133,6 +136,10 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
             <span className="dt-readout">{userBits}{autoUserBits ? ' · AUTO' : ''}</span>
           </div>
           <p className="dt-hint">{tr('dt.hint.startTc')}</p>
+        </DesktopSection>
+
+        <DesktopSection title={tr('preset.title')}>
+          <PresetsPanel />
         </DesktopSection>
 
         <p className="dt-hint dt-hint-keys">{tr('dt.hint.transport')}</p>

@@ -15,12 +15,12 @@ describe('visibleDesktopTabs', () => {
 
   it('gives a client every tab too, since none are host-only', () => {
     const ids = visibleDesktopTabs(false).map(tab => tab.id);
-    expect(ids).toEqual(['timecode', 'sync', 'markers', 'activity']);
+    expect(ids).toEqual(['timecode', 'sync', 'markers']);
   });
 
   it('keeps the declared order', () => {
     expect(visibleDesktopTabs(true).map(tab => tab.id))
-      .toEqual(['timecode', 'sync', 'markers', 'activity']);
+      .toEqual(['timecode', 'sync', 'markers']);
   });
 
   it('assigns every tab a unique hotkey', () => {
@@ -55,13 +55,24 @@ describe('resolveDesktopTab', () => {
 
 describe('desktopTabForHotkey', () => {
   it('maps a digit to its tab', () => {
-    expect(desktopTabForHotkey('1', false)).toBe('timecode');
-    expect(desktopTabForHotkey('3', false)).toBe('markers');
-    expect(desktopTabForHotkey('4', false)).toBe('activity');
+    expect(desktopTabForHotkey({ key: '1', code: 'Digit1' }, false)).toBe('timecode');
+    expect(desktopTabForHotkey({ key: '3', code: 'Digit3' }, false)).toBe('markers');
+  });
+
+  it('still matches on macOS, where Option+digit rewrites key into symbols', () => {
+    // Option+1/2/3 produce '¡'/'™'/'£' on US macOS layouts, but code stays put.
+    expect(desktopTabForHotkey({ key: '¡', code: 'Digit1' }, true)).toBe('timecode');
+    expect(desktopTabForHotkey({ key: '™', code: 'Digit2' }, true)).toBe('sync');
+    expect(desktopTabForHotkey({ key: '£', code: 'Digit3' }, false)).toBe('markers');
+  });
+
+  it('falls back to key for digits that do not come from the top row', () => {
+    expect(desktopTabForHotkey({ key: '2', code: 'Numpad2' }, false)).toBe('sync');
   });
 
   it('returns null for a digit that addresses no tab', () => {
-    expect(desktopTabForHotkey('9', true)).toBeNull();
-    expect(desktopTabForHotkey('', true)).toBeNull();
+    expect(desktopTabForHotkey({ key: '9', code: 'Digit9' }, true)).toBeNull();
+    expect(desktopTabForHotkey({ key: '€', code: 'Digit5' }, true)).toBeNull();
+    expect(desktopTabForHotkey({ key: '', code: '' }, true)).toBeNull();
   });
 });

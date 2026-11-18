@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { GuideOverlay } from './GuideOverlay';
 
 describe('GuideOverlay', () => {
@@ -44,8 +44,14 @@ describe('GuideOverlay', () => {
 
   it('calls setShowGuide(false) when close button is clicked', () => {
     render(<GuideOverlay {...baseProps} />);
-    const closeBtn = screen.getByLabelText('Close');
+    const closeBtn = screen.getByLabelText('help.close');
     closeBtn.click();
+    expect(baseProps.setShowGuide).toHaveBeenCalledWith(false);
+  });
+
+  it('calls setShowGuide(false) when Escape is pressed', () => {
+    render(<GuideOverlay {...baseProps} />);
+    fireEvent.keyDown(window, { key: 'Escape' });
     expect(baseProps.setShowGuide).toHaveBeenCalledWith(false);
   });
 
