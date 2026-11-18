@@ -1,5 +1,6 @@
 import { useLTC } from '../LTCSyncContext';
 import { useVuMeter } from '../hooks/useVuMeter';
+import './timecodeSurface.css';
 
 /**
  * Mic input level bar + clip badge for mono-L output mode.
@@ -7,11 +8,11 @@ import { useVuMeter } from '../hooks/useVuMeter';
  * useVuMeter, so its per-frame re-renders stay isolated to this component.
  */
 export function VuMeter() {
-  const { analyserRef, isRunning, outputMode } = useLTC();
+  const { analyserRef, isRunning, outputMode, isMobile } = useLTC();
   const { vuLevel, isClipping } = useVuMeter(analyserRef, isRunning, outputMode);
 
   return (
-    <div className="vu-meter-row">
+    <div className={isMobile ? "vu-meter-row vu-v2" : "vu-meter-row"}>
       <div className="vu-meter-track">
         <div className="vu-bar-fill" style={{ width: `${Math.min(vuLevel * 120, 100)}%` }} />
       </div>

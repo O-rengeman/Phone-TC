@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useLTC } from "./LTCSyncContext";
 import { useMasterDrift } from "./masterDriftContext";
 import { FPS_OPTIONS, JAM_THRESHOLD_SEC } from "./constants";
+import "./components/timecodeSurface.css";
 
 export function VideoPlayer() {
   const {
@@ -120,18 +121,44 @@ export function VideoPlayer() {
   }, [isRunning, isMobile, setSlateTime, canvasRef, engineRef, currentTcRef, isVisualSlateRef, slateTimeRef]);
 
   return (
-    <div className="timecode-card-pro" onClick={() => { setIsVisualSlate(true); }}>
+    <div
+      className={isMobile ? "timecode-card-pro tc-card-v2" : "timecode-card-pro"}
+      onClick={() => { setIsVisualSlate(true); }}
+    >
       <canvas ref={canvasRef} className="time-canvas" />
-      <div className="info-strip-pro">
-        <span className="info-label">{tr('vp.fps')}: {FPS_OPTIONS[fpsIndex].label}</span>
-        <span className="info-label">{tr('vp.lvl')}: {outputLevel.toUpperCase()}</span>
-        <span className="info-label">{tr('vp.ubit')}: {userBits}</span>
-        {p2pRole === 'client' && masterDrift !== null && (
-          <span className={`info-label ${masterDrift >= JAM_THRESHOLD_SEC ? 'warn' : 'ok'}`}>
-            {masterDrift >= JAM_THRESHOLD_SEC ? '✖ ' : '✔ '}δ: {masterDrift < 0.01 ? '<0.01' : masterDrift.toFixed(2)}s
+      {isMobile ? (
+        <div className="info-strip-pro info-strip-v2">
+          <span className="info-label v2-chip">
+            <span className="v2-k">{tr('vp.fps')}</span>
+            <span className="v2-v">{FPS_OPTIONS[fpsIndex].label}</span>
           </span>
-        )}
-      </div>
+          <span className="info-label v2-chip">
+            <span className="v2-k">{tr('vp.lvl')}</span>
+            <span className="v2-v">{outputLevel.toUpperCase()}</span>
+          </span>
+          <span className="info-label v2-chip">
+            <span className="v2-k">{tr('vp.ubit')}</span>
+            <span className="v2-v">{userBits}</span>
+          </span>
+          {p2pRole === 'client' && masterDrift !== null && (
+            <span className={`info-label v2-chip ${masterDrift >= JAM_THRESHOLD_SEC ? 'warn' : 'ok'}`}>
+              <span className="v2-k">{masterDrift >= JAM_THRESHOLD_SEC ? '✖' : '✔'} δ</span>
+              <span className="v2-v">{masterDrift < 0.01 ? '<0.01' : masterDrift.toFixed(2)}s</span>
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className="info-strip-pro">
+          <span className="info-label">{tr('vp.fps')}: {FPS_OPTIONS[fpsIndex].label}</span>
+          <span className="info-label">{tr('vp.lvl')}: {outputLevel.toUpperCase()}</span>
+          <span className="info-label">{tr('vp.ubit')}: {userBits}</span>
+          {p2pRole === 'client' && masterDrift !== null && (
+            <span className={`info-label ${masterDrift >= JAM_THRESHOLD_SEC ? 'warn' : 'ok'}`}>
+              {masterDrift >= JAM_THRESHOLD_SEC ? '✖ ' : '✔ '}δ: {masterDrift < 0.01 ? '<0.01' : masterDrift.toFixed(2)}s
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

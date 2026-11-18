@@ -1,0 +1,517 @@
+/* ============================================================
+   Mobile shell v2 — refreshed mobile chrome only.
+
+   Every rule is scoped to `.mobile-view` or to a `*-v2` class so
+   the desktop dashboard and feature selectors owned by other
+   packages are untouched. Color distribution is unchanged from
+   App.css: black background, white primary/text, grey muted/border,
+   and the existing red/yellow/green status semantics. Only shape,
+   spacing, elevation and tap-target sizes are refreshed.
+   ============================================================ */
+
+/* ── App frame ─────────────────────────────────────────────── */
+.mobile-view.mobile-shell-v2 {
+  background:
+    radial-gradient(120% 55% at 50% 0%, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 60%),
+    var(--bg);
+}
+
+/* ── Header v2 ─────────────────────────────────────────────── */
+/* Brand keeps left slot; status + battery lead the right tray,
+   then the preflight / language / help actions. */
+.mobile-view .header-v2 {
+  padding: 10px 14px;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid var(--border-subtle);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+}
+
+.mobile-view .header-v2 .logo-area {
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.mobile-view .header-v2 .logo {
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  line-height: 1.1;
+}
+
+.mobile-view .hdr-v2-tray {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mobile-view .header-v2 .hdr-status {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Status pill is the hero of the bar — slightly taller, still a
+   fixed footprint so JA/EN never reflows the row. */
+.mobile-view .header-v2 .status-pill {
+  min-width: 96px;
+  min-height: 30px;
+  padding: 5px 12px;
+}
+
+.mobile-view .header-v2 .batt-chip {
+  padding: 4px 10px;
+  font-size: 0.62rem;
+}
+
+.mobile-view .header-v2 .hdr-actions {
+  gap: 6px;
+}
+
+.mobile-view .header-v2 .preflight-open {
+  min-height: 44px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--panel-elevated);
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.mobile-view .header-v2 .preflight-open:active {
+  transform: scale(0.96);
+  border-color: var(--primary);
+}
+
+/* Touch-sized, fixed-width language toggle (width locked so the
+   JA/EN label swap cannot move the row). */
+.mobile-view .header-v2 .lang-btn {
+  width: 44px;
+  height: 44px;
+  font-size: 0.6rem;
+}
+
+.mobile-view .header-v2 .help-btn {
+  width: 44px;
+  height: 44px;
+  font-size: 0.85rem;
+}
+
+.mobile-view .header-v2 button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ≤640px portrait: pin the status/action tray to its own full row.
+   Below this width the single row cannot fit brand + status +
+   battery + preflight + language + help in JA, and a content-driven
+   wrap would make the header height language-dependent — pinning
+   the tray to row 2 keeps the two-row height identical in JA/EN. */
+@media (max-width: 640px) and (orientation: portrait) {
+  .mobile-view .header-v2 {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding: 10px 12px;
+  }
+  .mobile-view .header-v2 .hdr-v2-tray {
+    flex-basis: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* 320px-class screens: shrink row-2 items so status + battery +
+   preflight + language + help still fit without wrapping a third
+   row (worst case is the longer JA labels). Tap targets dip below
+   44px here on purpose — five controls must share ~300px. */
+@media (max-width: 360px) {
+  .mobile-view .header-v2 {
+    padding: 8px 10px;
+  }
+  .mobile-view .header-v2 .logo {
+    font-size: 0.68rem;
+    letter-spacing: 1.5px;
+  }
+  .mobile-view .header-v2 .status-pill {
+    min-width: 80px;
+    font-size: 0.55rem;
+    padding: 4px 8px;
+  }
+  .mobile-view .header-v2 .batt-chip {
+    padding: 3px 8px;
+    font-size: 0.58rem;
+  }
+  .mobile-view .header-v2 .preflight-open {
+    min-height: 32px;
+    padding: 4px 8px;
+    font-size: 0.56rem;
+  }
+  .mobile-view .header-v2 .lang-btn {
+    width: 34px;
+    height: 30px;
+  }
+  .mobile-view .header-v2 .help-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.66rem;
+  }
+}
+
+/* ── Tab bar v2: underline tabs → touch-sized pill segments ─── */
+.mobile-view .tab-bar-v2 {
+  gap: 8px;
+  padding: 8px 14px 10px;
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+}
+
+.mobile-view .tab-bar-v2 button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.mobile-view .tab-bar-v2 button.active {
+  background: var(--primary);
+  color: #000;
+  border-color: var(--primary);
+  box-shadow: 0 0 12px var(--primary-dim);
+}
+
+.mobile-view .tab-bar-v2 button:active {
+  transform: scale(0.97);
+}
+
+.mobile-view .tab-bar-v2 button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ── Tab content v2: the only scroll region in the shell ────── */
+.mobile-view .tab-content-v2 {
+  padding: 14px 14px calc(24px + env(safe-area-inset-bottom));
+  scroll-padding-bottom: calc(110px + env(safe-area-inset-bottom));
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-view .tab-content-v2 .tab-pane {
+  gap: 12px;
+}
+
+/* ── Control cards v2 (FPS / output / offset / sync / start TC) ─
+   Black/grey card chrome, white primary accents — same palette,
+   grouped into elevated cards instead of loose floating rows. */
+.mobile-view .control-section-v2 {
+  gap: 10px;
+  padding: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
+    var(--panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 12px 28px rgba(0, 0, 0, 0.25);
+}
+
+.mobile-view .control-section-v2 .section-label {
+  font-size: 0.62rem;
+  letter-spacing: 1.8px;
+  margin-bottom: 2px;
+}
+
+.mobile-view .control-section-v2 .btn-pill {
+  min-height: 44px;
+  padding: 10px 6px;
+  font-size: 0.75rem;
+  border-radius: 12px;
+}
+
+.mobile-view .control-section-v2 .sync-toggle-pro {
+  padding: 5px;
+  gap: 4px;
+  background: var(--bg);
+  border-radius: 14px;
+}
+
+.mobile-view .control-section-v2 .sync-toggle-pro button {
+  min-height: 40px;
+  padding: 8px 4px;
+  font-size: 0.68rem;
+  border-radius: 10px;
+}
+
+.mobile-view .control-section-v2 .offset-control {
+  gap: 12px;
+}
+
+.mobile-view .control-section-v2 input[type="range"] {
+  height: 28px; /* taller hit area; accent-color keeps it white */
+}
+
+.mobile-view .control-section-v2 .offset-value {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--text-bright);
+  min-width: 44px;
+}
+
+.mobile-view .control-section-v2 .tc-input {
+  min-height: 52px;
+  background: var(--bg);
+}
+
+.mobile-view .control-section-v2 .drift-panel {
+  margin-top: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+/* Inline sync strip on MAIN gets the same card radius so it sits
+   visually inside the section stack. */
+.mobile-view .main-sync-bar-v2 {
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
+    var(--panel-elevated);
+}
+
+.mobile-view .main-sync-bar-v2 .msb-resync {
+  min-height: 40px;
+  padding: 8px 16px;
+}
+
+/* ── Metadata tools card v2 ────────────────────────────────── */
+.mobile-view .tool-section-shell-meta-v2 {
+  padding: 14px;
+  gap: 12px;
+  border-radius: 18px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 12px 28px rgba(0, 0, 0, 0.25);
+}
+
+.mobile-view .tool-section-shell-meta-v2 .tools-grid-meta {
+  gap: 10px;
+}
+
+.mobile-view .tool-section-shell-meta-v2 .tool-card {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Metadata inputs become real fields with a tap-sized box. */
+.mobile-view .tool-section-shell-meta-v2 .tool-card input {
+  min-height: 44px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 1.05rem;
+  transition: border-color 0.2s;
+}
+
+.mobile-view .tool-section-shell-meta-v2 .tool-card input:focus {
+  border-color: var(--primary);
+}
+
+.mobile-view .tool-section-shell-meta-v2 .tool-card input:disabled {
+  opacity: 0.5;
+}
+
+.mobile-view .tool-section-shell-meta-v2 .userbits-row .btn-pill {
+  min-height: 44px;
+}
+
+/* ── Landscape phone (e.g. 932x430): compress the chrome ────── */
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-view .header-v2 {
+    padding: 4px 10px;
+    gap: 8px;
+  }
+  .mobile-view .header-v2 .status-pill {
+    min-width: 86px;
+    min-height: 26px;
+    padding: 3px 8px;
+    font-size: 0.56rem;
+  }
+  .mobile-view .header-v2 .batt-chip {
+    padding: 2px 8px;
+  }
+  .mobile-view .header-v2 .preflight-open {
+    min-height: 28px;
+    padding: 3px 10px;
+  }
+  .mobile-view .header-v2 .lang-btn {
+    width: 38px;
+    height: 28px;
+    font-size: 0.52rem;
+  }
+  .mobile-view .header-v2 .help-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.66rem;
+  }
+  .mobile-view .tab-bar-v2 {
+    padding: 4px 12px 6px;
+    gap: 6px;
+  }
+  .mobile-view .tab-bar-v2 button {
+    min-height: 34px;
+    padding: 6px 6px;
+    font-size: 0.62rem;
+    letter-spacing: 1.4px;
+  }
+  .mobile-view .tab-content-v2 {
+    padding: 8px 10px calc(56px + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+  .mobile-view .tab-content-v2 .tab-pane {
+    gap: 8px;
+  }
+  .mobile-view .control-section-v2 {
+    padding: 10px 12px;
+    gap: 8px;
+    border-radius: var(--radius-md);
+  }
+  .mobile-view .control-section-v2 .btn-pill {
+    min-height: 36px;
+  }
+  .mobile-view .control-section-v2 .sync-toggle-pro button {
+    min-height: 32px;
+    font-size: 0.6rem;
+  }
+  .mobile-view .control-section-v2 input[type="range"] {
+    height: 22px;
+  }
+  .mobile-view .tool-section-shell-meta-v2 {
+    padding: 10px 12px;
+    border-radius: var(--radius-lg);
+  }
+  .mobile-view .tool-section-shell-meta-v2 .tool-card input,
+  .mobile-view .tool-section-shell-meta-v2 .userbits-row .btn-pill {
+    min-height: 36px;
+  }
+}
+
+/* ── Mobile sheets: guide, feature-help and preflight ───────── */
+/* These overlays portal to <body>, so they cannot be scoped via
+   .mobile-view. Guide/preflight add the v2 class only when the
+   shell is mobile; the help sheet carries the class always and is
+   gated by the same media conditions isMobile uses (width ≤768px,
+   or touch-capable landscape ≤1024x600 — `any-pointer: coarse`
+   covers maxTouchPoints>0 devices whose primary pointer is fine,
+   mirroring src/LTCSyncContext.tsx getIsMobileLayout). */
+
+.guide-overlay.guide-overlay-v2 {
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+
+.guide-card.guide-card-v2 {
+  width: 100%;
+  max-width: 640px;
+  max-height: min(88dvh, calc(var(--app-height, 100dvh) - 16px));
+  border-radius: 20px 20px 0 0;
+  border-bottom: none;
+  padding: 20px 20px calc(18px + env(safe-area-inset-bottom));
+}
+
+.guide-card-v2 .guide-x {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.guide-card-v2 .guide-done {
+  min-height: 48px;
+  font-size: 0.85rem;
+}
+
+.guide-card-v2 .guide-steps li {
+  font-size: 0.9rem;
+}
+
+.guide-card-v2 button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* The preflight sheet sits on a light surface (#f5f5f7), so it keeps
+   preflight.css's blue focus accent — the shell's white ring would be
+   invisible there. */
+.preflight-v2 button:focus-visible {
+  outline: 3px solid #2997ff;
+  outline-offset: 3px;
+}
+
+@media (max-width: 768px), (any-pointer: coarse) and (max-width: 1024px) and (max-height: 600px) {
+  .fhelp-sheet-v2 button:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+  .fhelp-overlay.fhelp-overlay-v2 {
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+  }
+  .fhelp-sheet.fhelp-sheet-v2 {
+    width: 100%;
+    max-width: none;
+    max-height: min(88dvh, calc(var(--app-height, 100dvh) - 16px));
+    border-radius: 20px 20px 0 0;
+    border-bottom: none;
+    padding: 18px 20px calc(16px + env(safe-area-inset-bottom));
+  }
+  .fhelp-sheet-v2 .fhelp-x {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .fhelp-sheet-v2 .fhelp-done {
+    min-height: 48px;
+  }
+  .fhelp-sheet-v2 .fhelp-title {
+    font-size: 1.05rem;
+  }
+}
+
+/* Preflight keeps its light surface and OK/warn colors — only the
+   framing becomes a roomier sheet with bigger tap targets. */
+.preflight-dialog.preflight-v2 {
+  width: calc(100vw - 16px);
+  max-width: 640px;
+  max-height: calc(var(--app-height, 100dvh) - 20px);
+  margin: auto auto calc(8px + env(safe-area-inset-bottom));
+  border-radius: 20px;
+  padding: 18px;
+}
+
+.preflight-v2 .preflight-heading {
+  margin-bottom: 16px;
+}
+
+.preflight-v2 .preflight-check {
+  padding: 14px;
+}
+
+.preflight-v2 .preflight-return {
+  min-height: 50px;
+}

@@ -1,0 +1,295 @@
+/*
+ * mobileSync.css — Mobile (`.mobile-view`) redesign of the P2P/session UI
+ * inside ConnectionManager: the CREATE/JOIN role picker, the session card
+ * (role + invite link + START SOURCE + manual TC + join form + status), and
+ * the tappable ADVANCED disclosure.
+ *
+ * ConnectionManager is shared with the desktop SYNC pane, so every visual
+ * rule here is scoped to `.mobile-view` and the cm-v2-* classes added in the
+ * component — desktop markup, spacing and behaviour are untouched.
+ *
+ * Colour allocation is unchanged from App.css: white actions on black
+ * panels, grey muted text/borders, var(--danger) for errors. Geometry,
+ * opacity, borders, shadows and typography only.
+ */
+
+/* The v2 wrapper is layout-neutral on both shells: its children keep
+   participating in the surrounding flex/grid layout exactly as the old
+   fragment did (desktop's .dt-panel-control spacing relies on this). */
+.connection-manager-v2 {
+  display: contents;
+}
+
+/* ── Section rhythm ──────────────────────────────────────────────────── */
+
+.mobile-view .cm-v2-section {
+  gap: 14px;
+}
+
+/* ── CREATE MASTER / JOIN AS CLIENT — large selection cards ──────────── */
+
+.mobile-view .cm-v2-role-cards {
+  gap: 12px;
+}
+
+.mobile-view .cm-v2-role-card {
+  min-height: 96px;
+  padding: 18px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  color: var(--primary);
+  font-family: var(--font-main);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  line-height: 1.35;
+  text-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  /* Long translations may wrap inside the card instead of clipping. */
+  white-space: normal;
+  overflow-wrap: break-word;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.mobile-view .cm-v2-role-card:active {
+  transform: scale(0.97);
+  background: var(--primary-dim);
+}
+
+.mobile-view .cm-v2-role-card:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.mobile-view .cm-v2-role-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ── Connected session card ──────────────────────────────────────────── */
+
+.mobile-view .cm-v2-session {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-radius: var(--radius-lg);
+  border-color: var(--border-subtle);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
+    var(--panel);
+}
+
+.mobile-view .cm-v2-session-head {
+  margin-bottom: 0;
+}
+
+.mobile-view .cm-v2-role-tag {
+  font-size: 0.65rem;
+  padding: 5px 12px;
+  letter-spacing: 1.5px;
+}
+
+.mobile-view .cm-v2-reset {
+  min-height: 36px;
+  padding: 8px 14px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  touch-action: manipulation;
+}
+
+/* ── Invite row: peer ID + copy link ─────────────────────────────────── */
+
+.mobile-view .cm-v2-id-row {
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.mobile-view .cm-v2-id {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--primary);
+  /* Peer IDs are opaque strings — wrap anywhere, never overflow 320px. */
+  overflow-wrap: anywhere;
+}
+
+.mobile-view .cm-v2-copy {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+
+/* ── START SOURCE segmented toggle ───────────────────────────────────── */
+
+.mobile-view .cm-v2-source {
+  gap: 8px;
+}
+
+.mobile-view .cm-v2-source-toggle button {
+  min-height: 44px;
+  padding: 10px 6px;
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+  touch-action: manipulation;
+}
+
+/* ── Manual START TC input ───────────────────────────────────────────── */
+
+.mobile-view .cm-v2-starttc {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mobile-view .cm-v2-field-label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 1.5px;
+  padding-left: 2px;
+}
+
+.mobile-view .cm-v2-starttc input {
+  min-height: 48px;
+  padding: 12px 14px;
+  font-size: 1.15rem;
+  letter-spacing: 2px;
+  text-overflow: ellipsis;
+}
+
+.mobile-view .cm-v2-starttc input:disabled {
+  opacity: 0.45;
+}
+
+/* ── Client join form ────────────────────────────────────────────────── */
+
+.mobile-view .cm-v2-client {
+  gap: 10px;
+}
+
+.mobile-view .cm-v2-client input {
+  min-height: 48px;
+  padding: 12px 14px;
+  font-size: 1.05rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  text-overflow: ellipsis;
+}
+
+.mobile-view .cm-v2-client input::placeholder {
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  opacity: 0.7;
+}
+
+.mobile-view .cm-v2-link {
+  min-height: 48px;
+  font-size: 0.85rem;
+  letter-spacing: 2px;
+  touch-action: manipulation;
+  transition: transform 0.1s ease, opacity 0.2s ease;
+}
+
+.mobile-view .cm-v2-link:active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
+/* ── Status line ─────────────────────────────────────────────────────── */
+
+.mobile-view .cm-v2-status {
+  margin-top: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 0.6rem;
+  text-align: left;
+  /* Long error strings wrap to a second line instead of ellipsising away. */
+  white-space: normal;
+  overflow-wrap: break-word;
+  line-height: 1.5;
+}
+
+/* ── ADVANCED <details> — fat summary row, readable collapsed body ───── */
+
+.mobile-view .cm-v2-advanced {
+  border-top: none;
+  padding-top: 0;
+}
+
+.mobile-view .cm-v2-adv-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  background: var(--panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.mobile-view .cm-v2-adv-summary::-webkit-details-marker {
+  display: none;
+}
+
+.mobile-view .cm-v2-adv-summary::after {
+  content: "▸";
+  font-size: 0.8rem;
+  line-height: 1;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.mobile-view .cm-v2-adv-summary:hover {
+  color: var(--text);
+}
+
+.mobile-view .cm-v2-advanced[open] > .cm-v2-adv-summary {
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border-bottom-color: var(--border);
+  color: var(--text);
+}
+
+.mobile-view .cm-v2-advanced[open] > .cm-v2-adv-summary::after {
+  transform: rotate(90deg);
+}
+
+.mobile-view .cm-v2-adv-body {
+  padding: 12px 2px 2px;
+  gap: 14px;
+}
+
+/* ── Dev packet-loss simulator (DEV builds only) ─────────────────────── */
+
+.mobile-view .cm-v2-dev {
+  margin-top: 4px;
+}

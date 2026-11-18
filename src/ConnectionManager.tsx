@@ -10,6 +10,7 @@ import {
 } from "./utils/signalingConfig";
 import type { PeerServerConfig } from "./utils/signalingConfig";
 import "./components/signaling.css";
+import "./components/mobileSync.css";
 
 interface SignalingFormState {
   turnUrls: string;
@@ -153,37 +154,39 @@ export function ConnectionManager() {
   };
 
   return (
-    <>
-      <div className="control-section">
+    // .connection-manager-v2 is display:contents — the v2 hooks never change
+    // the desktop pane's flex/grid layout, they only scope mobileSync.css.
+    <div className="connection-manager-v2">
+      <div className="control-section cm-v2-section">
         <label className="section-label">{tr('label.p2p')}</label>
         {!p2pRole ? (
-          <div className="p2p-init-pro">
+          <div className="p2p-init-pro cm-v2-role-cards">
             {/* Disabled while a setup initialize() is in flight — a second
                 tap used to spawn a parallel PeerSync whose late resolution
                 installed a ghost peer over the live one. */}
-            <button onClick={() => void setupP2PMaster()} disabled={isP2PSetupPending}>{tr('btn.createMaster')}</button>
-            <button onClick={() => void setupP2PClient()} disabled={isP2PSetupPending}>{tr('btn.joinClient')}</button>
+            <button className="cm-v2-role-card" onClick={() => void setupP2PMaster()} disabled={isP2PSetupPending}>{tr('btn.createMaster')}</button>
+            <button className="cm-v2-role-card" onClick={() => void setupP2PClient()} disabled={isP2PSetupPending}>{tr('btn.joinClient')}</button>
           </div>
         ) : (
-          <div className="p2p-panel-pro">
-            <div className="p2p-header">
-              <span className="role-tag">{p2pRole.toUpperCase()}</span>
-              <button className="btn-small" onClick={resetP2P}>{tr('btn.reset')}</button>
+          <div className="p2p-panel-pro cm-v2-session">
+            <div className="p2p-header cm-v2-session-head">
+              <span className="role-tag cm-v2-role-tag">{p2pRole.toUpperCase()}</span>
+              <button className="btn-small cm-v2-reset" onClick={resetP2P}>{tr('btn.reset')}</button>
             </div>
             {p2pRole === 'master' && (
-              <div className="p2p-master-box">
-                <div className="id-display id-display-row">
-                  <span>ID: {peerId || '...'}</span>
+              <div className="p2p-master-box cm-v2-master">
+                <div className="id-display id-display-row cm-v2-id-row">
+                  <span className="cm-v2-id">ID: {peerId || '...'}</span>
                   {peerId && (
-                    <button className="btn-small" onClick={copyInviteLink}>
+                    <button className="btn-small cm-v2-copy" onClick={copyInviteLink}>
                       {tr('p2p.copyLink')}
                     </button>
                   )}
                 </div>
 
-                <div className="control-section">
+                <div className="control-section cm-v2-source">
                   <label className="section-label">{tr('p2p.startSource')}</label>
-                  <div className="sync-toggle-pro">
+                  <div className="sync-toggle-pro cm-v2-source-toggle">
                     <button
                       className={p2pSyncSource === 'manual' ? 'active' : ''}
                       onClick={() => setP2pSyncSource('manual')}
@@ -202,8 +205,8 @@ export function ConnectionManager() {
                 </div>
 
                 {p2pSyncSource === 'manual' && (
-                  <div className="start-tc-input">
-                    <label>{tr('p2p.startTc')}</label>
+                  <div className="start-tc-input cm-v2-starttc">
+                    <label className="cm-v2-field-label">{tr('p2p.startTc')}</label>
                     <input
                       value={manualTimecode}
                       onChange={e => setManualTimecode(e.target.value)}
@@ -215,26 +218,26 @@ export function ConnectionManager() {
               </div>
             )}
             {p2pRole === 'client' && (
-              <div className="p2p-client-box">
+              <div className="p2p-client-box cm-v2-client">
                 <input
                   placeholder={tr('p2p.enterMasterId')}
                   value={targetId}
                   maxLength={8}
                   onChange={e => setTargetId(e.target.value.toUpperCase())}
                 />
-                <button onClick={joinSession}>{tr('p2p.link')}</button>
+                <button className="cm-v2-link" onClick={joinSession}>{tr('p2p.link')}</button>
               </div>
             )}
-            <div className={`p2p-status-mini ${p2pStatus.includes('ERROR') ? 'error' : ''}`}>{formatP2pStatus(p2pStatus, lang)}</div>
+            <div className={`p2p-status-mini cm-v2-status ${p2pStatus.includes('ERROR') ? 'error' : ''}`}>{formatP2pStatus(p2pStatus, lang)}</div>
           </div>
         )}
 
         {/* Advanced: self-hosted signaling + custom TURN. Outside the role
             conditional so it can be configured before create/join; values are
             only read when the next Peer is constructed. */}
-        <details className="sig-advanced">
-          <summary className="sig-advanced-summary">{tr('sig.advanced')}</summary>
-          <div className="sig-advanced-body">
+        <details className="sig-advanced cm-v2-advanced">
+          <summary className="sig-advanced-summary cm-v2-adv-summary">{tr('sig.advanced')}</summary>
+          <div className="sig-advanced-body cm-v2-adv-body">
             <div className="sig-group">
               <span className="sig-group-label">{tr('sig.turnSection')}</span>
               <div className="sig-field">
@@ -353,7 +356,7 @@ export function ConnectionManager() {
       </div>
 
       {import.meta.env.DEV && (
-        <div className="control-section dev-panel">
+        <div className="control-section dev-panel cm-v2-dev">
           <label className="section-label dev-label">{tr('p2p.devSim')}</label>
           <div className="dev-sim-row">
             <input
@@ -370,6 +373,6 @@ export function ConnectionManager() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

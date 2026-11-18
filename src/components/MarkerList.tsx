@@ -4,6 +4,7 @@ import type { Marker } from '../utils/export';
 import { MarkerSyncBadge } from './MarkerSyncBadge';
 import { MarkerTimeline } from './MarkerTimeline';
 import { FPS_OPTIONS } from '../constants';
+import './mobileTools.css';
 
 // Playhead refresh for the timeline strip — the live TC lives in refs by
 // design (no per-frame context state), so poll it at a lazy 2Hz.
@@ -57,26 +58,38 @@ export function MarkerList({
   return (
     <>
       {isMobile && (
-        <section className="tool-section-shell tool-section-shell-marks">
+        <section className="tool-section-shell tool-section-shell-marks quick-marks-v2">
           <div className="control-section mobile-marker-section">
             <label className="section-label">{tr('label.quickMark')}</label>
             <div className="marker-buttons-grid">
-              <button className="btn-mark-large red" onClick={() => addMarker('Red')}>{tr('color.red')}</button>
-              <button className="btn-mark-large blue" onClick={() => addMarker('Blue')}>{tr('color.blue')}</button>
-              <button className="btn-mark-large green" onClick={() => addMarker('Green')}>{tr('color.green')}</button>
-              <button className="btn-mark-large yellow" onClick={() => addMarker('Yellow')}>{tr('color.yellow')}</button>
+              <button className="btn-mark-large red" onClick={() => addMarker('Red')}>
+                <span className="qmk-swatch" aria-hidden="true" />
+                <span className="qmk-label">{tr('color.red')}</span>
+              </button>
+              <button className="btn-mark-large blue" onClick={() => addMarker('Blue')}>
+                <span className="qmk-swatch" aria-hidden="true" />
+                <span className="qmk-label">{tr('color.blue')}</span>
+              </button>
+              <button className="btn-mark-large green" onClick={() => addMarker('Green')}>
+                <span className="qmk-swatch" aria-hidden="true" />
+                <span className="qmk-label">{tr('color.green')}</span>
+              </button>
+              <button className="btn-mark-large yellow" onClick={() => addMarker('Yellow')}>
+                <span className="qmk-swatch" aria-hidden="true" />
+                <span className="qmk-label">{tr('color.yellow')}</span>
+              </button>
             </div>
           </div>
         </section>
       )}
 
-      <section className="tool-section-shell marker-section-pro">
-        <div className="marker-header">
+      <section className={`tool-section-shell marker-section-pro${isMobile ? ' take-log-v2' : ''}`}>
+        <div className={`marker-header${isMobile ? ' take-log-head-v2' : ''}`}>
           <label>
             {tr('label.loggedTakes')}
             <HelpButton topic="markers" tr={tr} variant="inline" />
           </label>
-          <div className="export-group">
+          <div className={isMobile ? 'export-group export-chips-v2' : 'export-group'}>
             <button className="btn-export-pro" onClick={exportToEDL} disabled={markers.length === 0}>EDL</button>
             <button className="btn-export-pro" onClick={exportToALE} disabled={markers.length === 0}>ALE</button>
             <button className="btn-export-pro" onClick={exportToFCPXML} disabled={markers.length === 0}>FCPXML</button>
@@ -85,34 +98,38 @@ export function MarkerList({
             <button className="btn-export-pro" onClick={exportToOTIO} disabled={markers.length === 0}>OTIO</button>
           </div>
         </div>
-        <MarkerTimeline
-          markers={markers}
-          fps={fpsOption.value}
-          drop={fpsOption.drop}
-          onRecall={recallTimecode}
-          tr={tr}
-          currentTc={getCurrentTc ? playheadTc : undefined}
-        />
-        <div className="marker-scroll">
+        <div className={isMobile ? 'mtl-v2' : undefined}>
+          <MarkerTimeline
+            markers={markers}
+            fps={fpsOption.value}
+            drop={fpsOption.drop}
+            onRecall={recallTimecode}
+            tr={tr}
+            currentTc={getCurrentTc ? playheadTc : undefined}
+          />
+        </div>
+        <div className={isMobile ? 'marker-scroll marker-scroll-v2' : 'marker-scroll'}>
           {markers.length === 0 ? (
             <div className="empty-msg">{tr('markers.none')}</div>
           ) : (
             markers.map(m => (
-              <div key={m.id} className="marker-row-pro">
+              <div key={m.id} className={`marker-row-pro${isMobile ? ' marker-row-v2' : ''}`}>
                 <div className="marker-row-top">
                   <div className="marker-row-left">
                     <div className={`color-dot ${m.color.toLowerCase()}`}>{m.color.charAt(0)}</div>
-                    <span className="m-tc">{m.tc}</span>
-                    <span className="m-take">
-                      {tr('marker.sceneTake', { scene: m.sceneName || '001', take: m.take })}
-                    </span>
+                    <div className="m-id-block">
+                      <span className="m-tc">{m.tc}</span>
+                      <span className="m-take">
+                        {tr('marker.sceneTake', { scene: m.sceneName || '001', take: m.take })}
+                      </span>
+                    </div>
                   </div>
                   <div className="marker-row-right">
                     <span className="m-time">{m.time}</span>
                     <button className="btn-delete-marker" onClick={() => removeMarker(m.id)}>✕</button>
                   </div>
                 </div>
-                <div className="marker-comment-row">
+                <div className={`marker-comment-row${isMobile ? ' m-comment-v2' : ''}`}>
                   <MarkerSyncBadge sync={m.sync} tr={tr} />
                   <input
                     type="text"

@@ -17,6 +17,7 @@ import { PwaRegister } from './components/PwaRegister';
 import { VuMeter } from './components/VuMeter';
 import { LivePreflightScreen } from './components/PreflightScreen';
 import './App.css';
+import './mobile-shell.css';
 
 const DesktopShell = lazy(() => import('./components/desktop/DesktopShell').then(m => ({ default: m.DesktopShell })));
 const VisualSlate = lazy(() => import('./components/VisualSlate').then(m => ({ default: m.VisualSlate })));
@@ -132,7 +133,7 @@ function MainApp() {
   }, []);
 
   return (
-    <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
+    <div className={`app-container ${isMobile ? 'mobile-view mobile-shell-v2' : 'desktop-view'} ${isRunning ? 'is-recording' : ''}`}>
       <PwaRegister />
       <HeaderBar
         isRunning={isRunning}
@@ -146,11 +147,12 @@ function MainApp() {
         setLang={setLang}
         setShowGuide={setShowGuide}
         tr={tr}
+        isMobile={isMobile}
         onOpenPreflight={() => setShowPreflight(true)}
       />
 
       {isMobile && (
-        <nav className="tab-bar" aria-label={tr('tab.aria')}>
+        <nav className="tab-bar tab-bar-v2" aria-label={tr('tab.aria')}>
           <button className={activeTab === 'main' ? 'active' : ''} onClick={() => setActiveTab('main')} aria-current={activeTab === 'main' ? 'page' : undefined}>{tr('tab.main')}</button>
           <button className={activeTab === 'sync' ? 'active' : ''} onClick={() => setActiveTab('sync')} aria-current={activeTab === 'sync' ? 'page' : undefined}>{tr('tab.sync')}</button>
           <button className={activeTab === 'tools' ? 'active' : ''} onClick={() => setActiveTab('tools')} aria-current={activeTab === 'tools' ? 'page' : undefined}>{tr('tab.tools')}</button>
@@ -164,13 +166,13 @@ function MainApp() {
       )}
 
       {isMobile && (
-      <main className="tab-content">
+      <main className="tab-content tab-content-v2">
         {activeTab === 'main' && (
           <div className="tab-pane main-pane">
             <VideoPlayer />
 
             {syncMode === 'network' && (
-              <div className="main-sync-bar">
+              <div className="main-sync-bar main-sync-bar-v2">
                 <div className="msb-info">
                   <span className="msb-label">{tr('sync.label')}</span>
                   <span className="msb-mode">{tr('sync.network')}</span>
@@ -184,7 +186,7 @@ function MainApp() {
               </div>
             )}
 
-            <div className="control-section">
+            <div className="control-section control-section-v2">
               <label className="section-label">
                 {tr('label.frameRate')}
                 <HelpButton topic="timecode" tr={tr} variant="inline" />
@@ -203,7 +205,7 @@ function MainApp() {
               </div>
             </div>
 
-            <div className="control-section">
+            <div className="control-section control-section-v2">
               <label className="section-label">{tr('label.outputMode')}</label>
               <div className="sync-toggle-pro">
                 <button className={outputMode === 'stereo' ? 'active' : ''} onClick={() => handleOutputModeChange('stereo')} disabled={isRunning}>{tr('out.stereoTc')}</button>
@@ -214,7 +216,7 @@ function MainApp() {
               {isRunning && outputMode === 'mono-l' && <VuMeter />}
             </div>
 
-            <div className="control-section">
+            <div className="control-section control-section-v2">
               <label className="section-label">{tr('cm.tcOffset')}</label>
               <div className="offset-control">
                 <input type="range" min="-10" max="10" step="1" value={outputOffset} onChange={(e) => setOutputOffset(parseInt(e.target.value, 10))} disabled={isRunning || (syncMode === 'p2p' && p2pRole === 'client')} aria-label={tr('cm.tcOffset')} />
@@ -226,7 +228,7 @@ function MainApp() {
 
         {activeTab === 'sync' && (
           <div className="tab-pane sync-pane">
-            <div className="control-section">
+            <div className="control-section control-section-v2">
               <label className="section-label">
                 {tr('label.syncMethod')}
                 <HelpButton topic="sync" tr={tr} variant="inline" />
@@ -260,7 +262,7 @@ function MainApp() {
             </div>
 
             {syncMode === 'freerun' && (
-              <div className="control-section">
+              <div className="control-section control-section-v2">
                 <label className="section-label">{tr('label.startTc')}</label>
                 <div className="section-content">
                   <input
@@ -282,7 +284,7 @@ function MainApp() {
 
         {activeTab === 'tools' && (
           <div className="tab-pane tools-pane">
-            <section className="tool-section-shell tool-section-shell-meta">
+            <section className="tool-section-shell tool-section-shell-meta tool-section-shell-meta-v2">
               <div className="tools-grid-pro tools-grid-meta">
                 <div className="tool-card tool-card-userbits span-2">
                   <label>{tr('label.userBits')}</label>
@@ -386,7 +388,7 @@ function MainApp() {
         </Suspense>
       )}
 
-      <GuideOverlay showGuide={showGuide} setShowGuide={setShowGuide} tr={tr} />
+      <GuideOverlay showGuide={showGuide} setShowGuide={setShowGuide} tr={tr} isMobile={isMobile} />
       {showPreflight && <LivePreflightScreen onClose={() => setShowPreflight(false)} />}
     </div>
   );

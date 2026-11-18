@@ -4,9 +4,11 @@ interface GuideOverlayProps {
   showGuide: boolean;
   setShowGuide: (v: boolean) => void;
   tr: (key: string) => string;
+  /** Mobile renders the guide as a bottom sheet (v2 chrome). */
+  isMobile?: boolean;
 }
 
-export function GuideOverlay({ showGuide, setShowGuide, tr }: GuideOverlayProps) {
+export function GuideOverlay({ showGuide, setShowGuide, tr, isMobile = false }: GuideOverlayProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const prevFocusRef = useRef<HTMLElement | null>(null);
 
@@ -26,10 +28,10 @@ export function GuideOverlay({ showGuide, setShowGuide, tr }: GuideOverlayProps)
 
   if (!showGuide) return null;
   return (
-    <div className="guide-overlay" onClick={() => setShowGuide(false)} role="presentation">
+    <div className={`guide-overlay${isMobile ? ' guide-overlay-v2' : ''}`} onClick={() => setShowGuide(false)} role="presentation">
       <div
         ref={cardRef}
-        className="guide-card"
+        className={`guide-card${isMobile ? ' guide-card-v2' : ''}`}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         role="dialog"

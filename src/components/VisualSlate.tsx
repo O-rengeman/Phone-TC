@@ -2,6 +2,8 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { FPS_OPTIONS } from '../constants';
 import type { Marker } from '../utils/export';
 import { useSlateTime } from '../slateTimeContext';
+import { shouldUseMobileLayout } from '../utils/layout';
+import './timecodeSurface.css';
 
 interface VisualSlateProps {
   isSlateFlashing: boolean;
@@ -29,8 +31,16 @@ export function VisualSlate({
   // Consumed from its own context so ~30fps TC updates re-render only this
   // overlay — not every useLTC() consumer in the tree.
   const slateTime = useSlateTime();
+  // Same detection LTCSyncContext uses — read at render time so the v2
+  // chrome stays mobile-only without subscribing this overlay to useLTC().
+  const isMobile = shouldUseMobileLayout({
+    width: window.innerWidth,
+    height: window.innerHeight,
+    hasTouchInput: navigator.maxTouchPoints > 0
+      || (typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches),
+  });
   return (
-    <div className={`visual-slate-overlay ${isSlateFlashing ? 'flashing' : ''}`}>
+    <div className={`visual-slate-overlay ${isMobile ? 'slate-v2 ' : ''}${isSlateFlashing ? 'flashing' : ''}`}>
       <div className="slate-tap-area" onClick={handleSlateClick} />
       <div className="slate-content">
         <div className="slate-tc">{slateTime}</div>

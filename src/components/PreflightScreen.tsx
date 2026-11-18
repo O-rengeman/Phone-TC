@@ -15,10 +15,12 @@ interface PreflightScreenProps {
   batteryEta: number | null;
   tr: (key: string, vars?: Record<string, string | number>) => string;
   onClose: () => void;
+  /** Mobile renders the checklist as an edge-to-edge sheet (v2 chrome). */
+  isMobile?: boolean;
 }
 
 /** The dialog only observes the generator; closing it never stops LTC. */
-export function PreflightScreen({ state, outputLevel, batteryEta, tr, onClose }: PreflightScreenProps) {
+export function PreflightScreen({ state, outputLevel, batteryEta, tr, onClose, isMobile = false }: PreflightScreenProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const checks = getPreflightChecks(state);
   const passed = checks.filter(c => c.ok).length;
@@ -36,7 +38,7 @@ export function PreflightScreen({ state, outputLevel, batteryEta, tr, onClose }:
   }, []);
 
   return (
-    <dialog ref={dialogRef} className="preflight-dialog" aria-labelledby="preflight-title" onCancel={onClose}>
+    <dialog ref={dialogRef} className={`preflight-dialog${isMobile ? ' preflight-v2' : ''}`} aria-labelledby="preflight-title" onCancel={onClose}>
       <div className="preflight-heading">
         <div>
           <p className="preflight-eyebrow">PREFLIGHT / LTC SYNC PRO</p>
@@ -84,5 +86,6 @@ export function LivePreflightScreen({ onClose }: { onClose: () => void }) {
     batteryEta={ltc.batteryEta}
     tr={ltc.tr}
     onClose={onClose}
+    isMobile={ltc.isMobile}
   />;
 }
