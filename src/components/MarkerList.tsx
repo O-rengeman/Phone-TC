@@ -1,15 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { HelpButton } from './HelpButton';
 import type { Marker } from '../utils/export';
 import { MarkerSyncBadge } from './MarkerSyncBadge';
 import { MarkerTimeline } from './MarkerTimeline';
 import { MobilePager } from './mobile/MobilePager';
 import { FPS_OPTIONS } from '../constants';
+import { usePlayheadTc } from '../hooks/usePlayheadTc';
 import './mobileTools.css';
 
-// Playhead refresh for the timeline strip — the live TC lives in refs by
-// design (no per-frame context state), so poll it at a lazy 2Hz.
-const PLAYHEAD_POLL_MS = 500;
+// Stable no-op getter so the hook can run unconditionally even when the
+// parent omits getCurrentTc — the playhead is gated off below in that case.
+const NO_TC = () => '';
 
 // No-scroll mobile take log: the marker rows are paged instead of scrolled,
 // two cards per page so a 320x568 phone fits the whole section chrome.
@@ -57,14 +58,7 @@ export function MarkerList({
   mobileView,
   tr,
 }: MarkerListProps) {
-  const [playheadTc, setPlayheadTc] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    if (!getCurrentTc) return;
-    const tick = () => setPlayheadTc(getCurrentTc());
-    tick();
-    const id = window.setInterval(tick, PLAYHEAD_POLL_MS);
-    return () => window.clearInterval(id);
-  }, [getCurrentTc]);
+  const playheadTc = usePlayheadTc(getCurrentTc ?? NO_TC);
 
   // Paged take rows for the mobile 'log' view — no inner scroll region, so
   // the whole marker list is reachable through the pager instead. The page is

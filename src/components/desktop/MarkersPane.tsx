@@ -1,12 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { useLTC } from '../../LTCSyncContext';
 import { DesktopPanel, DesktopSection } from './DesktopPanel';
 import { MarkerSyncBadge } from '../MarkerSyncBadge';
 import { MarkerTimeline } from '../MarkerTimeline';
 import { FPS_OPTIONS } from '../../constants';
-
-// Playhead refresh — the live TC lives in refs by design, so poll lazily.
-const PLAYHEAD_POLL_MS = 500;
+import { usePlayheadTc } from '../../hooks/usePlayheadTc';
 
 /**
  * The take log: markers laid down during a shot, the metadata that ends up in
@@ -26,16 +24,13 @@ export function MarkersPane() {
     tr,
   } = useLTC();
 
-  const [playheadTc, setPlayheadTc] = useState('');
-  useEffect(() => {
-    const tick = () => {
-      const engine = engineRef.current;
-      setPlayheadTc(isRunning ? currentTcRef.current : (engine ? engine.getTimecodeString() : ''));
-    };
-    tick();
-    const id = window.setInterval(tick, PLAYHEAD_POLL_MS);
-    return () => window.clearInterval(id);
+  // Live TC lives in refs by design; the hook polls this getter at 125ms so
+  // the timeline playhead glides instead of jumping twice a second.
+  const getPlayheadTc = useCallback(() => {
+    const engine = engineRef.current;
+    return isRunning ? currentTcRef.current : (engine ? engine.getTimecodeString() : '');
   }, [isRunning, engineRef, currentTcRef]);
+  const playheadTc = usePlayheadTc(getPlayheadTc);
 
   const fpsOption = FPS_OPTIONS[fpsIndex];
 

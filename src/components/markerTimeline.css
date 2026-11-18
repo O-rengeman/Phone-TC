@@ -15,6 +15,10 @@
 .mtl-track {
   position: relative;
   height: 56px;
+  /* Live mode slides the window under a fixed playhead, so dots enter and
+     leave at the rail ends — clip them instead of ever scrolling the strip
+     (the mobile no-scroll constraint forbids an inner scroll region). */
+  overflow: hidden;
 }
 
 /* The rail the dots sit on. */
@@ -48,6 +52,8 @@
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
+  /* Dots glide between the ~125ms playhead-feed ticks instead of jumping. */
+  transition: left 120ms linear;
 }
 
 .mtl-dot-fill {

@@ -29,6 +29,32 @@ export interface MarkerTimelineLayout {
   skippedCount: number;
 }
 
+/** Seconds of timeline shown behind the playhead in the live follow window. */
+export const LIVE_TIMELINE_PAST_SECONDS = 120;
+/** Seconds of near-future timeline shown ahead of the playhead. */
+export const LIVE_TIMELINE_FUTURE_SECONDS = 40;
+
+export interface LiveTimelineOptions {
+  /** Override for the past window width, in frames. */
+  pastFrames?: number;
+  /** Override for the future window width, in frames. */
+  futureFrames?: number;
+}
+
+export interface LiveMarkerTimelineLayout {
+  /** Oldest→newest, left→right; only markers inside the view window. */
+  items: MarkerTimelineItem[];
+  /** Playhead anchor across the track, 0–100 (75 with default windows). */
+  playheadPct: number;
+  /** Sliding view bounds that leftPct is relative to. */
+  viewMinFrame: number;
+  viewMaxFrame: number;
+  /** Markers skipped because their TC string did not parse. */
+  skippedCount: number;
+  /** Parseable markers outside the view window (omitted from items). */
+  outsideCount: number;
+}
+
 /**
  * Parses "HH:MM:SS:FF" (also accepts the ';'/'.' separators smpte-timecode
  * allows) into an absolute frame count. Returns null instead of throwing so
@@ -100,4 +126,63 @@ export function markerTimelineLayout(
   }));
 
   return { items, minFrame, maxFrame, viewMinFrame, viewMaxFrame, skippedCount };
+}
+
+/**
+ * Lays markers out on a live "follow" window that tracks the current TC.
+ *
+ * The visible range is [currentFrame - pastFrames, currentFrame + futureFrames]
+ * (default: 120s behind / 40s ahead) so the playhead is anchored at
+ * past/(past+future) ≈ 75% of the track — past takes flow left while running
+ * and the strip always moves. Markers outside the window are omitted from
+ * items and counted in outsideCount; since the window slides instead of the
+ * playhead clamping, the head never pins at the right edge.
+ */
+export function liveMarkerTimelineLayout(
+  markers: Marker[],
+  fps: number,
+  drop: boolean,
+  currentFrame: number,
+  options: LiveTimelineOptions = {},
+): LiveMarkerTimelineLayout {
+  const pastFrames = options.pastFrames ?? Math.round(LIVE_TIMELINE_PAST_SECONDS * fps);
+  const futureFrames = options.futureFrames ?? Math.round(LIVE_TIMELINE_FUTURE_SECONDS * fps);
+
+  const viewMinFrame = currentFrame - pastFrames;
+  const viewMaxFrame = currentFrame + futureFrames;
+  const viewSpan = Math.max(1, viewMaxFrame - viewMinFrame);
+  const playheadPct = (pastFrames / Math.max(1, pastFrames + futureFrames)) * 100;
+
+  const parsed: { marker: Marker; frame: number }[] = [];
+  let skippedCount = 0;
+  for (const marker of markers) {
+    const frame = parseTcFrame(marker.tc, fps, drop);
+    if (frame === null) {
+      skippedCount += 1;
+      console.warn(`liveMarkerTimelineLayout: skipping marker ${marker.id} with unparseable TC "${marker.tc}"`);
+    } else {
+      parsed.push({ marker, frame });
+    }
+  }
+
+  // Reverse first so same-frame ties keep oldest→newest order (the app stores
+  // markers newest-first), then stable-sort by frame.
+  const ordered = [...parsed].reverse().sort((a, b) => a.frame - b.frame);
+
+  const items: MarkerTimelineItem[] = [];
+  let outsideCount = 0;
+  for (const { marker, frame } of ordered) {
+    if (frame < viewMinFrame || frame > viewMaxFrame) {
+      outsideCount += 1;
+      continue;
+    }
+    items.push({
+      marker,
+      tc: marker.tc,
+      frame,
+      leftPct: ((frame - viewMinFrame) / viewSpan) * 100,
+    });
+  }
+
+  return { items, playheadPct, viewMinFrame, viewMaxFrame, skippedCount, outsideCount };
 }
