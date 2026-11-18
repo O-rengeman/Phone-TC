@@ -97,6 +97,13 @@ export function useLtcEngine({
   const stopHoldRafRef = useRef<number | null>(null);
   const holdStoppedRef = useRef(false);
   const stopHoldStartRef = useRef(0);
+  // Local to this hook: the mono-L mic source node has no shared consumer
+  // (unlike analyserRef, which the VU meter reads), so it gets its own ref
+  // purely so stopEngine can disconnect it. startInFlightRef guards
+  // handleStartStop's async gap before isRunning flips — a state value would
+  // lag a render and let a double-tap spawn two worklet nodes.
+  const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const startInFlightRef = useRef(false);
 
   useEffect(() => {
     const settings: LtcSettings = {
@@ -185,6 +192,11 @@ export function useLtcEngine({
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
     osc.connect(gain);
     gain.connect(ctx.destination);
+    // Web Audio never auto-disconnects: without this every beep leaves the
+    // oscillator+gain pair wired to the destination forever.
+    osc.onended = () => {
+      try { osc.disconnect(); gain.disconnect(); } catch { /* context may be closed */ }
+    };
     osc.start();
     osc.stop(ctx.currentTime + duration);
   }, [audioCtxRef]);
@@ -209,6 +221,11 @@ export function useLtcEngine({
       } catch (e) {
         console.error('Worklet addition failed', e);
         return;
+      } finally {
+        // addModule fetches+compiles the script before settling, so the blob
+        // URL is dead weight on both the success and failure paths — revoke it
+        // either way (one URL per AudioContext lifetime otherwise).
+        URL.revokeObjectURL(url);
       }
     }
 
@@ -246,18 +263,34 @@ export function useLtcEngine({
     };
 
     if (outputMode === 'mono-l') {
+      // Hoisted locals so the catch path can unwind a partially-built graph —
+      // getUserMedia can succeed while a later wiring step throws.
+      let stream: MediaStream | null = null;
+      let inputSource: MediaStreamAudioSourceNode | null = null;
+      let analyser: AnalyserNode | null = null;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         micStreamRef.current = stream;
-        const inputSource = ctx.createMediaStreamSource(stream);
-        const analyser = ctx.createAnalyser();
+        inputSource = ctx.createMediaStreamSource(stream);
+        analyser = ctx.createAnalyser();
         analyser.fftSize = 512;
         inputSource.connect(analyser);
         analyser.connect(workletNode);
+        inputSourceRef.current = inputSource;
         analyserRef.current = analyser;
       } catch (err) {
         console.warn('Mic access denied', err);
         addToast(translate('toast.micDenied', langRef.current), 'error');
+        // Unwind whatever got built so the source/analyser nodes and the mic
+        // tracks don't leak when wiring fails after getUserMedia succeeded.
+        try { analyser?.disconnect(); } catch { /* ignore */ }
+        try { inputSource?.disconnect(); } catch { /* ignore */ }
+        if (analyserRef.current === analyser) analyserRef.current = null;
+        if (inputSourceRef.current === inputSource) inputSourceRef.current = null;
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop());
+          if (micStreamRef.current === stream) micStreamRef.current = null;
+        }
       }
     }
 
@@ -275,7 +308,17 @@ export function useLtcEngine({
       workletNodeRef.current.disconnect();
       workletNodeRef.current = null;
     }
-    analyserRef.current = null;
+    // workletNode.disconnect() only removes its *outputs* — the mono-L input
+    // chain (mic source → analyser → worklet) stays wired and retains all
+    // three nodes unless it's torn down explicitly.
+    if (inputSourceRef.current) {
+      try { inputSourceRef.current.disconnect(); } catch { /* context may be closed */ }
+      inputSourceRef.current = null;
+    }
+    if (analyserRef.current) {
+      try { analyserRef.current.disconnect(); } catch { /* context may be closed */ }
+      analyserRef.current = null;
+    }
     if (micStreamRef.current) {
       micStreamRef.current.getTracks().forEach(t => t.stop());
       micStreamRef.current = null;
@@ -363,7 +406,14 @@ export function useLtcEngine({
     if (isRunning) {
       setIsPaused(false);
       stopEngine(true);
-    } else {
+      return;
+    }
+    // isRunning only flips after the whole async start sequence resolves, so
+    // a rapid double-tap would otherwise run startSequence twice and leave two
+    // worklet nodes both emitting LTC. The ref closes that gap immediately.
+    if (startInFlightRef.current) return;
+    startInFlightRef.current = true;
+    try {
       if (!audioCtxRef.current) {
         const AudioCtx = window.AudioContext
           || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -380,6 +430,9 @@ export function useLtcEngine({
       gain.gain.value = 0;
       osc.connect(gain);
       gain.connect(ctx.destination);
+      osc.onended = () => {
+        try { osc.disconnect(); gain.disconnect(); } catch { /* context may be closed */ }
+      };
       osc.start(0);
       osc.stop(0.1);
 
@@ -392,6 +445,8 @@ export function useLtcEngine({
       }
 
       await startSequence();
+    } finally {
+      startInFlightRef.current = false;
     }
   };
 
