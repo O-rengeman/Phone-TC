@@ -1,0 +1,158 @@
+/*
+ * timecodePane.css — TIMECODE pane refresh (desktop console).
+ *
+ * Every selector carries `.desktop-view` plus `.dt-pane-timecode` or a
+ * `dtv2-` hook, so nothing here reaches the mobile layout, the shared
+ * components' own rules (PresetsPanel is only retuned through descendant
+ * selectors inside this pane), or another desktop pane.
+ *
+ * Colour allocation is untouched: white = primary/active, greys = muted
+ * text and borders. Only geometry, spacing, borders and typography move.
+ */
+
+/* ── Pane grid ──────────────────────────────────────────────────────────
+ *
+ * desktop.css gives every pane `grid-auto-rows: min-content` — right for
+ * the control cards, but it left the old TIMING/PRESETS column unbounded:
+ * its internal scroll could never engage, so at 720p the lower sections
+ * were simply clipped at the stage edge.
+ *
+ * The `.dt-pane` second class lifts this above the shared pane rule. The
+ * contract is kept — three equal columns, controls at natural height —
+ * but the pane now has an explicit middle track that the preset shelf can
+ * actually scroll inside, and a footer track for the shortcut legend.
+ */
+.desktop-view .dt-pane.dt-pane-timecode {
+  grid-template-rows: min-content minmax(0, 1fr) min-content;
+}
+
+/* Explicit cell placement. DOM order matches tab order (controls first,
+   presets shelf, legend) — these hooks just pin each card to its slot so
+   the layout no longer depends on implicit auto-placement. */
+.desktop-view .dt-pane-timecode > .dtv2-cell-fps {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.desktop-view .dt-pane-timecode > .dtv2-cell-output {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.desktop-view .dt-pane-timecode > .dtv2-cell-timing {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+/* The preset shelf takes the full flexible row — the same "one wide
+   surface" treatment the ACTIVITY log gets, since the list is the part of
+   this tab that grows over a session. */
+.desktop-view .dt-pane-timecode > .dtv2-cell-presets {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+/* ── Section hierarchy inside the control cards ───────────────────────── */
+
+/* A little more air between offset/metadata groups than the shared 8px —
+   they are read as two separate decisions. */
+.desktop-view .dt-pane-timecode .dtv2-cell-timing .dt-section {
+  gap: 10px;
+}
+
+.desktop-view .dt-pane-timecode .dtv2-cell-timing .dt-section + .dt-section {
+  padding-top: 10px;
+}
+
+/* ── Shared component retune: PresetsPanel (descendant selectors only) ──
+ *
+ * PresetsPanel renders `tool-section-shell` chrome for the mobile tools
+ * tab; inside a dt-panel that extra card-in-card border, radius and shadow
+ * reads as a rendering bug, so the shell is flattened to plain content and
+ * the dt-panel provides the chrome instead. */
+.desktop-view .dt-pane-timecode .dtv2-cell-presets .preset-panel {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  gap: var(--dt-gap);
+}
+
+/* The save button inherits the roomy mobile pill metrics; match the
+   console control height instead. */
+.desktop-view .dt-pane-timecode .dtv2-cell-presets .preset-save-btn {
+  height: var(--dt-control-h);
+  padding: 0 16px;
+  font-size: var(--dt-label);
+}
+
+/* The shelf is wide and the panel scrolls, so the 180px list cap and the
+   single column are both wasted — let rows tile across the shelf. */
+.desktop-view .dt-pane-timecode .dtv2-cell-presets .preset-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  gap: 8px;
+  max-height: none;
+  overflow: visible;
+  align-content: start;
+}
+
+/* Empty list centres like the console's other waiting states. */
+.desktop-view .dt-pane-timecode .dtv2-cell-presets .preset-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: clamp(64px, 10vh, 120px);
+  padding: 12px;
+}
+
+/* ── Shortcut legend (direct grid child, footer row) ────────────────────
+ *
+ * desktop.css already spans `.dt-hint-keys` across the columns; the v2
+ * hook turns the sentence into a legend card of kbd chips — the same
+ * discovery aid the tab strip's Alt+digit badges provide. */
+.desktop-view .dt-pane-timecode > .dt-hint-keys.dtv2-keylegend {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: clamp(12px, 1.4vw, 26px);
+  row-gap: 5px;
+  padding: clamp(6px, 0.9vh, 10px) clamp(10px, 1.2vw, 18px);
+  background: var(--dt-surface);
+  border: 1px solid var(--dt-line-soft);
+  border-radius: var(--dt-radius);
+}
+
+.desktop-view .dt-pane-timecode .dtv2-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.desktop-view .dt-pane-timecode .dtv2-kbd {
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+  font-size: var(--dt-label);
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--dt-line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+}
+
+.desktop-view .dt-pane-timecode .dtv2-key-desc {
+  color: var(--text-muted);
+}
+
+@media (max-height: 820px) {
+  .desktop-view .dt-pane-timecode > .dt-hint-keys.dtv2-keylegend {
+    padding-block: 4px;
+  }
+}

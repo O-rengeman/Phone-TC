@@ -1,0 +1,116 @@
+/*
+ * activityPane.css — ACTIVITY pane refresh (desktop console).
+ *
+ * Every selector carries `.desktop-view` plus `.dt-pane-activity` or a
+ * `dtv2-` hook, so nothing here reaches the mobile layout or the other
+ * desktop panes.
+ *
+ * Colour allocation is untouched: the re-jam rail reuses the existing
+ * warning amber and the start rail the existing live red — same hues,
+ * same meanings, only where and how strongly they appear.
+ */
+
+/* ── Pane grid ──────────────────────────────────────────────────────────
+ *
+ * desktop.css makes this pane a single wide column, but rows still fall
+ * back to `auto` — which sizes the track to content, so a long log could
+ * inflate past the stage and clip instead of scrolling. One explicit
+ * bounded row makes the panel's `.dt-scroll` body do its job. The extra
+ * `.dt-pane` class lifts the rule above the shared pane layer. */
+.desktop-view .dt-pane.dt-pane-activity {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+/* The log panel always takes the whole column. (`.dt-panel-grow` would
+   push a child to `grid-column: 2 / -1`, meaningless on a one-track grid —
+   this pins the placement regardless.) */
+.desktop-view .dt-pane-activity > .dt-panel {
+  grid-column: 1 / -1;
+}
+
+/* ── Log list ─────────────────────────────────────────────────────────── */
+
+/* Slightly roomier rows and a wider gutter so the eye can follow the
+   time → event mapping across a long list. */
+.desktop-view .dt-pane-activity .dt-log li {
+  gap: 12px;
+  align-items: baseline;
+  padding: clamp(4px, 0.7vh, 8px) 10px;
+  transition: background 0.12s ease;
+}
+
+/* The time column is the row's anchor: tabular figures plus a fixed
+   measure keep every event starting on the same rail, JA or EN. */
+.desktop-view .dt-pane-activity .dt-log-time {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+  min-width: 8ch;
+}
+
+/* Event text reads one step up from the timestamp — it is the content,
+   the time is the index. */
+.desktop-view .dt-pane-activity .dt-log-text {
+  font-size: var(--dt-text);
+  line-height: 1.45;
+}
+
+/* ── Fresh entry & kind rails ─────────────────────────────────────────── */
+
+/* The newest row (always first — the store prepends) gets a brief settle
+   animation plus a quiet highlight so a just-logged event is visible
+   without any kind colouring of its own. */
+.desktop-view .dt-pane-activity .dt-log li:first-child {
+  background: rgba(255, 255, 255, 0.045);
+  animation: dtv2-log-in 0.35s ease-out;
+}
+
+@keyframes dtv2-log-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Kind rails use inset shadow, not border — a rail must not shift the
+   grid the moment it appears. transportStart = the session went live;
+   rejam = a warning that must not scroll past unnoticed. */
+.desktop-view .dt-pane-activity .dt-log li.dtv2-kind-transportStart {
+  box-shadow: inset 2px 0 0 rgba(255, 59, 113, 0.6);
+}
+
+.desktop-view .dt-pane-activity .dt-log li.dtv2-kind-rejam {
+  background: rgba(245, 166, 35, 0.07);
+  box-shadow: inset 2px 0 0 #f5a623;
+}
+
+/* ── State pills ────────────────────────────────────────────────────────
+ *
+ * `.dt-log-state` is shared chrome for inline LIVE/PREVIEW pills; inside
+ * this pane the pills get a letter-spaced label treatment and a colour-
+ * keyed edge so the state reads at arm's length. */
+.desktop-view .dt-pane-activity .dt-log-state {
+  padding: 1px 7px;
+  border: 1px solid var(--dt-line);
+  border-radius: 4px;
+  font-size: var(--dt-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.desktop-view .dt-pane-activity .dt-log-state.state-live {
+  border-color: rgba(255, 59, 113, 0.45);
+}
+
+.desktop-view .dt-pane-activity .dt-log-state.state-preview {
+  border-color: rgba(53, 208, 127, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-view .dt-pane-activity .dt-log li:first-child {
+    animation: none;
+  }
+}

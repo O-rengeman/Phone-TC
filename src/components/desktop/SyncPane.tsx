@@ -4,6 +4,7 @@ import { formatSyncAge } from '../../utils/DriftMonitor';
 import { isClientDrifting, isClientOffline } from '../../utils/clients';
 import { ConnectionManager } from '../../ConnectionManager';
 import { DesktopPanel, DesktopSection } from './DesktopPanel';
+import './syncPane.css';
 
 const SYNC_MODES: SyncMode[] = ['system', 'network', 'p2p', 'freerun'];
 
@@ -27,7 +28,7 @@ export function SyncPane() {
     <div className="dt-pane dt-pane-sync">
       <DesktopPanel title={tr('dt.control')} help="sync" className="dt-panel-control" scroll>
         <DesktopSection title={tr('label.syncMethod')}>
-          <div className="dt-segment dt-segment-4">
+          <div className="dt-segment dt-segment-4 dtv2-methods">
             {SYNC_MODES.map(mode => (
               <button
                 key={mode}
@@ -41,7 +42,7 @@ export function SyncPane() {
             ))}
           </div>
 
-          <div className="dt-stat-row">
+          <div className="dt-stat-row dtv2-stats">
             <div className="dt-stat">
               <span className="dt-stat-label">{tr('dt.latency')}</span>
               <strong>{syncStatus ? `${syncStatus.latency.toFixed(1)}ms` : '—'}</strong>
@@ -59,7 +60,7 @@ export function SyncPane() {
           {syncMode === 'network' && (
             <button
               type="button"
-              className="dt-btn"
+              className="dt-btn dtv2-resync"
               onClick={() => void handleManualResync()}
               disabled={isResyncing}
             >
@@ -68,12 +69,18 @@ export function SyncPane() {
           )}
 
           {driftStatus?.hasSync && driftStatus.rejamRecommended && (
-            <p className="dt-warn">⚠️ {tr('drift.rejam')}</p>
+            <p className="dt-warn dtv2-warn">⚠️ {tr('drift.rejam')}</p>
           )}
         </DesktopSection>
 
         <DesktopSection title={tr('dt.session')}>
-          <ConnectionManager />
+          {/* Layout-neutral wrapper: .connection-manager-v2 is
+              display:contents, so this div is the box that the shared
+              markup actually renders inside — syncPane.css scopes all of
+              its ConnectionManager descendant restyles to it. */}
+          <div className="dtv2-session">
+            <ConnectionManager />
+          </div>
         </DesktopSection>
       </DesktopPanel>
 
@@ -89,13 +96,13 @@ export function SyncPane() {
             <span>{tr('dt.noClientsHint')}</span>
           </div>
         ) : (
-          <table className="dt-table">
+          <table className="dt-table dtv2-client-table">
             <thead>
               <tr>
                 <th>{tr('dt.camera')}</th>
                 <th>ID</th>
-                <th>{tr('dt.rtt')}</th>
-                <th>{tr('dt.drift')}</th>
+                <th className="dtv2-num">{tr('dt.rtt')}</th>
+                <th className="dtv2-num">{tr('dt.drift')}</th>
                 <th>{tr('dt.status')}</th>
               </tr>
             </thead>
@@ -107,11 +114,11 @@ export function SyncPane() {
                   <tr key={id} className={offline ? 'offline' : ''}>
                     <td>{`CAM${idx + 1}`}</td>
                     <td className="dt-mono">{id}</td>
-                    <td className="dt-mono">{stats.rtt.toFixed(0)}ms</td>
-                    <td className={`dt-mono ${driftWarn ? 'warn' : ''}`}>
+                    <td className="dt-mono dtv2-num">{stats.rtt.toFixed(0)}ms</td>
+                    <td className={`dt-mono dtv2-num ${driftWarn ? 'warn' : ''}`}>
                       {stats.drift >= 0 ? '+' : ''}{stats.drift.toFixed(3)}s
                     </td>
-                    <td>
+                    <td className="dtv2-status">
                       <span className={`dt-dot ${offline ? 'offline' : driftWarn ? 'warn' : 'ok'}`} />
                       {offline ? tr('dt.offline') : driftWarn ? tr('dt.drift') : tr('dt.locked')}
                     </td>

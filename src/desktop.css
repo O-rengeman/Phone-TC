@@ -14,15 +14,25 @@
 .desktop-view {
   --dt-gap: clamp(8px, 1.1vh, 16px);
   --dt-pad: clamp(10px, 1.5vh, 20px);
-  --dt-radius: 10px;
+  /* Radii scale with the viewport like every other measurement, so panels
+     keep the same proportions between 720p and 1080p. */
+  --dt-radius: clamp(10px, 1.3vh, 14px);
+  --dt-radius-inner: 8px;
   --dt-label: clamp(9px, 1.05vh, 12px);
   --dt-text: clamp(11px, 1.35vh, 15px);
   --dt-title: clamp(12px, 1.5vh, 16px);
   --dt-control-h: clamp(28px, 4vh, 44px);
-  --dt-line: rgba(255, 255, 255, 0.1);
-  --dt-line-soft: rgba(255, 255, 255, 0.05);
-  --dt-surface: rgba(255, 255, 255, 0.022);
-  --dt-surface-hi: rgba(255, 255, 255, 0.06);
+  --dt-line: rgba(255, 255, 255, 0.11);
+  --dt-line-soft: rgba(255, 255, 255, 0.06);
+  --dt-surface: rgba(255, 255, 255, 0.026);
+  --dt-surface-hi: rgba(255, 255, 255, 0.07);
+  /* The card recipe shared by panels, stat tiles and the tab track: a faint
+     top-light gradient over the near-black surface plus a contact shadow —
+     the same treatment the mobile v2 cards carry, at console scale. */
+  --dt-card-grad: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
+  --dt-card-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 14px 30px rgba(0, 0, 0, 0.32);
 }
 
 /* ── Frame ────────────────────────────────────────────────────────────── */
@@ -50,6 +60,15 @@
   padding: clamp(6px, 1.2vh, 18px) clamp(16px, 2vw, 40px);
   border-bottom: 1px solid var(--dt-line);
   min-height: 0;
+  min-width: 0;
+}
+
+/* Header-only chrome. `.dt-readout` is also reused as the inline user-bits
+   value inside the timecode pane, so anything that must only style the top
+   strip hangs off this hook class (added on the element in DesktopShell). */
+.desktop-view .dt-readout-bar {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0) 82%);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
 }
 
 /* The timecode is read from across a room, so it gets the height freed by
@@ -105,29 +124,33 @@
   display: flex;
   align-items: stretch;
   justify-content: flex-end;
-  gap: clamp(10px, 1.2vw, 22px);
+  gap: clamp(8px, 1vw, 18px);
   flex: 1;
   min-height: 0;
 }
 
+/* Each vital is its own tile now — the hairline column dividers made the
+   strip read as one long sentence; cards let each number be located on its
+   own, the same way the mobile v2 stats are grouped. */
 .desktop-view .dt-readout-stat {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
-  padding: 0 clamp(8px, 0.9vw, 18px);
-  border-left: 1px solid var(--dt-line-soft);
-  min-width: clamp(72px, 7vw, 132px);
-}
-
-.desktop-view .dt-readout-stat:first-child {
-  border-left: none;
+  gap: 5px;
+  padding: clamp(6px, 1vh, 12px) clamp(10px, 1vw, 18px);
+  background: var(--dt-card-grad);
+  border: 1px solid var(--dt-line-soft);
+  border-radius: var(--dt-radius-inner);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  min-width: clamp(78px, 7.4vw, 140px);
 }
 
 .desktop-view .dt-readout-stat strong {
   font-size: clamp(13px, 1.75vh, 20px);
   font-weight: 700;
   letter-spacing: 0.04em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
   color: var(--text-bright);
   white-space: nowrap;
 }
@@ -153,11 +176,21 @@
 
 /* ── Tab bar ──────────────────────────────────────────────────────────── */
 
+/* Pill tabs on a recessed track — the same segmented pattern the mobile
+   tab-bar-v2 uses, sized for a cursor instead of a thumb. The Alt+digit
+   badge stays on each tab; it is how the shortcuts are discovered. */
 .desktop-view .dt-tabs {
   display: flex;
-  gap: 4px;
-  flex: none;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 3px;
+  flex: none;
+  align-self: flex-end;
+  padding: 3px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--dt-line-soft);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.55);
 }
 
 .desktop-view .dt-tab {
@@ -165,10 +198,10 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: clamp(6px, 0.9vh, 11px) clamp(11px, 1.1vw, 20px);
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid var(--dt-line);
-  border-radius: var(--radius-sm);
+  padding: clamp(5px, 0.8vh, 10px) clamp(10px, 1.1vw, 20px);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
   color: var(--text-muted);
   font-family: var(--font-main);
   font-size: var(--dt-title);
@@ -176,15 +209,16 @@
   letter-spacing: 0.1em;
   white-space: nowrap;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 
-.desktop-view .dt-tab:hover { color: var(--text); border-color: rgba(255, 255, 255, 0.28); }
+.desktop-view .dt-tab:hover { color: var(--text); background: var(--dt-surface-hi); }
 
 .desktop-view .dt-tab.active {
   color: #000;
   background: var(--primary);
   border-color: var(--primary);
+  box-shadow: 0 0 14px var(--primary-dim);
 }
 
 .desktop-view .dt-tab-key {
@@ -193,6 +227,7 @@
   justify-content: center;
   width: clamp(15px, 2vh, 20px);
   height: clamp(15px, 2vh, 20px);
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--dt-line);
   border-radius: 4px;
   font-size: var(--dt-label);
@@ -201,6 +236,7 @@
 }
 
 .desktop-view .dt-tab.active .dt-tab-key {
+  background: rgba(0, 0, 0, 0.1);
   border-color: rgba(0, 0, 0, 0.35);
   color: #000;
 }
@@ -263,6 +299,9 @@
   .desktop-view .dt-panel-control .dt-panel-head { padding: 5px 10px; }
   .desktop-view .dt-panel-control .dt-section { gap: 6px; }
   .desktop-view .dt-panel-control .dt-section + .dt-section { padding-top: 6px; }
+  /* Stat tiles are cards now, so their padding is part of the readout's
+     height budget on a short console too. */
+  .desktop-view .dt-readout-stat { padding: 4px 8px; gap: 3px; }
 }
 
 /* Titled blocks inside a panel. These replace what used to be separate
@@ -281,11 +320,26 @@
 
 .desktop-view .dt-section-title {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: var(--dt-label);
   font-weight: 800;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-muted);
+}
+
+/* The short tick before each section label anchors the eye at the start of
+   a group — same role the label rail plays on the mobile cards, and cheaper
+   than drawing another divider. */
+.desktop-view .dt-section-title::before {
+  content: '';
+  flex: none;
+  width: 3px;
+  height: 0.95em;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.22);
 }
 
 /* The controls panel holds several sections, so it is the one that may need
@@ -300,14 +354,19 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--dt-surface);
+  background:
+    var(--dt-card-grad),
+    var(--dt-surface);
   border: 1px solid var(--dt-line);
   border-radius: var(--dt-radius);
+  box-shadow: var(--dt-card-shadow);
   overflow: hidden;
 }
 
 .desktop-view .dt-panel-grow { min-height: 0; }
 
+/* The header picks up a faint top light so the console doesn't read as one
+   flat dark sheet — the same gradient the mobile v2 card headers carry. */
 .desktop-view .dt-panel-head {
   display: flex;
   align-items: center;
@@ -315,7 +374,7 @@
   gap: 10px;
   padding: clamp(7px, 1vh, 13px) var(--dt-pad);
   border-bottom: 1px solid var(--dt-line-soft);
-  background: rgba(0, 0, 0, 0.28);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.22));
   flex: none;
 }
 
@@ -369,6 +428,9 @@
   background: rgba(255, 255, 255, 0.14);
   border-radius: 4px;
 }
+.desktop-view .dt-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
 
 /* ── Controls ─────────────────────────────────────────────────────────── */
 
@@ -389,11 +451,12 @@
 .desktop-view .dt-segment {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px;
-  padding: 2px;
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid var(--dt-line);
-  border-radius: var(--radius-sm);
+  gap: 3px;
+  padding: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--dt-line-soft);
+  border-radius: var(--dt-radius-inner);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .desktop-view .dt-segment-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -403,21 +466,25 @@
   height: var(--dt-control-h);
   background: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--text-muted);
   font-family: var(--font-main);
   font-size: var(--dt-text);
   font-weight: 700;
   letter-spacing: 0.06em;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: transform 0.06s ease, background 0.15s, color 0.15s, box-shadow 0.15s;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .desktop-view .dt-segment button:hover:not(:disabled) { color: var(--text); background: var(--dt-surface-hi); }
-.desktop-view .dt-segment button.active { background: var(--primary); color: #000; }
+.desktop-view .dt-segment button.active {
+  background: var(--primary);
+  color: #000;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
 .desktop-view .dt-segment button:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .desktop-view .dt-fps-grid {
@@ -440,14 +507,23 @@
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-.desktop-view .dt-chip:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.3); }
-.desktop-view .dt-chip.active { background: var(--primary); border-color: var(--primary); color: #000; }
+.desktop-view .dt-chip:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-bright);
+}
+.desktop-view .dt-chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #000;
+  box-shadow: 0 0 12px var(--primary-dim);
+}
 .desktop-view .dt-chip:disabled { opacity: 0.35; cursor: not-allowed; }
 .desktop-view .dt-chip-lg { font-size: clamp(12px, 1.5vh, 17px); }
 
 .desktop-view .dt-btn,
 .desktop-view .dt-btn-sm {
-  background: rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.055));
   border: 1px solid var(--dt-line);
   border-radius: var(--radius-sm);
   color: var(--text-bright);
@@ -455,13 +531,16 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
 }
 
 .desktop-view .dt-btn { height: var(--dt-control-h); padding: 0 18px; font-size: var(--dt-text); }
 .desktop-view .dt-btn-sm { height: clamp(22px, 3vh, 30px); padding: 0 12px; font-size: var(--dt-label); }
 .desktop-view .dt-btn:hover:not(:disabled),
-.desktop-view .dt-btn-sm:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
+.desktop-view .dt-btn-sm:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.12));
+  border-color: rgba(255, 255, 255, 0.28);
+}
 .desktop-view .dt-btn:disabled,
 .desktop-view .dt-btn-sm:disabled { opacity: 0.3; cursor: not-allowed; }
 
@@ -470,7 +549,7 @@
   height: clamp(20px, 2.6vh, 26px);
   background: transparent;
   border: 1px solid var(--dt-line);
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--text-muted);
   font-size: var(--dt-text);
   line-height: 1;
@@ -490,9 +569,18 @@
   font-size: var(--dt-text);
   width: 100%;
   min-width: 0;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.desktop-view .dt-input:focus { outline: none; border-color: rgba(255, 255, 255, 0.4); }
+.desktop-view .dt-input::placeholder { color: rgba(255, 255, 255, 0.28); }
+
+/* Border plus a soft halo reads as "armed for typing" — lighter than the
+   red ring reserved for focus-visible further down. */
+.desktop-view .dt-input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.07);
+}
 .desktop-view .dt-input:disabled { opacity: 0.4; }
 .desktop-view .dt-input-mono { font-family: var(--font-mono); letter-spacing: 0.08em; }
 
@@ -509,7 +597,52 @@
 .desktop-view .dt-inline .dt-input { flex: 1; }
 .desktop-view .dt-inline-spread { justify-content: space-between; }
 
-.desktop-view .dt-range { width: 100%; accent-color: #fff; }
+/* A real fader, not the stock control: the default thumb rendered small
+   enough in some engines that it was hard to grab at arm's length. White
+   thumb on a grey rail — the same ink the rest of the controls use. */
+.desktop-view .dt-range {
+  width: 100%;
+  height: clamp(18px, 2.6vh, 28px);
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  accent-color: #fff;
+  cursor: pointer;
+}
+
+.desktop-view .dt-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.desktop-view .dt-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: clamp(13px, 1.8vh, 18px);
+  height: clamp(13px, 1.8vh, 18px);
+  margin-top: calc(2px - clamp(13px, 1.8vh, 18px) / 2);
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.6);
+}
+
+.desktop-view .dt-range::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.desktop-view .dt-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.6);
+}
+
+.desktop-view .dt-range:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .desktop-view .dt-range-scale {
   display: flex;
@@ -534,11 +667,13 @@
 
 .desktop-view .dt-lock,
 .desktop-view .dt-count {
-  padding: 2px 8px;
+  padding: 2px 9px;
+  background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--dt-line);
   border-radius: 999px;
   font-family: var(--font-mono);
   font-size: var(--dt-label);
+  letter-spacing: 0.08em;
   color: var(--text-muted);
 }
 
@@ -546,14 +681,11 @@
   font-family: var(--font-mono);
   font-size: clamp(14px, 1.9vh, 22px);
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: var(--text-bright);
 }
 
-.desktop-view .dt-readout {
-  min-width: 0;
-}
-
-.desktop-view .dt-mono { font-family: var(--font-mono); }
+.desktop-view .dt-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* ── Stat row ─────────────────────────────────────────────────────────── */
 
@@ -566,11 +698,12 @@
 .desktop-view .dt-stat {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: clamp(6px, 0.9vh, 11px) 10px;
-  background: rgba(0, 0, 0, 0.35);
+  gap: 4px;
+  padding: clamp(7px, 1vh, 12px) 12px;
+  background: var(--dt-card-grad);
   border: 1px solid var(--dt-line-soft);
-  border-radius: var(--radius-sm);
+  border-radius: var(--dt-radius-inner);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .desktop-view .dt-stat strong {
@@ -598,6 +731,7 @@
   font-size: var(--dt-label);
   font-weight: 700;
   letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -651,9 +785,12 @@
   align-items: center;
   padding: 4px 6px;
   border-bottom: 1px solid var(--dt-line-soft);
+  border-radius: 4px;
   font-size: var(--dt-label);
   color: var(--text);
 }
+
+.desktop-view .dt-log li:hover { background: rgba(255, 255, 255, 0.03); }
 
 .desktop-view .dt-log-time {
   color: var(--text-muted);
@@ -757,6 +894,7 @@
 .desktop-view .dt-btn:focus-visible,
 .desktop-view .dt-btn-sm:focus-visible,
 .desktop-view .dt-btn-icon:focus-visible,
+.desktop-view .dt-range:focus-visible,
 .desktop-view .dt-input:focus-visible {
   outline: 2px solid #ff3b71;
   outline-offset: 2px;
@@ -776,12 +914,21 @@
   transform: translateY(1px);
 }
 
+/* One merged transition: the press needs a fast 60ms ease while hover
+   colour/border/shadow changes stay on the slower 150ms — listing them
+   together stops the shorthand from silently erasing each other. */
 .desktop-view .dt-btn,
 .desktop-view .dt-btn-sm,
 .desktop-view .dt-chip,
 .desktop-view .dt-tab,
 .desktop-view .dt-btn-icon {
-  transition: transform 0.06s ease;
+  transition:
+    transform 0.06s ease,
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s,
+    opacity 0.15s;
 }
 
 /* LIVE gets an on-air pulse dot so the state reads at a glance from across
@@ -794,6 +941,7 @@
   margin-right: 7px;
   border-radius: 50%;
   background: #ff3b71;
+  box-shadow: 0 0 8px rgba(255, 59, 113, 0.75);
   vertical-align: 1px;
   animation: dt-live-pulse 1.4s ease-in-out infinite;
 }
@@ -801,6 +949,12 @@
 @keyframes dt-live-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
+}
+
+/* The pulse is information, not decoration — but for operators who ask for
+   reduced motion the steady dot still reads as on-air. */
+@media (prefers-reduced-motion: reduce) {
+  .desktop-view .dt-readout-stat strong.live::before { animation: none; }
 }
 
 .desktop-view .dt-readout-stat strong {
@@ -820,12 +974,6 @@
   background: rgba(245, 166, 35, 0.09);
   border-left: 3px solid #f5a623;
   border-radius: 4px;
-}
-
-/* Panel headers pick up a faint top light so the console doesn't read as one
-   flat dark sheet. */
-.desktop-view .dt-panel-head {
-  background: linear-gradient(rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.18));
 }
 
 /* The shortcut legend at the foot of the timecode pane is a caption, not
