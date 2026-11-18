@@ -53,7 +53,10 @@ jobs:
         run: |
           deadline=$((SECONDS + 1800))
           while true; do
-            gh pr checks "$PR_NUMBER" --repo "$REPO" > /tmp/checks.txt 2>&1 || true
+            gh pr checks "$PR_NUMBER" --repo "$REPO" > /tmp/checks-all.txt 2>&1 || true
+            # Exclude this run's own job rows (linked under actions/runs/$GITHUB_RUN_ID):
+            # the job can never observe itself settled, so counting it deadlocks the wait.
+            grep -v "actions/runs/${GITHUB_RUN_ID}/" /tmp/checks-all.txt > /tmp/checks.txt || true
             # gh pr checks prints nothing until at least one check has
             # reported — an empty file must keep waiting, not read as "green".
             rows=$(awk -F'\t' 'NF >= 2' /tmp/checks.txt | wc -l | tr -d ' ')
