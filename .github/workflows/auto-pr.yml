@@ -23,6 +23,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
   pull-requests: write
   checks: read
   issues: write
@@ -133,3 +134,9 @@ jobs:
             echo "::warning::Direct merge rejected — enabling auto-merge instead"
             gh pr merge "$PR_NUMBER" --repo "$REPO" --merge --auto
           fi
+
+      # Merges made by this workflow's GITHUB_TOKEN do not fire `push`
+      # workflow triggers, so the Pages deploy must be dispatched by hand.
+      - name: Redeploy GitHub Pages
+        if: success()
+        run: gh workflow run deploy-pages.yml --repo "$REPO" --ref main || true
