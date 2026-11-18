@@ -82,4 +82,21 @@ describe('GuideOverlay', () => {
     expect(container.querySelector('.guide-overlay-v2')).toBeTruthy();
     expect(container.querySelector('.guide-card-v2')).toBeTruthy();
   });
+
+  it('splits the steps into two pager pages on mobile (1-3 / 4-5 + tip)', () => {
+    const { container } = render(<GuideOverlay {...baseProps} isMobile />);
+    expect(container.querySelector('.guide-card-v3')).toBeTruthy();
+    expect(container.querySelector('.mobile-pager')).toBeTruthy();
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(screen.queryByText('guide.tip')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'pager.next' }));
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getByText('guide.tip')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'pager.next' }).hasAttribute('disabled')).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'pager.prev' }));
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(screen.queryByText('guide.tip')).toBeNull();
+  });
 });

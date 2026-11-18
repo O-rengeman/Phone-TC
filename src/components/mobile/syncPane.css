@@ -1,0 +1,161 @@
+/*
+ * syncPane.css — mobile SYNC pane v3 (no-scroll).
+ *
+ * Layout contract: the pane is a bounded flex column — a fixed sub-tab row
+ * (.mobile-pane-tabs, shared contract class) on top and a .mobile-pane-body
+ * holding exactly one .mobile-pane-view. Nothing scrolls; anything that does
+ * not fit must be split into another tab/page instead of overflowing.
+ *
+ * Every rule is scoped to `.mobile-view .sync-pane-v3` (or `.cm-v3` for the
+ * ConnectionManager half, which lives in mobileSync.css) so it can never leak
+ * into the desktop SYNC pane or other packages' selector families. Colours
+ * keep the existing semantics: white = primary/active, grey = muted/border.
+ */
+
+/* ── Pane frame ────────────────────────────────────────────────────── */
+
+.mobile-view .sync-pane-v3 {
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 10px;
+  overflow: hidden;
+}
+
+/* ── Sub-tab row (METHOD / P2P) ────────────────────────────────────── */
+
+.mobile-view .sync-pane-v3 .mobile-pane-tabs,
+.mobile-view .sync-pane-v3 .sync-pane-v3-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+}
+
+.mobile-view .sync-pane-v3 .mobile-pane-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text-muted);
+  font-family: var(--font-main);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mobile-view .sync-pane-v3 .mobile-pane-tab.active {
+  background: var(--primary);
+  color: #000;
+  border-color: var(--primary);
+  box-shadow: 0 0 10px var(--primary-dim);
+}
+
+.mobile-view .sync-pane-v3 .mobile-pane-tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ── Body + view ───────────────────────────────────────────────────── */
+
+.mobile-view .sync-pane-v3 .mobile-pane-body,
+.mobile-view .sync-pane-v3 .sync-pane-v3-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-view .sync-pane-v3 .mobile-pane-view,
+.mobile-view .sync-pane-v3 .sync-pane-v3-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* The P2P view is just <ConnectionManager /> — it must be allowed to fill
+   the view so its own sub-tabs + page split the space. */
+.mobile-view .sync-pane-v3 .sync-pane-v3-p2p {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── METHOD view internals ─────────────────────────────────────────── */
+
+.mobile-view .sync-pane-v3 .sync-pane-v3-card {
+  flex: 0 0 auto;
+}
+
+/* Four modes on a 2x2 grid: one row is too tight for the widest labels and
+   the card reads better balanced against the sub-tab pills above. */
+.mobile-view .sync-pane-v3 .sync-pane-v3-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.mobile-view .sync-pane-v3 .sync-pane-v3-modes button {
+  min-height: 40px;
+}
+
+.mobile-view .sync-pane-v3 .tc-input {
+  min-height: 48px;
+}
+
+/* ── Landscape phone (e.g. touch 932x430): compress ────────────────── */
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-view .sync-pane-v3 {
+    gap: 8px;
+  }
+
+  .mobile-view .sync-pane-v3 .mobile-pane-tab {
+    min-height: 32px;
+    padding: 5px 6px;
+    font-size: 0.55rem;
+    letter-spacing: 1px;
+  }
+
+  .mobile-view .sync-pane-v3 .sync-pane-v3-view {
+    gap: 8px;
+  }
+
+  /* Method card and start-TC card sit side by side when both are shown. */
+  .mobile-view .sync-pane-v3 .sync-pane-v3-method {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 8px;
+    align-content: start;
+  }
+
+  .mobile-view .sync-pane-v3 .sync-pane-v3-card {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .mobile-view .sync-pane-v3 .sync-pane-v3-modes button {
+    min-height: 30px;
+    font-size: 0.6rem;
+  }
+
+  .mobile-view .sync-pane-v3 .tc-input {
+    min-height: 36px;
+    font-size: 0.95rem;
+    padding: 8px 10px;
+  }
+
+  .mobile-view .sync-pane-v3 .drift-panel {
+    padding: 5px 8px;
+    font-size: 0.55rem;
+  }
+}

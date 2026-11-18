@@ -187,9 +187,18 @@
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25), 0 3px 10px rgba(0, 0, 0, 0.45);
 }
 
-/* Landscape: keep the slim single-row transport, still readable. */
+/* Landscape: keep the slim single-row transport, still readable.
+   `position: relative` pins the footer back into the app column's flex
+   flow: App.css's landscape pass uses `position: fixed`, which took the
+   bar out of flow so it overlaid pane content instead of reserving its
+   own slot. The extra `.transport-v2` class wins on specificity, so no
+   `!important` is needed and desktop (no v2 class) is untouched. */
 @media (orientation: landscape) and (max-height: 500px) {
   .mobile-view .fixed-footer.transport-v2 {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
     padding: 4px 8px;
     padding-bottom: calc(4px + env(safe-area-inset-bottom));
   }
@@ -312,9 +321,15 @@
     env(safe-area-inset-left);
 }
 
+/* Mobile slate never scrolls: every element is sized in vw/vh/clamp
+   below, so the whole clap card fits inside the safe area at any
+   viewport — including 932x430 landscape (see the compact block at
+   the end of this section). Desktop keeps `.slate-content`'s
+   `overflow-y: auto` because the `slate-v2` gate is mobile-only. */
 .mobile-view .slate-v2 .slate-content {
   padding: 0 14px;
   max-height: 100%;
+  overflow-y: hidden;
 }
 
 .mobile-view .slate-v2 .slate-tc {
@@ -386,4 +401,43 @@
   -webkit-backdrop-filter: blur(8px);
   font-size: 1.5rem;
   line-height: 1;
+}
+
+/* Landscape phone: ~430px of height must hold TC + REEL/SCENE/TAKE +
+   info + QR + close with no scroll, so every vertical term below is
+   a vh fraction — the stack always sums well under the viewport. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-view .slate-v2 .slate-tc {
+    font-size: min(13vw, 20vh);
+  }
+  .mobile-view .slate-v2 .slate-metadata-row {
+    gap: 6px 10px;
+    margin: 1.6vh 0 1vh;
+  }
+  .mobile-view .slate-v2 .slate-metadata-row > div {
+    font-size: clamp(0.7rem, 2.8vh, 1rem);
+    padding: 3px 9px;
+  }
+  .mobile-view .slate-v2 .slate-info {
+    margin-top: 1vh;
+    font-size: min(3vw, 2.6vh);
+    letter-spacing: 2px;
+  }
+  .mobile-view .slate-v2 .slate-qr {
+    margin-top: 1.8vh;
+    padding: 8px;
+  }
+  .mobile-view .slate-v2 .slate-qr canvas {
+    width: min(22vh, 30vw) !important;
+  }
+  .mobile-view .slate-v2 .slate-close {
+    margin-top: 1.6vh;
+    font-size: 0.62rem;
+    letter-spacing: 3px;
+  }
+  .mobile-view .slate-v2 .slate-close-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+  }
 }

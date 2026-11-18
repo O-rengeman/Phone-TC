@@ -47,3 +47,113 @@
   .mobile-view header { flex-wrap: wrap; gap: 8px; }
   .mobile-view .header-right { flex-wrap: wrap; }
 }
+
+/* ── v3 mobile sheet: fixed height, one check per page, no scroll ──
+   `.preflight-dialog.preflight-v3` (0-2-0) outranks the `.preflight-dialog`
+   base (0-1-0) regardless of load order, so the mobile sheet never scrolls;
+   the checks area flexes and clips, and the MobilePager page-flips between
+   the individual checks. */
+.preflight-dialog.preflight-v3 {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.preflight-v3 .preflight-intro {
+  flex: 0 0 auto;
+  margin: 10px 0;
+}
+.preflight-v3 .preflight-checks {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.preflight-v3 .preflight-check {
+  height: 100%;
+  align-items: flex-start;
+  overflow: hidden;
+}
+.preflight-v3 .preflight-note {
+  flex: 0 0 auto;
+  margin: 10px 0;
+}
+.preflight-v3 .preflight-return {
+  flex: 0 0 auto;
+}
+/* The shared pager ships dark-surface chrome; restyle it for this light sheet. */
+.preflight-dialog.preflight-v3 .mobile-pager {
+  flex: 0 0 auto;
+  margin: 10px 0;
+}
+.preflight-dialog.preflight-v3 .mobile-page-btn {
+  min-width: 52px;
+  min-height: 40px;
+  padding: 6px 14px;
+  border: 1px solid #e0e0e0;
+  border-radius: 9999px;
+  background: #fff;
+  color: #1d1d1f;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+.preflight-dialog.preflight-v3 .mobile-page-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.preflight-dialog.preflight-v3 .mobile-page-btn:not(:disabled):active {
+  transform: scale(0.95);
+}
+.preflight-dialog.preflight-v3 .mobile-page-btn:focus-visible {
+  outline: 3px solid #2997ff;
+  outline-offset: 3px;
+}
+.preflight-dialog.preflight-v3 .mobile-page-status {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: #6e6e73;
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .preflight-dialog.preflight-v3 {
+    padding: 12px;
+  }
+  .preflight-v3 .preflight-heading {
+    margin-bottom: 8px;
+  }
+  .preflight-v3 .preflight-heading h1 {
+    font-size: 20px;
+  }
+  .preflight-v3 .preflight-summary {
+    padding: 10px 14px;
+    gap: 12px;
+  }
+  .preflight-v3 .preflight-summary h2 {
+    font-size: 16px;
+  }
+  .preflight-v3 .preflight-summary-icon {
+    font-size: 24px;
+  }
+  .preflight-v3 .preflight-intro {
+    margin: 6px 0;
+    font-size: 12px;
+  }
+  .preflight-v3 .preflight-note {
+    margin: 6px 0;
+    font-size: 11px;
+  }
+  .preflight-v3 .preflight-check {
+    padding: 10px;
+    gap: 8px;
+  }
+  .preflight-v3 .preflight-return {
+    min-height: 40px;
+    padding: 8px 18px;
+  }
+  .preflight-dialog.preflight-v3 .mobile-pager {
+    margin: 6px 0;
+  }
+  .preflight-dialog.preflight-v3 .mobile-page-btn {
+    min-height: 32px;
+  }
+}

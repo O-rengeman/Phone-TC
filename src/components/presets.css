@@ -114,6 +114,15 @@
   color: var(--text-muted);
 }
 
+/* No-scroll mobile tools pane: the preset list is paged two rows at a time
+   via MobilePager, so the shared scroll region above is switched off on
+   mobile. The `.preset-panel-v2` link keeps this above the base rule and
+   leaves every `.desktop-view` metric untouched. */
+.mobile-view .preset-panel.preset-panel-v2 .preset-list {
+  max-height: none;
+  overflow: hidden;
+}
+
 /* On the desktop console the panel sits inside a dt-section: match the
    denser control metrics there instead of the mobile card rhythm. */
 .desktop-view .preset-panel .preset-name-input {

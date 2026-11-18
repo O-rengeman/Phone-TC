@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLTC } from '../LTCSyncContext';
 import { useMasterDrift } from '../masterDriftContext';
 import { useVuMeter } from '../hooks/useVuMeter';
@@ -7,6 +7,7 @@ import type { PreflightState } from '../utils/preflight';
 import { effectiveOutputVolume } from '../utils/audioLevel';
 import type { OutputLevel } from '../utils/audioLevel';
 import { formatDuration } from '../utils/battery';
+import { MobilePager } from './mobile/MobilePager';
 import './preflight.css';
 
 interface PreflightScreenProps {
@@ -15,17 +16,21 @@ interface PreflightScreenProps {
   batteryEta: number | null;
   tr: (key: string, vars?: Record<string, string | number>) => string;
   onClose: () => void;
-  /** Mobile renders the checklist as an edge-to-edge sheet (v2 chrome). */
+  /** Mobile renders the checklist as a fixed-height sheet (v3): one check
+      per page reachable via MobilePager instead of a scrolling list. */
   isMobile?: boolean;
 }
 
 /** The dialog only observes the generator; closing it never stops LTC. */
 export function PreflightScreen({ state, outputLevel, batteryEta, tr, onClose, isMobile = false }: PreflightScreenProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [page, setPage] = useState(0);
   const checks = getPreflightChecks(state);
   const passed = checks.filter(c => c.ok).length;
   const ready = passed === checks.length;
   const outputDb = 20 * Math.log10(effectiveOutputVolume(state.volume, outputLevel));
+  const currentPage = Math.min(page, Math.max(checks.length - 1, 0));
+  const visibleChecks = isMobile ? checks.slice(currentPage, currentPage + 1) : checks;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -38,7 +43,7 @@ export function PreflightScreen({ state, outputLevel, batteryEta, tr, onClose, i
   }, []);
 
   return (
-    <dialog ref={dialogRef} className={`preflight-dialog${isMobile ? ' preflight-v2' : ''}`} aria-labelledby="preflight-title" onCancel={onClose}>
+    <dialog ref={dialogRef} className={`preflight-dialog${isMobile ? ' preflight-v2 preflight-v3' : ''}`} aria-labelledby="preflight-title" onCancel={onClose}>
       <div className="preflight-heading">
         <div>
           <p className="preflight-eyebrow">PREFLIGHT / LTC SYNC PRO</p>
@@ -55,7 +60,7 @@ export function PreflightScreen({ state, outputLevel, batteryEta, tr, onClose, i
       </div>
       <p className="preflight-intro">{tr('preflight.intro')}</p>
       <ul className="preflight-checks">
-        {checks.map(check => (
+        {visibleChecks.map(check => (
           <li key={check.id} className={`preflight-check ${check.ok ? 'is-ok' : 'is-problem'}`}>
             <span className="preflight-check-icon" aria-hidden="true">{check.ok ? '✓' : '!'}</span>
             <div className="preflight-check-copy">
@@ -68,6 +73,9 @@ export function PreflightScreen({ state, outputLevel, batteryEta, tr, onClose, i
           </li>
         ))}
       </ul>
+      {isMobile && (
+        <MobilePager page={currentPage} pageCount={checks.length} onPage={setPage} tr={tr} className="preflight-pager" />
+      )}
       <p className="preflight-note">{tr('preflight.hardwareNote')}</p>
       <button type="button" className="preflight-return" onClick={onClose}>{tr('preflight.return')}</button>
     </dialog>
