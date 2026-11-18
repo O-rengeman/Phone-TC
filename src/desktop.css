@@ -633,6 +633,48 @@
 .desktop-view .dt-marker-dot.green { background: #35d07f; }
 .desktop-view .dt-marker-dot.yellow { background: #f5c542; }
 
+/* ── Log ──────────────────────────────────────────────────────────────── */
+
+.desktop-view .dt-log {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.desktop-view .dt-log li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--dt-line-soft);
+  font-size: var(--dt-label);
+  color: var(--text);
+}
+
+.desktop-view .dt-log-time {
+  color: var(--text-muted);
+  font-size: var(--dt-label);
+}
+
+.desktop-view .dt-log-text { color: var(--text); }
+
+/* Marker rows get their colour dot inline, matching the marker table. */
+.desktop-view .dt-log-text .dt-marker-dot { margin-right: 6px; }
+
+.desktop-view .dt-log-state {
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.desktop-view .dt-log-state.state-live { background: rgba(255, 59, 113, 0.22); color: #ff7d9f; }
+.desktop-view .dt-log-state.state-preview { background: rgba(53, 208, 127, 0.2); color: #6be0a5; }
+
 /* ── Empty states ─────────────────────────────────────────────────────── */
 
 /* Fills its panel and centres, so a list that is legitimately empty looks
@@ -698,6 +740,12 @@
 }
 .desktop-view .dt-panel-control .id-display { font-size: clamp(13px, 1.7vh, 19px); }
 .desktop-view .dt-panel-control .dev-panel { display: none; }
+
+/* A log reads best as one wide column, not three — same rule the removed
+   switcher pane used. */
+.desktop-view .dt-pane-activity {
+  grid-template-columns: minmax(0, 1fr);
+}
 
 /* ── Keyboard & polish ────────────────────────────────────────────────── */
 

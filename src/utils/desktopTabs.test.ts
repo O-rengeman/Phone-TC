@@ -15,12 +15,12 @@ describe('visibleDesktopTabs', () => {
 
   it('gives a client every tab too, since none are host-only', () => {
     const ids = visibleDesktopTabs(false).map(tab => tab.id);
-    expect(ids).toEqual(['timecode', 'sync', 'markers']);
+    expect(ids).toEqual(['timecode', 'sync', 'markers', 'activity']);
   });
 
   it('keeps the declared order', () => {
     expect(visibleDesktopTabs(true).map(tab => tab.id))
-      .toEqual(['timecode', 'sync', 'markers']);
+      .toEqual(['timecode', 'sync', 'markers', 'activity']);
   });
 
   it('assigns every tab a unique hotkey', () => {
@@ -57,6 +57,7 @@ describe('desktopTabForHotkey', () => {
   it('maps a digit to its tab', () => {
     expect(desktopTabForHotkey({ key: '1', code: 'Digit1' }, false)).toBe('timecode');
     expect(desktopTabForHotkey({ key: '3', code: 'Digit3' }, false)).toBe('markers');
+    expect(desktopTabForHotkey({ key: '4', code: 'Digit4' }, false)).toBe('activity');
   });
 
   it('still matches on macOS, where Option+digit rewrites key into symbols', () => {

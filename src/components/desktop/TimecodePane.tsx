@@ -1,5 +1,5 @@
 import { useLTC } from '../../LTCSyncContext';
-import { FPS_OPTIONS } from '../../constants';
+import { FPS_OPTIONS, OUTPUT_OFFSET_MAX, OUTPUT_OFFSET_MIN } from '../../constants';
 import { DesktopPanel, DesktopSection } from './DesktopPanel';
 import { PresetsPanel } from '../PresetsPanel';
 
@@ -104,8 +104,8 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
           <input
             type="range"
             className="dt-range"
-            min="-10"
-            max="10"
+            min={OUTPUT_OFFSET_MIN}
+            max={OUTPUT_OFFSET_MAX}
             step="1"
             value={outputOffset}
             onChange={e => setOutputOffset(parseInt(e.target.value, 10))}
@@ -113,7 +113,7 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
             aria-label={tr('cm.tcOffset')}
           />
           <div className="dt-range-scale">
-            <span>-10</span><span>0</span><span>+10</span>
+            <span>{OUTPUT_OFFSET_MIN}</span><span>0</span><span>+{OUTPUT_OFFSET_MAX}</span>
           </div>
           <p className="dt-hint">{tr('dt.hint.offset')}</p>
         </DesktopSection>
