@@ -271,6 +271,7 @@ const en: Dict = {
   'cm.tcOffset': 'TC OFFSET (FRAMES)',
   'cm.latencyOffset': 'Latency: {latency}ms | Offset: {offset}ms',
   'marker.flash': 'MARK {tc}',
+  'marker.delete': 'Delete marker {tc}',
   'clients.title': 'CONNECTED CLIENTS ({count})',
   'marker.sceneTake': 'Sc.{scene} Tk.{take}',
   'marker.sync.network': 'NETWORK (HTTP)',
@@ -322,6 +323,7 @@ const en: Dict = {
   'vp.fps': 'FPS',
   'vp.lvl': 'LVL',
   'vp.ubit': 'UBIT',
+  'tab.aria': 'App sections',
 };
 
 const ja: Dict = {
@@ -579,6 +581,7 @@ const ja: Dict = {
   'cm.tcOffset': 'TCオフセット（フレーム）',
   'cm.latencyOffset': '遅延: {latency}ms | オフセット: {offset}ms',
   'marker.flash': 'マーク {tc}',
+  'marker.delete': 'マーカー {tc} を削除',
   'clients.title': '接続中のクライアント ({count})',
   'marker.sceneTake': 'シーン{scene} テイク{take}',
   'marker.sync.network': 'ネット同期 (HTTP)',
@@ -630,6 +633,7 @@ const ja: Dict = {
   'vp.fps': 'FPS',
   'vp.lvl': 'レベル',
   'vp.ubit': 'UBIT',
+  'tab.aria': 'アプリセクション',
 };
 
 const DICTS: Record<Lang, Dict> = { en, ja };

@@ -27,9 +27,9 @@ export interface Marker {
   sync?: MarkerSync;
 }
 
-/** Strips characters that would corrupt the line-based EDL/ALE layout. */
+/** Strips C0 control characters that would corrupt the line-based EDL/ALE layout. */
 function sanitize(s: string): string {
-  return s.replace(/[\r\n\t]/g, '');
+  return [...s].filter(c => c.charCodeAt(0) >= 32).join('');
 }
 
 /**
@@ -51,7 +51,7 @@ export function buildEdl(markers: Marker[], isDropFrame: boolean): string {
     const time = sanitize(m.time);
     const commentLabel = m.comment ? ` |N:${sanitize(m.comment)}` : '';
     edl += `${eventNum}  ${reel} V     C        ${tc} ${tc} ${tc} ${tc}\n`;
-    edl += ` |C:ResolveColor${m.color} |M:Scene ${sceneLabel} Take ${m.take} (${reelLabel}) at ${time}${commentLabel} |D:1\n\n`;
+    edl += ` |C:ResolveColor${sanitize(m.color)} |M:Scene ${sceneLabel} Take ${sanitize(String(m.take))} (${reelLabel}) at ${time}${commentLabel} |D:1\n\n`;
   });
 
   return edl;
@@ -61,7 +61,8 @@ export function buildEdl(markers: Marker[], isDropFrame: boolean): string {
 export function buildAle(markers: Marker[], fpsLabel: string): string {
   const safeFps = sanitize(fpsLabel);
   let ale = `Heading\nFIELD_DELIM\tTABS\nVIDEO_FORMAT\t1080\nFPS\t${safeFps}\n\nColumn\nName\tTracks\tStart\tEnd\tScene\tTake\tDescription\tSync_Method\tSync_Drift_ms\tSync_Drift_Frames\tSync_Age_s\tSync_Confidence\n\nData\n`;
-  markers.forEach((m) => {
+  // App stores newest-first; emit oldest-first like every other export format.
+  [...markers].reverse().forEach((m) => {
     // Same sanitization rule as EDL: user-entered scene names/comments can
     // contain tabs/newlines that would corrupt the TAB-delimited ALE rows.
     const scene = sanitize(m.sceneName);
@@ -69,15 +70,25 @@ export function buildAle(markers: Marker[], fpsLabel: string): string {
     const numeric = (value: number | null) => value !== null && Number.isFinite(value) ? String(value) : '';
     const sync = m.sync;
     const syncFields = sync ? [sanitize(sync.method), numeric(sync.driftMs), numeric(sync.driftFrames), numeric(sync.msSinceSync === null ? null : sync.msSinceSync / 1000), sanitize(sync.confidence)] : ['', '', '', '', ''];
-    ale += `Scene ${scene} Take ${m.take}\tV\t${sanitize(m.tc)}\t${sanitize(m.tc)}\t${scene}\t${m.take}\t${m.color} marker at ${sanitize(m.time)}${commentPart}\t${syncFields.join('\t')}\n`;
+    const takeLabel = sanitize(String(m.take));
+    ale += `Scene ${scene} Take ${takeLabel}\tV\t${sanitize(m.tc)}\t${sanitize(m.tc)}\t${scene}\t${takeLabel}\t${sanitize(m.color)} marker at ${sanitize(m.time)}${commentPart}\t${syncFields.join('\t')}\n`;
   });
   return ale;
 }
 
 type ExportFrameRate = { value: number; fpsNum: number; fpsDen: number; drop: boolean };
 
+// XML 1.0 Char production: #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] |
+// [#x10000-#x10FFFF]. Lone surrogates and U+FFFE/U+FFFF are illegal and would
+// produce a malformed FCPXML document.
+const isXmlChar = (cp: number): boolean =>
+  cp === 0x9 || cp === 0xA || cp === 0xD
+  || (cp >= 0x20 && cp <= 0xD7FF)
+  || (cp >= 0xE000 && cp <= 0xFFFD)
+  || (cp >= 0x10000 && cp <= 0x10FFFF);
+
 function xml(value: string): string {
-  return [...value].filter(c => c.charCodeAt(0) >= 32 || '\r\n\t'.includes(c)).join('').replace(/[&<>"'\r\n\t]/g, c => ({
+  return [...value].filter(c => isXmlChar(c.codePointAt(0) ?? 0)).join('').replace(/[&<>"'\r\n\t]/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;',
     '\r': '&#13;', '\n': '&#10;', '\t': '&#9;',
   })[c]!);
@@ -88,7 +99,13 @@ export function buildFcpxml(markers: Marker[], fps: ExportFrameRate, isDropFrame
   const frames = ordered.map(m => Timecode(m.tc, fps.value, isDropFrame).frameCount);
   const first = frames.length ? Math.min(...frames) : 0;
   const duration = frames.length ? Math.max(...frames) - first + 1 : 1;
-  const time = (n: number) => `${n * fps.fpsDen}/${fps.fpsNum}s`;
+  // Canonical FCPXML rational time; a zero numerator renders as "0s".
+  const time = (n: number) => (n === 0 ? '0s' : `${n * fps.fpsDen}/${fps.fpsNum}s`);
+  // FCPXML child positions are expressed in the parent element's anchored local
+  // timeline: the gap's `start` anchors its local timeline at `first`, so a
+  // marker written as start=F lands at gap-position F-first — its own absolute
+  // frame. Gap-relative values (F-first) would shift every marker `first`
+  // frames early and clip them before the gap origin.
   const entries = ordered.map((m, i) => `            <marker start="${time(frames[i])}" duration="${time(1)}" value="${xml(`Scene ${m.sceneName} Take ${m.take}`)}" note="${xml(m.comment)}"/>`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE fcpxml>
@@ -118,9 +135,9 @@ export function buildResolveMarkers(markers: Marker[], fps: ExportFrameRate): st
   [...markers].reverse().forEach((m, i) => {
     const start = Timecode(m.tc, fps.value, fps.drop);
     const end = Timecode(start.frameCount + 1, fps.value, fps.drop).toString();
-    const name = sanitize(`Scene ${m.sceneName} Take ${m.take}${m.comment ? ` - ${m.comment}` : ''}`);
+    const name = sanitize(`Scene ${m.sceneName} Take ${sanitize(String(m.take))}${m.comment ? ` - ${m.comment}` : ''}`);
     edl += `${String(i + 1).padStart(3, '0')}  ${sanitize(m.reelName || 'AX').substring(0, 8).padEnd(8)} V     C        ${start.toString()} ${end} ${start.toString()} ${end}\n`;
-    edl += ` |C:ResolveColor${m.color} |M:${name} |D:1\n\n`;
+    edl += ` |C:ResolveColor${sanitize(m.color)} |M:${name} |D:1\n\n`;
   });
   return edl;
 }
@@ -136,7 +153,13 @@ const CSV_COLUMNS: { header: string; value: (marker: Marker) => string | number 
 ];
 
 export function buildCsv(markers: Marker[]): string {
-  const cell = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
+  // A leading apostrophe neutralizes spreadsheet formula injection for cells
+  // beginning with =, +, - or @ (standard CSV-injection mitigation).
+  const cell = (value: string | number) => {
+    const text = String(value);
+    const guarded = /^[=+\-@]/.test(text) ? `'${text}` : text;
+    return `"${guarded.replace(/"/g, '""')}"`;
+  };
   return [CSV_COLUMNS.map(c => cell(c.header)).join(','), ...[...markers].reverse().map(m =>
     CSV_COLUMNS.map(c => cell(c.value(m))).join(','))].join('\r\n') + '\r\n';
 }

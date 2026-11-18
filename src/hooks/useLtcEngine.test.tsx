@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useLtcEngine } from './useLtcEngine';
-import type { LtcEngine } from '../utils/LtcEngine';
 import type { Lang } from '../utils/i18n';
 import type { Dispatch, SetStateAction } from 'react';
 import { TimeSync } from '../utils/TimeSync';
@@ -36,7 +35,7 @@ function makeParams(overrides: Partial<Parameters<typeof useLtcEngine>[0]> = {})
     setSlateTime: vi.fn(),
     isVisualSlateRef: { current: false },
     audioCtxRef: { current: null },
-    engineRef: { current: { getTimecodeString: () => '00:00:00:00' } as unknown as LtcEngine },
+    engineRef: { current: null }, // mount effect replaces it with a real LtcEngine
     workletNodeRef: { current: null },
     currentTcRef: { current: '00:00:00:00' },
     analyserRef: { current: null },
@@ -162,5 +161,74 @@ describe('useLtcEngine — thin state-transition coverage', () => {
   it('beep is a no-op without an active AudioContext', () => {
     const { result } = renderHook(() => useLtcEngine(makeParams({ audioCtxRef: { current: null } })));
     expect(() => result.current.beep(1000, 0.1)).not.toThrow();
+  });
+
+  it('hands the worklet numeric h/m/s/f for drop-frame timecode on start', async () => {
+    // Regression: getTimecodeString() emits 'HH:MM:SS;FF' for drop-frame and
+    // split(':') produced [h, m, NaN] — the worklet got s=NaN/f=undefined and
+    // LTC output froze on every 29.97 DF run.
+    let captured: Record<string, unknown> | null = null;
+    vi.stubGlobal('AudioWorkletNode', class {
+      port = { onmessage: null as unknown, postMessage: vi.fn() };
+      connect = vi.fn();
+      disconnect = vi.fn();
+      constructor(_ctx: unknown, _name: string, options?: { processorOptions?: Record<string, unknown> }) {
+        captured = options?.processorOptions ?? null;
+      }
+    });
+    const audio = {
+      state: 'running', sampleRate: 48000, __ltcWorkletAdded: true,
+      destination: {},
+      createOscillator: () => ({ connect: vi.fn(), start: vi.fn(), stop: vi.fn() }),
+      createGain: () => ({ gain: { value: 0 }, connect: vi.fn() }),
+    } as unknown as AudioContext;
+    const params = makeParams({
+      isRunning: false, fpsIndex: 4, // 29.97 DF
+      syncMode: 'freerun', manualTimecode: '00:00:00:00',
+      audioCtxRef: { current: audio },
+    });
+    const { result } = renderHook(() => useLtcEngine(params));
+    await act(async () => { await result.current.handleStartStop(); });
+
+    expect(captured).not.toBeNull();
+    const opts = captured as unknown as Record<string, unknown>;
+    expect(opts.isDrop).toBe(true);
+    expect(opts.framesPerSec).toBe(30);
+    for (const key of ['h', 'm', 's', 'f'] as const) {
+      expect(Number.isFinite(opts[key])).toBe(true);
+    }
+    expect(opts).toMatchObject({ h: 0, m: 0, s: 0, f: 0 });
+  });
+
+  it('posts fps fields in the config message when fpsIndex changes while running', () => {
+    // Regression: the worklet kept its construction-time fps until restart —
+    // a mid-run rate change (P2P master sync or manual override) never
+    // reached the AudioWorklet.
+    const postMessage = vi.fn();
+    const workletNode = {
+      port: { postMessage, onmessage: null },
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    };
+    const params = makeParams({
+      isRunning: true,
+      workletNodeRef: { current: workletNode as unknown as AudioWorkletNode },
+      fpsIndex: 2, // 25fps
+    });
+    const { rerender } = renderHook((p: typeof params) => useLtcEngine(p), { initialProps: params });
+
+    const configCalls = () => postMessage.mock.calls
+      .map((c) => c[0] as Record<string, unknown>)
+      .filter((m) => m.type === 'config');
+
+    expect(configCalls().at(-1)).toMatchObject({
+      type: 'config', fps: 25, fpsNum: 25000, fpsDen: 1000, framesPerSec: 25, isDrop: false,
+    });
+
+    rerender({ ...params, fpsIndex: 5 }); // 30fps
+
+    expect(configCalls().at(-1)).toMatchObject({
+      type: 'config', fps: 30, fpsNum: 30000, fpsDen: 1000, framesPerSec: 30, isDrop: false,
+    });
   });
 });

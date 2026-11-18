@@ -173,13 +173,11 @@ describe('useMarkers', () => {
   });
 
   it('updateMarkerComment updates only the targeted marker', () => {
-    // addMarker ids come from Date.now(); back-to-back calls in the same test
-    // tick can collide on the same millisecond, so force distinct values.
-    const nowSpy = vi.spyOn(Date, 'now').mockReturnValueOnce(1000).mockReturnValueOnce(2000);
+    // addMarker ids are sequential (max existing id + 1), so back-to-back adds
+    // can never collide even within the same tick.
     const { result } = renderHook(() => useMarkers(makeParams()));
     act(() => result.current.addMarker('Red'));
     act(() => result.current.addMarker('Blue'));
-    nowSpy.mockRestore();
     const targetId = result.current.markers[1].id; // the older (Red) marker
 
     act(() => result.current.updateMarkerComment(targetId, 'nice take'));
@@ -259,5 +257,62 @@ describe('useMarkers', () => {
     expect(writeFile).toHaveBeenCalledWith(expect.objectContaining({
       path: expect.stringMatching(/\.ale$/) as unknown as string,
     }));
+  });
+
+  it('keeps valid stored markers and drops corrupt entries with a warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    localStorage.setItem('ltc-markers', JSON.stringify([
+      // Valid entry missing optional string fields — they are coerced to ''.
+      { id: 1, tc: '00:00:01:00', color: 'Red', take: 1 },
+      { id: 2, tc: 'bogus', time: 't', color: 'Blue', reelName: 'A002', take: 2, sceneName: '002', comment: '' },
+      { id: 3, tc: '00:00:02:00', time: 't', color: 'Purple', reelName: 'A003', take: 3, sceneName: '003', comment: '' },
+      { id: 'x', tc: '00:00:03:00', time: 't', color: 'Green', reelName: 'A004', take: 4, sceneName: '004', comment: '' },
+      { id: 4.5, tc: '00:00:04:00', time: 't', color: 'Yellow', reelName: 'A005', take: Number.NaN, sceneName: '005', comment: '' },
+      'not-an-object',
+      // A TC that only parses under a different supported frame rate survives.
+      { id: 6, tc: '00:00:05;29', time: 't', color: 'Green', reelName: 'A006', take: 6, sceneName: '006', comment: '' },
+    ]));
+    const { result } = renderHook(() => useMarkers(makeParams()));
+    expect(result.current.markers.map(m => m.id)).toEqual([1, 6]);
+    expect(result.current.markers[0]).toMatchObject({ tc: '00:00:01:00', color: 'Red', take: 1, reelName: '', sceneName: '', comment: '', time: '' });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('dropped'));
+  });
+
+  it('assigns unique sequential ids and takes to rapid successive adds', () => {
+    const { result } = renderHook(() => useMarkers(makeParams()));
+    act(() => {
+      result.current.addMarker('Red');
+      result.current.addMarker('Blue');
+      result.current.addMarker('Green');
+    });
+    expect(result.current.markers).toHaveLength(3);
+    const ids = result.current.markers.map(m => m.id);
+    expect(new Set(ids).size).toBe(3);
+    // Newest-first order; takes increment 3, 2, 1 just like the ids did.
+    expect(result.current.markers.map(m => m.take)).toEqual([3, 2, 1]);
+    expect(result.current.markers.map(m => m.id)).toEqual([3, 2, 1]);
+  });
+
+  it('shows an error toast instead of throwing when an export builder fails', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const addToast = vi.fn();
+    // An engine that reports an unparseable TC makes buildFcpxml throw.
+    const { result } = renderHook(() => useMarkers(makeParams({ engineRef: makeEngineRef('bogus'), addToast })));
+    act(() => result.current.addMarker('Red'));
+    expect(() => act(() => result.current.exportToFCPXML())).not.toThrow();
+    expect(addToast).toHaveBeenCalledWith(expect.any(String), 'error');
+    expect(writeFile).not.toHaveBeenCalled();
+  });
+
+  it('includes a date and time stamp in export filenames so same-day exports do not collide', async () => {
+    isNativePlatform.mockReturnValue(true);
+    const { result } = renderHook(() => useMarkers(makeParams()));
+    act(() => result.current.addMarker('Red'));
+    await act(async () => {
+      result.current.exportToEDL();
+      await Promise.resolve();
+    });
+    const path = (writeFile.mock.calls[0][0] as { path: string }).path;
+    expect(path).toMatch(/^PHONE_TC_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}\.edl$/);
   });
 });

@@ -60,8 +60,20 @@ export function resolveDesktopTab(requested: unknown, isHost: boolean): DesktopT
  * Maps an Alt+<digit> shortcut to a tab, so an operator can move between
  * sections without letting go of whatever else they are doing. Returns null
  * when the digit doesn't address a tab this device can show.
+ *
+ * Takes the key event rather than just `key` because the two disagree under
+ * Alt/Option: macOS rewrites `key` into symbols ('¡', '™', '£') while `code`
+ * keeps reporting the physical key ('Digit1'..'Digit3'). `code` is matched
+ * first; `key` remains the fallback for layouts that put digits on the
+ * numpad ('Numpad1') or report an empty code.
  */
-export function desktopTabForHotkey(key: string, isHost: boolean): DesktopTabId | null {
-  const match = visibleDesktopTabs(isHost).find(tab => tab.hotkey === key);
+export function desktopTabForHotkey(
+  event: { key: string; code: string },
+  isHost: boolean,
+): DesktopTabId | null {
+  const tabs = visibleDesktopTabs(isHost);
+  const digit = event.code.startsWith('Digit') ? event.code.slice('Digit'.length) : null;
+  const match = tabs.find(tab => tab.hotkey === (digit ?? event.key))
+    ?? tabs.find(tab => tab.hotkey === event.key);
   return match ? match.id : null;
 }

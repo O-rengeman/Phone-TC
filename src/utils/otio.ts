@@ -1,4 +1,4 @@
-import Timecode from 'smpte-timecode';
+import { parseTcFrame } from './markerTimeline';
 
 // Pure builder for OpenTimelineIO (OTIO) export. Emits a Timeline.1 document
 // whose single Video track holds one Marker.1 clip per logged take, positioned
@@ -30,16 +30,23 @@ function syncComment(sync: MarkerSync | undefined): string {
 /**
  * Builds an OTIO JSON string from logged markers.
  * Markers are emitted oldest-first (the app stores newest-first).
+ * Markers whose stored TC string does not parse are skipped (with a
+ * console.warn) instead of failing the whole export — same tolerance
+ * markerTimelineLayout applies to corrupt stored markers.
  */
 export function buildOtio(markers: Marker[], fps: OtioFrameRate): string {
   // RationalTime rate is fpsNum/fpsDen so 29.97 (DF or NDF) exports as the
   // exact 30000/1001 rate OTIO readers expect instead of a rounded 29.97.
   const rate = fps.fpsNum / fps.fpsDen;
-  const children = [...markers].reverse().map(m => {
-    const frames = Timecode(m.tc, fps.value, fps.drop).frameCount;
+  const children = [...markers].reverse().flatMap(m => {
+    const frames = parseTcFrame(m.tc, fps.value, fps.drop);
+    if (frames === null) {
+      console.warn(`buildOtio: skipping marker ${m.id} with unparseable TC "${m.tc}"`);
+      return [];
+    }
     const comment = `TC ${m.tc} | ${m.time} | ${m.color}`
       + `${m.comment ? ` | ${m.comment}` : ''}${syncComment(m.sync)}`;
-    return {
+    return [{
       OTIO_SCHEMA: 'Marker.1',
       name: `Scene ${m.sceneName} Take ${m.take} — ${m.color}`,
       comment,
@@ -48,7 +55,7 @@ export function buildOtio(markers: Marker[], fps: OtioFrameRate): string {
         start_time: { value: frames, rate },
         duration: { value: 1, rate },
       },
-    };
+    }];
   });
 
   return JSON.stringify({

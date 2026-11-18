@@ -16,6 +16,8 @@ ENV_FILE = Path(__file__).with_name(".env")
 PORT = 8080
 MAX_RETRIES = 3
 RETRY_DELAY = 3.0
+# Chat-completion payloads are small; anything larger is a mistake or abuse.
+MAX_BODY_BYTES = 1024 * 1024  # 1 MB
 
 
 def load_api_key():
@@ -85,10 +87,19 @@ class SakuraProxyHandler(BaseHTTPRequestHandler):
         try:
             self.send_response(403)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self._send_cors_origin()
             self.end_headers()
             self.wfile.write("Forbidden: localhost origins only".encode("utf-8"))
         except Exception:
             pass
+
+    def _send_cors_origin(self):
+        # _origin_allowed() has already rejected non-localhost Origins by the
+        # time this runs, so echoing the request Origin back is safe — and
+        # required, or the browser would block the POST response even though
+        # the OPTIONS preflight succeeded.
+        origin = self.headers.get("Origin")
+        self.send_header("Access-Control-Allow-Origin", origin if origin else "*")
 
     # CORS対応（VS Codeの仕様対策）
     def do_OPTIONS(self):
@@ -96,7 +107,7 @@ class SakuraProxyHandler(BaseHTTPRequestHandler):
             self._reject_origin()
             return
         self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self._send_cors_origin()
         self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.end_headers()
@@ -109,6 +120,8 @@ class SakuraProxyHandler(BaseHTTPRequestHandler):
             sys.stdout.write(f"\n[FATAL ERROR] プロキシ内部でクラッシュが発生しました:\n{traceback.format_exc()}\n")
             try:
                 self.send_response(500)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self._send_cors_origin()
                 self.end_headers()
                 self.wfile.write(b'Internal Proxy Error')
             except:
@@ -119,13 +132,41 @@ class SakuraProxyHandler(BaseHTTPRequestHandler):
             self._reject_origin()
             return
 
-        content_length = int(self.headers.get("Content-Length", 0))
+        # Content-Length must be present, numeric and within the cap before we
+        # trust it — a missing/garbage value would otherwise crash int() or
+        # read an unbounded body.
+        raw_length = self.headers.get("Content-Length")
+        try:
+            content_length = int(raw_length) if raw_length is not None else -1
+        except ValueError:
+            content_length = -1
+        # Absent, negative or non-numeric lengths all land on -1 here.
+        if content_length < 0:
+            self.send_response(400)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self._send_cors_origin()
+            self.end_headers()
+            self.wfile.write(b"Missing or invalid Content-Length")
+            return
+        if content_length > MAX_BODY_BYTES:
+            sys.stdout.write(f"\n[BLOCKED] Content-Length {content_length} exceeds {MAX_BODY_BYTES} bytes\n")
+            self.send_response(413)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self._send_cors_origin()
+            self.end_headers()
+            self.wfile.write(b"Request body too large")
+            return
+
         raw_body = self.rfile.read(content_length)
 
         try:
             # 巨大なファイルの特殊文字でパースが死ぬのを防ぐ
             req_data = json.loads(raw_body.decode('utf-8', errors='replace'))
         except json.JSONDecodeError:
+            req_data = {}
+        # Valid JSON that isn't an object ([] / "x" / 42) would crash the
+        # .get() calls below — treat it like an empty request.
+        if not isinstance(req_data, dict):
             req_data = {}
 
         target_model, route_reason = determine_target_model(req_data)
@@ -134,7 +175,14 @@ class SakuraProxyHandler(BaseHTTPRequestHandler):
         sys.stdout.write(f"\n[ROUTING] Task: {route_reason} -> Model: {target_model}\n")
         
         clean_req = {"model": target_model, "stream": is_stream}
-        
+
+        # INTENTIONAL ALLOWLIST — only these keys are forwarded upstream.
+        # Everything else the client sends (including OpenAI-isms like
+        # max_completion_tokens, response_format, stop, seed) is dropped on
+        # purpose: the Sakura endpoints behind this proxy reject parameters
+        # they don't support, and silently passing them through turns a
+        # harmless client extra into a hard 400. Extend this list only after
+        # verifying every routed model accepts the new key.
         for key in ["temperature", "top_p", "max_tokens", "tools", "tool_choice"]:
             if key in req_data:
                 clean_req[key] = req_data[key]
@@ -188,6 +236,7 @@ class SakuraProxyHandler(BaseHTTPRequestHandler):
                         clean_body = json.dumps(resp_data).encode("utf-8")
                         self.send_response(resp.status)
                         self.send_header("Content-Type", "application/json")
+                        self._send_cors_origin()
                         self.send_header("Content-Length", str(len(clean_body)))
                         self.end_headers()
                         self.wfile.write(clean_body)
@@ -197,6 +246,7 @@ class SakuraProxyHandler(BaseHTTPRequestHandler):
                         self.send_header("Content-Type", "text/event-stream")
                         self.send_header("Cache-Control", "no-cache")
                         self.send_header("Connection", "close")
+                        self._send_cors_origin()
                         self.end_headers()
 
                         has_streamed_content = False
@@ -271,6 +321,8 @@ class SakuraProxyHandler(BaseHTTPRequestHandler):
                     time.sleep(RETRY_DELAY)
                     continue
                 self.send_response(504)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self._send_cors_origin()
                 self.end_headers()
                 self.wfile.write(b'Gateway Timeout')
                 return
@@ -284,6 +336,8 @@ class SakuraProxyHandler(BaseHTTPRequestHandler):
                 
                 sys.stdout.write(f"\n[API REJECTED] HTTP {e.code}\nReason: {err_body}\n")
                 self.send_response(e.code)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self._send_cors_origin()
                 self.end_headers()
                 self.wfile.write(err_body.encode('utf-8'))
                 return

@@ -32,10 +32,33 @@ describe('editor exports', () => {
 
   it('uses real drop-frame frame counts and a one-frame Resolve event across a skipped label', () => {
     const df = [{ ...markers[0], tc: '00:01:00;02' }];
-    expect(parse(buildFcpxml(df, FPS_OPTIONS[4])).querySelector('marker')?.getAttribute('start')).toBe('1801800/30000s');
+    const doc = parse(buildFcpxml(df, FPS_OPTIONS[4]));
+    // Single marker: its absolute start equals the gap/sequence anchor, so all
+    // three attributes carry the same rational time.
+    expect(doc.querySelector('marker')?.getAttribute('start')).toBe('1801800/30000s');
+    expect(doc.querySelector('sequence')?.getAttribute('tcStart')).toBe('1801800/30000s');
+    expect(doc.querySelector('gap')?.getAttribute('offset')).toBe('1801800/30000s');
     const edl = buildResolveMarkers([{ ...markers[0], tc: '00:00:59;29' }], FPS_OPTIONS[4]);
     expect(edl).toContain('FCM: DROP FRAME');
     expect(edl).toContain('00:00:59;29 00:01:00;02 00:00:59;29 00:01:00;02');
+  });
+
+  it('emits FCPXML marker starts in the gap-anchored timeline domain', () => {
+    const doc = parse(buildFcpxml(markers, FPS_OPTIONS[1])); // 24fps
+    const sequence = doc.querySelector('sequence');
+    const gap = doc.querySelector('gap');
+    // markers: 00:00:05:00 → frame 120, 00:00:10:00 → frame 240 @24fps NDF.
+    expect(sequence?.getAttribute('tcStart')).toBe('120000/24000s');
+    expect(sequence?.getAttribute('duration')).toBe('121000/24000s');
+    expect(gap?.getAttribute('offset')).toBe('120000/24000s');
+    expect(gap?.getAttribute('start')).toBe('120000/24000s');
+    expect(gap?.getAttribute('duration')).toBe('121000/24000s');
+    // FCPXML child values live in the parent's anchored local timeline: the gap
+    // anchors at `first` (120), so marker start=absolute frame F resolves to
+    // gap-position F-first — the marker's own TC. Absolute values are correct;
+    // gap-relative values would land every marker `first` frames early.
+    const starts = [...doc.querySelectorAll('marker')].map(m => m.getAttribute('start'));
+    expect(starts).toEqual(['120000/24000s', '240000/24000s']);
   });
 
   it('builds chronological Resolve events with comments and sanitized lines', () => {
@@ -63,6 +86,17 @@ describe('editor exports', () => {
     const invalid = [{ ...markers[0], tc: 'invalid' }];
     expect(() => buildFcpxml(invalid, FPS_OPTIONS[2])).toThrow();
     expect(() => buildResolveMarkers(invalid, FPS_OPTIONS[2])).toThrow();
+  });
+
+  it('prefixes formula-leading cells to block spreadsheet injection', () => {
+    const csv = buildCsv([{ ...markers[0], sceneName: '=1+1', reelName: '+reel', time: '-2+3', comment: '@SUM(A1)' }]);
+    expect(csv).toContain(`"'=1+1"`);
+    expect(csv).toContain(`"'+reel"`);
+    expect(csv).toContain(`"'-2+3"`);
+    expect(csv).toContain(`"'@SUM(A1)"`);
+    // Cells that do not start with a formula character are untouched.
+    expect(csv).toContain('"Blue"');
+    expect(csv).toContain('"00:00:10:00"');
   });
 });
 
@@ -98,6 +132,29 @@ describe('buildEdl', () => {
     expect(edl).toContain('AX'); // empty reel name falls back to AX
   });
 
+  it('strips non-line-break C0 control characters as well', () => {
+    const bell = String.fromCharCode(7);
+    const unitSep = String.fromCharCode(31);
+    const dirty: Marker[] = [
+      { id: 1, tc: '00:00:01:00', time: 't', color: 'Green', reelName: `RE${bell}EL${unitSep}1`, take: 1, sceneName: '001', comment: '' },
+    ];
+    const edl = buildEdl(dirty, false);
+    expect(edl).toContain('REEL1');
+    expect(edl).not.toContain(bell);
+    expect(edl).not.toContain(unitSep);
+  });
+
+  it('sanitizes take values before interpolating them into EDL and ALE rows', () => {
+    const injected = `2${String.fromCharCode(10)}INJECT` as unknown as number;
+    const dirty: Marker[] = [{ ...markers[0], take: injected }];
+    const edl = buildEdl(dirty, false);
+    expect(edl).toContain('Take 2INJECT');
+    expect(edl).not.toContain(`Take 2${String.fromCharCode(10)}INJECT`);
+    const ale = buildAle(dirty, '25');
+    expect(ale).toContain('Take 2INJECT');
+    expect(ale).not.toContain(`2${String.fromCharCode(10)}INJECT`);
+  });
+
   it('returns just the header when there are no markers', () => {
     const edl = buildEdl([], false);
     expect(edl).toContain('TITLE: Logged Takes');
@@ -112,10 +169,12 @@ describe('buildAle', () => {
     expect(columns.slice(7)).toEqual(['Sync_Method', 'Sync_Drift_ms', 'Sync_Drift_Frames', 'Sync_Age_s', 'Sync_Confidence']);
     const rows = ale.split('Data\n')[1].split('\n').filter(Boolean).map(row => row.split('\t'));
     expect(rows.map(row => row.length)).toEqual([12, 12]);
-    expect(rows[0].slice(7)).toEqual(['network', '1.2', '0.03', '1.5', 'high']);
-    expect(rows[1].slice(7)).toEqual(['', '', '', '', '']);
-    expect(rows[0][4]).toBe('abc');
-    expect(rows[0][6]).toContain('xy');
+    // Oldest-first like the other exporters: markers[1] (no sync) precedes
+    // markers[0] (with sync).
+    expect(rows[0].slice(7)).toEqual(['', '', '', '', '']);
+    expect(rows[1].slice(7)).toEqual(['network', '1.2', '0.03', '1.5', 'high']);
+    expect(rows[1][4]).toBe('abc');
+    expect(rows[1][6]).toContain('xy');
   });
 
   it('leaves unknown and nonfinite numeric sync fields blank', () => {

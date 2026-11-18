@@ -129,7 +129,7 @@ export function MarkersPane() {
                 <th>{tr('dt.scTk')}</th>
                 <th>{tr('dt.color')}</th>
                 <th>{tr('label.comment')}</th>
-                <th aria-label="remove" />
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -148,6 +148,7 @@ export function MarkersPane() {
                       value={marker.comment || ''}
                       onChange={e => updateMarkerComment(marker.id, e.target.value)}
                       placeholder={tr('placeholder.comment')}
+                      aria-label={`${tr('label.comment')} ${marker.tc}`}
                       maxLength={100}
                     />
                   </td>
@@ -156,7 +157,7 @@ export function MarkersPane() {
                       type="button"
                       className="dt-btn-icon"
                       onClick={() => removeMarker(marker.id)}
-                      aria-label={`delete marker ${marker.tc}`}
+                      aria-label={tr('marker.delete', { tc: marker.tc })}
                     >
                       ×
                     </button>

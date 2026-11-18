@@ -28,6 +28,24 @@ export function offsetMsWithOutputOffset(
 }
 
 /**
+ * Parses an SMPTE timecode string into [hours, minutes, seconds, frames].
+ *
+ * Accepts ':' (non-drop-frame), ';' (drop-frame — this is what
+ * smpte-timecode's toString() emits when dropFrame is set) and '.' field
+ * separators. Splitting on ':' alone turns 'HH:MM:SS;FF' into
+ * [h, m, NaN], which previously jammed NaN/undefined into the AudioWorklet
+ * on every drop-frame session.
+ *
+ * Returns null unless exactly four finite numeric fields are present, so
+ * jam paths can skip malformed strings instead of posting garbage.
+ */
+export function parseTcParts(tc: string): [number, number, number, number] | null {
+  const parts = tc.split(/[:;.]/).map(Number);
+  if (parts.length !== 4 || !parts.every((n) => Number.isFinite(n))) return null;
+  return [parts[0], parts[1], parts[2], parts[3]];
+}
+
+/**
  * Returns `tcStr` shifted by `frames` frames (negative shifts backwards).
  * On unparseable input the original string is returned unchanged and a
  * warning is logged — callers previously disagreed on whether failures were

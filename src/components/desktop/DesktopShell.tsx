@@ -82,7 +82,7 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
       const target = event.target as HTMLElement | null;
       if (target?.isContentEditable || target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
 
-      const tab = desktopTabForHotkey(event.key, isHost);
+      const tab = desktopTabForHotkey(event, isHost);
       if (!tab) return;
       event.preventDefault();
       selectTab(tab);
@@ -197,7 +197,7 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
           </div>
         </div>
 
-        <nav className="dt-tabs" aria-label="Console sections">
+        <nav className="dt-tabs" aria-label={tr('tab.aria')}>
           {tabs.map(tab => (
             <button
               key={tab.id}
