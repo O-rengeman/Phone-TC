@@ -164,6 +164,7 @@ interface LTCActionsType {
   exportToFCPXML: () => void;
   exportToResolve: () => void;
   exportToCSV: () => void;
+  exportToOTIO: () => void;
   handleSlateClick: () => void;
   resetP2P: () => void;
   setupP2PMaster: () => Promise<void>;
@@ -174,6 +175,12 @@ interface LTCActionsType {
   beginStopHold: () => void;
   cancelStopHold: () => void;
   handleManualResync: () => Promise<void>;
+  /**
+   * Recalls a logged marker's timecode: always becomes the manual/next-start
+   * TC; jams the running worklet only in freerun, otherwise just toasts why
+   * the live output was left alone.
+   */
+  recallTimecode: (tc: string) => void;
 }
 
 type LTCSyncContextType = LTCStateType & LTCActionsType;
@@ -374,6 +381,53 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isRunning, outputOffset, fpsIndex]);
 
+  // Marker-timeline recall: jumping back to a logged TC. manualTimecode is
+  // always updated — it is both the idle display source and the freerun
+  // start field, so the recalled value is what the next START emits.
+  const recallTimecode = useCallback((tc: string) => {
+    setManualTimecode(tc);
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    if (!isRunning) {
+      // Idle path mirrors applySyncToWorklet: push the TC into the engine so
+      // the readout and the next startEngine() pick it up. Paused counts as
+      // idle here — the worklet is already disconnected.
+      try {
+        engine.setManualTimecode(tc);
+        currentTcRef.current = engine.getTimecodeString();
+      } catch {
+        // Unparseable TC string — the manualTimecode state update above still
+        // stands (the start-TC input validates on start, same as typing).
+      }
+      addToast(translate('toast.recallSet', langRef.current, { tc }), 'info');
+      return;
+    }
+
+    if (p2pRole === 'client') {
+      // A P2P client's TC is owned by the master session — jamming locally
+      // would just be overwritten by the next heartbeat/sync-response.
+      addToast(translate('toast.recallMasterControls', langRef.current), 'info');
+      return;
+    }
+
+    if (syncMode === 'freerun') {
+      // Free-run has no external clock to fight, so jam the live worklet.
+      // Split on ':'/';'/'.' — drop-frame TCs stringify with ';'.
+      const node = workletNodeRef.current;
+      const parts = tc.split(/[:;.]/).map(Number);
+      if (node && parts.length === 4 && parts.every(n => Number.isFinite(n))) {
+        node.port.postMessage({ type: 'jam', h: parts[0], m: parts[1], s: parts[2], f: parts[3] });
+      }
+      return;
+    }
+
+    // system/network/p2p while running: the resync loop would fight a manual
+    // jam, so leave the output alone — the recall still applied to
+    // manualTimecode for the next start.
+    addToast(translate('toast.recallSynced', langRef.current), 'info');
+  }, [isRunning, syncMode, p2pRole, engineRef, workletNodeRef, currentTcRef, addToast, langRef]);
+
   const {
     syncStatus, setSyncStatus, driftStatus, setDriftStatus,
     isResyncing, handleManualResync,
@@ -386,7 +440,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
   const {
     markers, setMarkers, markerFlash,
     addMarker, removeMarker, updateMarkerComment,
-    exportToEDL, exportToALE, exportToFCPXML, exportToResolve, exportToCSV,
+    exportToEDL, exportToALE, exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO,
   } = useMarkers({ engineRef, fpsIndex, defaultReelName, sceneName, langRef, addToast,
     syncMode, driftMonitorRef, p2pDriftSeconds: p2pRole === 'client' ? masterDrift : null,
     p2pLastSyncRef: lastP2pSyncTimeRef,
@@ -725,7 +779,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     updateMarkerComment,
     exportToEDL,
     exportToALE,
-    exportToFCPXML, exportToResolve, exportToCSV,
+    exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO,
     handleSlateClick,
     resetP2P,
     setupP2PMaster,
@@ -736,12 +790,13 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     beginStopHold,
     cancelStopHold,
     handleManualResync,
+    recallTimecode,
   }), [
     analyserRef, canvasRef, engineRef, currentTcRef, isVisualSlateRef, slateTimeRef,
     holdStoppedRef, stopHoldStartRef, stopHoldRafRef,
     tr, addToast, setSlateTime, addMarker, removeMarker, updateMarkerComment, exportToEDL,
-    exportToALE, exportToFCPXML, exportToResolve, exportToCSV, handleSlateClick, resetP2P, setupP2PMaster, setupP2PClient, joinSession,
-    handleStartStop, handlePause, beginStopHold, cancelStopHold, handleManualResync,
+    exportToALE, exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO, handleSlateClick, resetP2P, setupP2PMaster, setupP2PClient, joinSession,
+    handleStartStop, handlePause, beginStopHold, cancelStopHold, handleManualResync, recallTimecode,
   ]);
 
   return (

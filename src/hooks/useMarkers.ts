@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import type { LtcEngine } from '../utils/LtcEngine';
 import { buildEdl, buildAle, buildFcpxml, buildResolveMarkers, buildCsv } from '../utils/export';
+import { buildOtio } from '../utils/otio';
 import type { Marker, MarkerColor } from '../utils/export';
 import { t as translate } from '../utils/i18n';
 import type { Lang } from '../utils/i18n';
@@ -52,6 +53,7 @@ interface UseMarkersResult {
   exportToFCPXML: () => void;
   exportToResolve: () => void;
   exportToCSV: () => void;
+  exportToOTIO: () => void;
 }
 
 /**
@@ -217,5 +219,10 @@ export function useMarkers({
     void exportFile('\uFEFF' + buildCsv(markers), `PHONE_TC_${new Date().toISOString().slice(0, 10)}.csv`);
   };
 
-  return { markers, setMarkers, markerFlash, addMarker, removeMarker, updateMarkerComment, exportToEDL, exportToALE, exportToFCPXML, exportToResolve, exportToCSV };
+  const exportToOTIO = () => {
+    if (!markers.length) return;
+    void exportFile(buildOtio(markers, FPS_OPTIONS[fpsIndex]), `PHONE_TC_${new Date().toISOString().slice(0, 10)}.otio`);
+  };
+
+  return { markers, setMarkers, markerFlash, addMarker, removeMarker, updateMarkerComment, exportToEDL, exportToALE, exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO };
 }

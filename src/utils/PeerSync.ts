@@ -2,7 +2,8 @@ import { Peer } from 'peerjs';
 import type { DataConnection } from 'peerjs';
 
 import { debug } from './log';
-import { ICE_SERVERS } from './iceServers';
+import { getIceServers } from './iceServers';
+import { loadPeerServerConfig, peerJsOptionsFromConfig } from './signalingConfig';
 import { computeBackoffDelay } from './backoff';
 
 /** Fields shared by messages that carry the master's timecode/fps/state. */
@@ -161,12 +162,16 @@ export class PeerSync {
   ): void {
     try {
       const shortId = this.generateShortId();
-      // Use injected factory (defaults to real Peer) with ICE servers for NAT traversal
+      // Use injected factory (defaults to real Peer). ICE servers resolve at
+      // call time so a TURN override saved in the Advanced panel applies to
+      // the next Peer; the signaling spread is {} unless a self-hosted
+      // PeerServer is configured (STORAGE_KEYS.peerServer).
       const peer = this.peerFactory(shortId, {
         debug: 2,
         config: {
-          'iceServers': ICE_SERVERS,
-        }
+          'iceServers': getIceServers(),
+        },
+        ...peerJsOptionsFromConfig(loadPeerServerConfig()),
       });
       this.peer = peer;
       let opened = false;
