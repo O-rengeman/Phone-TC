@@ -71,10 +71,14 @@ export class LtcEngine {
   }
 
   public setFps(fps: number, isDrop: boolean) {
+    // Build the new timecode BEFORE mutating any state: Timecode() throws when
+    // the stored label can't exist at the new rate (frame >= fps, or DF
+    // frames 0/1 at a non-10th minute). Assigning settings first would leave a
+    // half-applied rate change behind on throw.
+    const next = Timecode(this.currentTimecode.toString(), fps, isDrop);
     this.settings.fps = fps;
     this.settings.isDropFrame = isDrop;
-    const currentStr = this.currentTimecode.toString();
-    this.currentTimecode = Timecode(currentStr, fps, isDrop);
+    this.currentTimecode = next;
 
     this.fpsNum = this.deriveNumerator(fps);
     this.fpsDen = this.deriveDenominator(fps);

@@ -149,7 +149,8 @@ function isPreset(value: unknown): value is Preset {
 /**
  * Read-path validator for STORAGE_KEYS.presets: every entry must be a fully
  * valid preset or the whole payload is rejected and listPresets() falls
- * back to [] — same all-or-nothing contract as isMarkerArray.
+ * back to [] — presets keep the all-or-nothing contract (unlike markers,
+ * which are filtered per-entry on load).
  */
 export const isPresetArray = (value: unknown): value is Preset[] =>
   Array.isArray(value) && value.every(isPreset);

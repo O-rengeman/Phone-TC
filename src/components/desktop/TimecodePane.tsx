@@ -59,6 +59,7 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
               type="button"
               className={outputMode === 'stereo' ? 'active' : ''}
               onClick={() => onOutputModeChange('stereo')}
+              disabled={isRunning}
             >
               {tr('out.stereoTc')}
             </button>
@@ -66,6 +67,7 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
               type="button"
               className={outputMode === 'mono-l' ? 'active' : ''}
               onClick={() => onOutputModeChange('mono-l')}
+              disabled={isRunning}
             >
               {tr('out.ltcRaudio')}
             </button>

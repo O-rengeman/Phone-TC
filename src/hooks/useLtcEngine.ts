@@ -11,7 +11,7 @@ import { debug } from '../utils/log';
 import { LTC_WORKLET_SOURCE } from '../audio/ltcWorkletSource';
 import { FPS_OPTIONS } from '../constants';
 import { effectiveOutputVolume } from '../utils/audioLevel';
-import { offsetMsWithOutputOffset, shiftTimecode } from '../utils/timecode';
+import { offsetMsWithOutputOffset, parseTcParts, shiftTimecode } from '../utils/timecode';
 import type { SyncMode } from '../LTCSyncContext';
 
 type ToastLevel = 'info' | 'warn' | 'error';
@@ -117,8 +117,30 @@ export function useLtcEngine({
   }, []);
 
   useEffect(() => {
-    if (engineRef.current) {
-      engineRef.current.setFps(FPS_OPTIONS[fpsIndex].value, FPS_OPTIONS[fpsIndex].drop);
+    const engine = engineRef.current;
+    if (!engine) return;
+    const opt = FPS_OPTIONS[fpsIndex];
+    try {
+      engine.setFps(opt.value, opt.drop);
+    } catch {
+      // smpte-timecode rejects labels that can't exist at the new rate —
+      // e.g. frame count >= the new fps after a rate drop, or frames 0/1 at
+      // a non-10th minute when switching to drop-frame. Re-anchor the TC at
+      // the nearest valid label for the new rate, then retry.
+      const parts = parseTcParts(engine.getTimecodeString());
+      if (parts) {
+        const [h, m, s] = parts;
+        const framesPerSec = Math.round(opt.fpsNum / opt.fpsDen);
+        let f = Math.min(parts[3], framesPerSec - 1);
+        if (opt.drop && m % 10 !== 0 && s === 0 && f < 2) f = 2;
+        const pad = (n: number) => String(n).padStart(2, '0');
+        try {
+          engine.setManualTimecode(`${pad(h)}:${pad(m)}:${pad(s)}:${pad(f)}`);
+          engine.setFps(opt.value, opt.drop);
+        } catch {
+          // Leave the engine at its previous rate rather than crash the effect.
+        }
+      }
     }
   }, [fpsIndex, engineRef]);
 
@@ -134,14 +156,23 @@ export function useLtcEngine({
   useEffect(() => {
     const node = workletNodeRef.current;
     if (isRunning && node) {
+      const opt = FPS_OPTIONS[fpsIndex];
       node.port.postMessage({
         type: 'config',
         volume: effectiveOutputVolume(volume, outputLevel),
         ubit: userBits,
         mode: outputMode,
+        // fps fields let the worklet adopt a mid-run rate change (manual
+        // override or P2P master fps sync) instead of staying at the
+        // construction-time rate until restart.
+        fps: opt.value,
+        fpsNum: opt.fpsNum,
+        fpsDen: opt.fpsDen,
+        framesPerSec: Math.round(opt.fpsNum / opt.fpsDen),
+        isDrop: opt.drop,
       });
     }
-  }, [volume, userBits, outputMode, outputLevel, isRunning, workletNodeRef]);
+  }, [fpsIndex, volume, userBits, outputMode, outputLevel, isRunning, workletNodeRef]);
 
   const beep = useCallback((freq: number, duration: number) => {
     if (!audioCtxRef.current) return;
@@ -181,7 +212,10 @@ export function useLtcEngine({
       }
     }
 
-    const currentTC = engineRef.current!.getTimecodeString().split(':').map(Number);
+    // getTimecodeString() emits 'HH:MM:SS;FF' for drop-frame — parseTcParts
+    // accepts ':'/';'/'.' so DF sessions don't hand NaN to the worklet.
+    const currentTC: [number, number, number, number] =
+      parseTcParts(engineRef.current!.getTimecodeString()) ?? [0, 0, 0, 0];
     const workletNode = new AudioWorkletNode(ctx, 'ltc-processor', {
       numberOfInputs: 1,
       numberOfOutputs: 1,
@@ -202,7 +236,12 @@ export function useLtcEngine({
       const tc = e.data?.tc;
       if (!tc) return;
       currentTcRef.current = tc;
-      if (engineRef.current) engineRef.current.setManualTimecode(tc);
+      // The worklet emits 'HH:MM:SS:FF' labels that can briefly be illegal at
+      // the engine's rate mid-rate-change (e.g. DF dropped labels while the
+      // engine already flipped to drop-frame) — Timecode() throws on those.
+      try {
+        if (engineRef.current) engineRef.current.setManualTimecode(tc);
+      } catch { /* next frame's label will parse */ }
       if (isVisualSlateRef.current) setSlateTime(tc);
     };
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { buildOtio } from './otio';
 import { FPS_OPTIONS } from '../constants';
 import type { Marker } from './export';
@@ -137,5 +137,18 @@ describe('buildOtio', () => {
     const doc = parse(buildOtio([], FPS_OPTIONS[2]));
     expect(doc.OTIO_SCHEMA).toBe('Timeline.1');
     expect(videoMarkers(doc)).toHaveLength(0);
+  });
+
+  it('skips markers with unparseable timecodes and warns instead of throwing', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const mixed: Marker[] = [
+      { ...markers[0], tc: 'not-a-timecode' },
+      { ...markers[1] },
+    ];
+    const clips = videoMarkers(parse(buildOtio(mixed, FPS_OPTIONS[2])));
+    expect(clips).toHaveLength(1);
+    expect(clips[0].name).toBe('Scene 001 Take 1 — Red');
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

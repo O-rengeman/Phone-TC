@@ -32,10 +32,13 @@ export function useVuMeter(
       return;
     }
     let rafId: number;
+    // Reused across frames — allocating a Float32Array per RAF tick was pure GC churn.
+    let data: Float32Array<ArrayBuffer> | null = null;
     const update = () => {
-      if (analyserRef.current) {
-        const data = new Float32Array(analyserRef.current.fftSize);
-        analyserRef.current.getFloatTimeDomainData(data);
+      const analyser = analyserRef.current;
+      if (analyser) {
+        if (!data || data.length !== analyser.fftSize) data = new Float32Array(analyser.fftSize);
+        analyser.getFloatTimeDomainData(data);
         setHasInputMeter(true);
         let peak = 0;
         for (let i = 0; i < data.length; i++) {

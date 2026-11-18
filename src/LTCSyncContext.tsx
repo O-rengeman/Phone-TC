@@ -28,7 +28,7 @@ import {
   CLIENT_REPORT_WINDOW_SLACK_MS,
 } from './constants';
 import { STORAGE_KEYS, readStored, writeStoredString } from './utils/storage';
-import { shiftTimecode } from './utils/timecode';
+import { parseTcParts, shiftTimecode } from './utils/timecode';
 import { useBatteryMonitor } from './hooks/useBatteryMonitor';
 import { useWakeLock } from './hooks/useWakeLock';
 import type { WakeLockStatus } from './hooks/useWakeLock';
@@ -368,8 +368,12 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     if (isRunning && node) {
       const diff = engine.getDiffSeconds(corrected);
       if (diff > JAM_THRESHOLD_SEC) {
-        const parts = corrected.split(':').map(Number);
-        node.port.postMessage({ type: 'jam', h: parts[0], m: parts[1], s: parts[2], f: parts[3] });
+        // parseTcParts accepts ':'/';'/'.' — drop-frame TCs stringify with ';'.
+        const parts = parseTcParts(corrected);
+        if (parts) {
+          const [h, m, s, f] = parts;
+          node.port.postMessage({ type: 'jam', h, m, s, f });
+        }
       } else {
         const frameDiff = engine.signedFrameDiffTo(corrected);
         if (frameDiff !== 0) {
@@ -413,11 +417,12 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
     if (syncMode === 'freerun') {
       // Free-run has no external clock to fight, so jam the live worklet.
-      // Split on ':'/';'/'.' — drop-frame TCs stringify with ';'.
+      // parseTcParts accepts ':'/';'/'.' — drop-frame TCs stringify with ';'.
       const node = workletNodeRef.current;
-      const parts = tc.split(/[:;.]/).map(Number);
-      if (node && parts.length === 4 && parts.every(n => Number.isFinite(n))) {
-        node.port.postMessage({ type: 'jam', h: parts[0], m: parts[1], s: parts[2], f: parts[3] });
+      const parts = parseTcParts(tc);
+      if (node && parts) {
+        const [h, m, s, f] = parts;
+        node.port.postMessage({ type: 'jam', h, m, s, f });
       }
       return;
     }

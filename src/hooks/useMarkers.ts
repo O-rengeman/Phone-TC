@@ -4,11 +4,12 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import type { LtcEngine } from '../utils/LtcEngine';
 import { buildEdl, buildAle, buildFcpxml, buildResolveMarkers, buildCsv } from '../utils/export';
 import { buildOtio } from '../utils/otio';
+import { parseTcFrame } from '../utils/markerTimeline';
 import type { Marker, MarkerColor } from '../utils/export';
 import { t as translate } from '../utils/i18n';
 import type { Lang } from '../utils/i18n';
 import { FPS_OPTIONS } from '../constants';
-import { STORAGE_KEYS, readStoredJson, writeStoredString } from '../utils/storage';
+import { STORAGE_KEYS, readStored, writeStoredString } from '../utils/storage';
 import type { SyncMode } from '../LTCSyncContext';
 import type { DriftMonitor } from '../utils/DriftMonitor';
 import type { MarkerSync } from '../utils/export';
@@ -22,11 +23,94 @@ const MARKER_FLASH_MS = 1300;
 // backup so we don't do a full-file write per character.
 const MARKER_BACKUP_DEBOUNCE_MS = 2000;
 
-const isMarkerArray = (v: unknown): v is Marker[] =>
-  Array.isArray(v) && v.every(m =>
-    typeof m === 'object' && m !== null
-    && typeof (m as Marker).id === 'number'
-    && typeof (m as Marker).tc === 'string');
+const MARKER_COLORS: ReadonlySet<string> = new Set<MarkerColor>(['Red', 'Blue', 'Green', 'Yellow']);
+const SYNC_METHODS: ReadonlySet<string> = new Set(['network', 'p2p', 'system', 'freerun']);
+const SYNC_CONFIDENCE: ReadonlySet<string> = new Set(['high', 'medium', 'low', 'none']);
+
+const asString = (value: unknown): string => (typeof value === 'string' ? value : '');
+const asFiniteNumber = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+/**
+ * A stored TC string is usable only if it parses under at least one frame rate
+ * the app supports — markers logged while a different fps setting was active
+ * still round-trip. Format alone is not enough: ';' DF labels and frame fields
+ * are validated against the rate (smpte-timecode throws on mismatches).
+ */
+function parseStoredTc(tc: unknown): string | null {
+  if (typeof tc !== 'string') return null;
+  return FPS_OPTIONS.some(o => parseTcFrame(tc, o.value, o.drop) !== null) ? tc : null;
+}
+
+/** Malformed sync metadata is dropped; it must never poison the marker itself. */
+function sanitizeSync(value: unknown): MarkerSync | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const s = value as Record<string, unknown>;
+  if (typeof s.method !== 'string' || !SYNC_METHODS.has(s.method)) return undefined;
+  const confidence = typeof s.confidence === 'string' && SYNC_CONFIDENCE.has(s.confidence)
+    ? s.confidence as MarkerSync['confidence']
+    : 'none';
+  return {
+    method: s.method as MarkerSync['method'],
+    driftMs: asFiniteNumber(s.driftMs),
+    driftFrames: asFiniteNumber(s.driftFrames),
+    msSinceSync: asFiniteNumber(s.msSinceSync),
+    confidence,
+  };
+}
+
+/**
+ * Per-marker validation for the persisted marker list: keeps entries that are
+ * well-formed and drops corrupt ones (with a warning), instead of the old
+ * all-or-nothing guard that discarded every stored marker when a single entry
+ * was bad. Required fields (id/tc/color/take) must check out; string fields are
+ * coerced to '' when missing or wrong-typed.
+ */
+function sanitizeMarker(raw: unknown): Marker | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const m = raw as Record<string, unknown>;
+  const tc = parseStoredTc(m.tc);
+  if (tc === null) return null;
+  if (typeof m.id !== 'number' || !Number.isFinite(m.id)) return null;
+  if (typeof m.color !== 'string' || !MARKER_COLORS.has(m.color)) return null;
+  if (typeof m.take !== 'number' || !Number.isFinite(m.take)) return null;
+  return {
+    id: m.id,
+    tc,
+    time: asString(m.time),
+    color: m.color as MarkerColor,
+    reelName: asString(m.reelName),
+    take: m.take,
+    sceneName: asString(m.sceneName),
+    comment: asString(m.comment),
+    sync: sanitizeSync(m.sync),
+  };
+}
+
+/** Returns the sanitized marker array, or undefined when the payload isn't one. */
+function sanitizeMarkers(raw: unknown): Marker[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const list: readonly unknown[] = raw;
+  const clean = list.map(sanitizeMarker).filter((m): m is Marker => m !== null);
+  const dropped = list.length - clean.length;
+  if (dropped > 0) {
+    console.warn(`useMarkers: dropped ${dropped} invalid stored marker(s)`);
+  }
+  // Legacy Date.now() ids could collide on same-ms double-adds — reassign
+  // duplicates so React keys and remove/update lookups stay unambiguous.
+  const seen = new Set<number>();
+  let highestId = 0;
+  return clean.map(m => {
+    highestId = Math.max(highestId, m.id);
+    if (!seen.has(m.id)) {
+      seen.add(m.id);
+      return m;
+    }
+    const id = ++highestId;
+    seen.add(id);
+    return { ...m, id };
+  });
+}
 
 interface UseMarkersParams {
   syncMode?: SyncMode;
@@ -76,7 +160,10 @@ export function useMarkers({
   const syncRef = useRef({ syncMode, driftMonitorRef, p2pDriftSeconds, p2pLastSyncRef, fpsIndex });
   useEffect(() => { syncRef.current = { syncMode, driftMonitorRef, p2pDriftSeconds, p2pLastSyncRef, fpsIndex }; }, [syncMode, driftMonitorRef, p2pDriftSeconds, p2pLastSyncRef, fpsIndex]);
   const [markers, setMarkers] = useState<Marker[]>(() =>
-    readStoredJson(STORAGE_KEYS.markers, [] as Marker[], isMarkerArray));
+    readStored(STORAGE_KEYS.markers, [] as Marker[], raw => {
+      const parsed: unknown = JSON.parse(raw);
+      return sanitizeMarkers(parsed);
+    }));
   const [markerFlash, setMarkerFlash] = useState<MarkerFlash>(null);
   const markerFlashTimerRef = useRef<number | null>(null);
   const backupTimerRef = useRef<number | null>(null);
@@ -135,22 +222,26 @@ export function useMarkers({
     } else if (current.syncMode === 'p2p' && lastP2pSync && Number.isFinite(lastP2pSync) && current.p2pDriftSeconds !== null && Number.isFinite(current.p2pDriftSeconds)) {
       sync.driftMs = round(current.p2pDriftSeconds * 1000);
       sync.driftFrames = round(current.p2pDriftSeconds * FPS_OPTIONS[current.fpsIndex].value);
-      sync.msSinceSync = Math.max(0, Date.now() - lastP2pSync);
+      sync.msSinceSync = round(Math.max(0, Date.now() - lastP2pSync));
     }
     const currentTC = engineRef.current ? engineRef.current.getTimecodeString() : '00:00:00:00';
-    const nextTake = markers.length > 0 ? Math.max(...markers.map(m => m.take || 0)) + 1 : 1;
-    const newMarker: Marker = {
-      id: Date.now(),
+    const baseMarker = {
       tc: currentTC,
       time: new Date().toLocaleTimeString(),
       color,
       reelName: defaultReelName,
-      take: nextTake,
       sceneName: sceneName,
       comment: '',
       sync,
     };
-    setMarkers(prev => [newMarker, ...prev]);
+    setMarkers(prev => {
+      // Sequential id/take computed inside the updater from the freshest list:
+      // Date.now() ids collide on same-millisecond double-adds, and a stale
+      // closure could hand two rapid adds the same take.
+      const take = prev.reduce((max, m) => Math.max(max, Number.isFinite(m.take) ? m.take : 0), 0) + 1;
+      const id = prev.reduce((max, m) => Math.max(max, Number.isFinite(m.id) ? m.id : 0), 0) + 1;
+      return [{ ...baseMarker, id, take }, ...prev];
+    });
 
     setMarkerFlash({ tc: currentTC, color, count: markers.length + 1 });
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
@@ -184,45 +275,54 @@ export function useMarkers({
         addToast(translate('toast.exportFailed', langRef.current), 'error');
       }
     } else {
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      let url: string | null = null;
+      try {
+        const blob = new Blob([content], { type: 'text/plain' });
+        url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+      } catch (e) {
+        console.error('File export failed', e);
+        addToast(translate('toast.exportFailed', langRef.current), 'error');
+      } finally {
+        if (url) URL.revokeObjectURL(url);
+      }
     }
   };
 
-  const exportToEDL = () => {
+  /** Local-time filename stamp (YYYY-MM-DD_HH-MM-SS-mmm) so exports never collide. */
+  const exportStamp = (): string => {
+    const d = new Date();
+    const p = (n: number, w = 2) => String(n).padStart(w, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}-${p(d.getMilliseconds(), 3)}`;
+  };
+
+  /**
+   * Runs a pure export builder and writes the result. A throwing builder
+   * (e.g. a stored TC that no longer parses under the active frame rate)
+   * becomes an error toast instead of an uncaught click-handler exception.
+   */
+  const exportToFile = (build: () => string, suffix: string) => {
     if (markers.length === 0) return;
-    const edl = buildEdl(markers, FPS_OPTIONS[fpsIndex].drop);
-    void exportFile(edl, `PHONE_TC_${new Date().toISOString().slice(0, 10)}.edl`);
+    let content: string;
+    try {
+      content = build();
+    } catch (e) {
+      console.error('Marker export failed', e);
+      addToast(translate('toast.exportFailed', langRef.current), 'error');
+      return;
+    }
+    void exportFile(content, `PHONE_TC_${exportStamp()}${suffix}`);
   };
 
-  const exportToALE = () => {
-    if (markers.length === 0) return;
-    const ale = buildAle(markers, FPS_OPTIONS[fpsIndex].label);
-    void exportFile(ale, `PHONE_TC_${new Date().toISOString().slice(0, 10)}.ale`);
-  };
-
-  const exportToFCPXML = () => {
-    if (!markers.length) return;
-    void exportFile(buildFcpxml(markers, FPS_OPTIONS[fpsIndex]), `PHONE_TC_${new Date().toISOString().slice(0, 10)}.fcpxml`);
-  };
-  const exportToResolve = () => {
-    if (!markers.length) return;
-    void exportFile(buildResolveMarkers(markers, FPS_OPTIONS[fpsIndex]), `PHONE_TC_${new Date().toISOString().slice(0, 10)}_resolve_markers.edl`);
-  };
-  const exportToCSV = () => {
-    if (!markers.length) return;
-    void exportFile('\uFEFF' + buildCsv(markers), `PHONE_TC_${new Date().toISOString().slice(0, 10)}.csv`);
-  };
-
-  const exportToOTIO = () => {
-    if (!markers.length) return;
-    void exportFile(buildOtio(markers, FPS_OPTIONS[fpsIndex]), `PHONE_TC_${new Date().toISOString().slice(0, 10)}.otio`);
-  };
+  const exportToEDL = () => exportToFile(() => buildEdl(markers, FPS_OPTIONS[fpsIndex].drop), '.edl');
+  const exportToALE = () => exportToFile(() => buildAle(markers, FPS_OPTIONS[fpsIndex].label), '.ale');
+  const exportToFCPXML = () => exportToFile(() => buildFcpxml(markers, FPS_OPTIONS[fpsIndex]), '.fcpxml');
+  const exportToResolve = () => exportToFile(() => buildResolveMarkers(markers, FPS_OPTIONS[fpsIndex]), '_resolve_markers.edl');
+  const exportToCSV = () => exportToFile(() => String.fromCharCode(0xFEFF) + buildCsv(markers), '.csv');
+  const exportToOTIO = () => exportToFile(() => buildOtio(markers, FPS_OPTIONS[fpsIndex]), '.otio');
 
   return { markers, setMarkers, markerFlash, addMarker, removeMarker, updateMarkerComment, exportToEDL, exportToALE, exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO };
 }
