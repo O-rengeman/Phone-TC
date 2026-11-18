@@ -1,0 +1,151 @@
+/*
+ * markersPane.css — MARKERS pane refresh (desktop console).
+ *
+ * Every rule is scoped under `.desktop-view .dt-pane-markers` plus the
+ * pane's own `dtv2-` hooks, so nothing here reaches the mobile layout or
+ * the other desktop panes. MarkerTimeline and MarkerSyncBadge are shared
+ * markup; they are only tuned through descendant selectors under the
+ * dtv2-timeline wrapper and the marker table.
+ *
+ * Colour allocation is untouched: white = primary/active, greys = muted
+ * text and borders, the four marker dot colours and the sync-badge
+ * confidence colours keep their existing meaning. Only spacing, borders,
+ * opacity, gradients and typography are adjusted.
+ */
+
+/* ── Metadata: reel + scene as one slate pair ─────────────────────────── */
+
+.desktop-view .dt-pane-markers .dtv2-field-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* Very narrow control columns (sub-900px consoles) stack the pair again
+   rather than squeezing two 8-character inputs into ~100px each. */
+@media (max-width: 900px) {
+  .desktop-view .dt-pane-markers .dtv2-field-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Metadata values are slate data — mono and letter-spaced like USER BITS. */
+.desktop-view .dt-pane-markers .dt-panel-control .dt-input {
+  letter-spacing: 0.06em;
+}
+
+/* The AUTO toggle docks at its content width beside the hex field. */
+.desktop-view .dt-pane-markers .dt-panel-control .dt-inline .dt-chip {
+  flex: none;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ── Export: six formats on a 3×2 grid ────────────────────────────────── */
+
+/* The desktop .dt-export-row defaults to two columns; this pane's formats
+   are short labels, so three columns halve the block's height. */
+.desktop-view .dt-pane-markers .dtv2-export {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.desktop-view .dt-pane-markers .dtv2-export .dt-btn {
+  padding: 0 6px;
+  font-family: var(--font-mono);
+  font-size: var(--dt-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ── Timeline rail ────────────────────────────────────────────────────── */
+
+/* The recall strip is a different kind of surface than the take table
+   below it, so it sits on its own sunken rail inside the panel. */
+.desktop-view .dt-pane-markers .dtv2-timeline {
+  flex: none;
+  padding: 4px 10px 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--dt-line-soft);
+  border-radius: var(--radius-sm);
+}
+
+.desktop-view .dt-pane-markers .dtv2-timeline .mtl {
+  padding: 0;
+}
+
+.desktop-view .dt-pane-markers .dtv2-timeline .mtl-track {
+  height: 40px;
+}
+
+/* MarkerTimeline renders null when it has neither a live TC nor any
+   parseable markers — an empty bordered rail would then read as a dead
+   strip, so the wrapper hides itself. */
+.desktop-view .dt-pane-markers .dtv2-timeline:empty {
+  display: none;
+}
+
+/* ── Marker table ─────────────────────────────────────────────────────── */
+
+/* Rows hold a two-line TC cell (code + sync badge), so the whole table
+   centres vertically instead of baselining against the first line. */
+.desktop-view .dt-pane-markers .dtv2-markers-table td {
+  vertical-align: middle;
+}
+
+.desktop-view .dt-pane-markers .dtv2-markers-table tbody tr {
+  transition: background 0.12s ease;
+}
+
+/* Index column: tabular, right-aligned, quiet. */
+.desktop-view .dt-pane-markers .dtv2-markers-table .dtv2-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* TC is the row's anchor: two tight lines, code above the sync badge. */
+.desktop-view .dt-pane-markers .dtv2-markers-table td.dtv2-tc {
+  line-height: 1.45;
+}
+
+.desktop-view .dt-pane-markers .dtv2-markers-table .marker-sync-badge {
+  margin-top: 3px;
+  font-size: var(--dt-label);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Scene/take stays mono; the colour cell keeps its dot + name together. */
+.desktop-view .dt-pane-markers .dtv2-markers-table td.dtv2-sctk {
+  font-variant-numeric: tabular-nums;
+}
+
+.desktop-view .dt-pane-markers .dtv2-markers-table td.dtv2-color {
+  white-space: nowrap;
+  font-size: var(--dt-label);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.desktop-view .dt-pane-markers .dtv2-markers-table td.dtv2-color .dt-marker-dot {
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+}
+
+/* The comment field is invisible until hovered/focused — the flush look
+   is kept, but focus gets a visible box so keyboard edits have a home. */
+.desktop-view .dt-pane-markers .dtv2-markers-table .dt-input-flush:focus {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+/* The delete column takes only what the icon button needs. */
+.desktop-view .dt-pane-markers .dtv2-markers-table th.dtv2-actions,
+.desktop-view .dt-pane-markers .dtv2-markers-table td.dtv2-actions {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}

@@ -207,7 +207,9 @@ export function DesktopShell({ onOutputModeChange }: DesktopShellProps) {
       {/* Vitals and tabs share the readout row rather than stacking below it:
           the tab strip was a full-width band carrying five words, and giving
           that height back to the timecode buys far more than it costs. */}
-      <div className="dt-readout">
+      {/* `dt-readout-bar` scopes the header-only chrome in desktop.css —
+          plain `dt-readout` is reused inside a pane for inline values. */}
+      <div className="dt-readout dt-readout-bar">
         <div className="dt-readout-tc">
           <VideoPlayer />
         </div>

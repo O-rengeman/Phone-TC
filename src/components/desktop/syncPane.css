@@ -1,0 +1,330 @@
+/*
+ * syncPane.css — SYNC pane refresh (desktop console).
+ *
+ * Every rule is scoped under `.desktop-view .dt-pane-sync` plus the pane's
+ * own `dtv2-` hooks, so nothing here reaches the mobile layout or the other
+ * desktop panes. The shared ConnectionManager markup cannot be edited, so
+ * it is restyled purely by descendant selectors inside .dtv2-session — the
+ * same technique desktop.css:708-748 already uses to compact it for the
+ * console.
+ *
+ * Colour allocation is untouched: white = active/primary, greys = muted
+ * text and borders, #f5a623 = warning rail, #35d07f/#f5a623/#555 = client
+ * status dots, #ff3b71 = focus ring. Only spacing, borders, opacity,
+ * gradients, typography and press feedback are adjusted.
+ */
+
+/* ── Sync method: one tight 4-way control ─────────────────────────────── */
+
+.desktop-view .dt-pane-sync .dtv2-methods {
+  gap: 3px;
+  padding: 3px;
+}
+
+.desktop-view .dt-pane-sync .dtv2-methods button {
+  font-size: clamp(9px, 1.15vh, 13px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ── Sync vitals: latency / offset / last-sync as real stat cards ─────── */
+
+.desktop-view .dt-pane-sync .dtv2-stats {
+  gap: 8px;
+}
+
+.desktop-view .dt-pane-sync .dtv2-stats .dt-stat {
+  gap: 4px;
+  padding: clamp(7px, 1.1vh, 13px) 10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(0, 0, 0, 0.3));
+  border: 1px solid var(--dt-line);
+}
+
+.desktop-view .dt-pane-sync .dtv2-stats .dt-stat strong {
+  font-size: clamp(13px, 1.7vh, 19px);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* ── RESYNC + re-jam warning rail ─────────────────────────────────────── */
+
+/* The only affirmative action on this tab when network sync is on — it
+   spans the control column so it cannot hide between the stat cards. */
+.desktop-view .dt-pane-sync .dtv2-resync {
+  width: 100%;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* desktop.css already gives .dt-warn a left rail; on this pane it also
+   gets a filled border and weight so it reads as an alert, not a hint. */
+.desktop-view .dt-pane-sync .dtv2-warn {
+  border: 1px solid rgba(245, 166, 35, 0.4);
+  border-left-width: 3px;
+  background: rgba(245, 166, 35, 0.12);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.45;
+}
+
+/* ── Session card (shared ConnectionManager, descendant-only restyle) ── */
+
+/* .connection-manager-v2 is display:contents, so this wrapper is the real
+   parent box of the session markup and owns its rhythm. */
+.desktop-view .dt-pane-sync .dtv2-session {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* CREATE MASTER / JOIN AS CLIENT: flat console buttons that match the
+   dt-btn family instead of the mobile role cards. */
+.desktop-view .dt-pane-sync .dtv2-session .p2p-init-pro button {
+  padding: clamp(10px, 1.6vh, 18px) 10px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--dt-line);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: var(--dt-text);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.06s ease;
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .p2p-init-pro button:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: var(--dt-surface-hi);
+  color: var(--text-bright);
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .p2p-init-pro button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .p2p-init-pro button:focus-visible {
+  outline: 2px solid #ff3b71;
+  outline-offset: 2px;
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .p2p-init-pro button:disabled {
+  opacity: 0.35;
+}
+
+/* The live session panel becomes a card with a faint top light, matching
+   the panel-head gradient the rest of the console uses. */
+.desktop-view .dt-pane-sync .dtv2-session .p2p-panel-pro {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: clamp(8px, 1.2vh, 14px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0.3));
+  border: 1px solid var(--dt-line);
+  border-radius: var(--dt-radius);
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .p2p-header {
+  margin-bottom: 0;
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .role-tag {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: var(--dt-label);
+  letter-spacing: 0.14em;
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .btn-small {
+  font-family: var(--font-main);
+  font-size: var(--dt-label);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  transition: border-color 0.15s, color 0.15s, transform 0.06s ease;
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .btn-small:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .btn-small:active {
+  transform: translateY(1px);
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .btn-small:focus-visible {
+  outline: 2px solid #ff3b71;
+  outline-offset: 2px;
+}
+
+/* Session ID reads as a mono readout chip; the copy button docks right. */
+.desktop-view .dt-pane-sync .dtv2-session .id-display-row {
+  gap: 8px;
+  padding: 5px 8px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--dt-line-soft);
+  border-radius: var(--radius-sm);
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .id-display-row .cm-v2-id {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.12em;
+}
+
+/* START SOURCE toggle picks up the same inset pill treatment as
+   .dt-segment so the two segmented controls on this pane match. */
+.desktop-view .dt-pane-sync .dtv2-session .sync-toggle-pro {
+  gap: 2px;
+  padding: 2px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--dt-line);
+  border-radius: var(--radius-sm);
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .sync-toggle-pro button {
+  border-radius: 4px;
+  min-height: clamp(24px, 3.2vh, 36px);
+  font-size: var(--dt-label);
+  letter-spacing: 0.08em;
+}
+
+/* Manual-TC and join-ID inputs settle into the console's control height
+   and radius instead of the mobile card's 12px/1.1rem field. */
+.desktop-view .dt-pane-sync .dtv2-session .start-tc-input input,
+.desktop-view .dt-pane-sync .dtv2-session .p2p-client-box input {
+  height: auto;
+  min-height: var(--dt-control-h);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: clamp(12px, 1.5vh, 17px);
+  letter-spacing: 0.1em;
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .start-tc-input input:focus,
+.desktop-view .dt-pane-sync .dtv2-session .p2p-client-box input:focus {
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: none;
+}
+
+/* JOIN row goes inline: host ID field plus LINK on one line. */
+.desktop-view .dt-pane-sync .dtv2-session .p2p-client-box {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .p2p-client-box input {
+  flex: 1;
+  min-width: 0;
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .p2p-client-box .cm-v2-link {
+  flex: none;
+  min-height: var(--dt-control-h);
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--dt-text);
+  letter-spacing: 0.12em;
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .p2p-status-mini {
+  margin-top: 0;
+  font-size: var(--dt-label);
+  letter-spacing: 0.08em;
+}
+
+/* ADVANCED disclosure: quieter rule, console-sized labels and inputs. */
+.desktop-view .dt-pane-sync .dtv2-session .sig-advanced {
+  border-top-color: var(--dt-line-soft);
+  padding-top: 6px;
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .sig-advanced-summary {
+  font-size: var(--dt-label);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 4px 0;
+  border-radius: 4px;
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .sig-advanced-summary:focus-visible {
+  outline: 2px solid #ff3b71;
+  outline-offset: 2px;
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .sig-group {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: var(--dt-line-soft);
+  border-radius: var(--radius-sm);
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .sig-group-label,
+.desktop-view .dt-pane-sync .dtv2-session .sig-field-label {
+  font-size: var(--dt-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .sig-input {
+  border-radius: var(--radius-sm);
+  font-size: var(--dt-text);
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .sig-hint {
+  font-size: var(--dt-label);
+  line-height: 1.6;
+}
+
+.desktop-view .dt-pane-sync .dtv2-session .sig-btn {
+  font-size: var(--dt-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ── Client table ─────────────────────────────────────────────────────── */
+
+/* Numeric columns right-align and use tabular figures, so a column of
+   RTT/drift values scans as a straight edge. */
+.desktop-view .dt-pane-sync .dtv2-client-table .dtv2-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The camera name is the row's anchor, so it is the one strong cell. */
+.desktop-view .dt-pane-sync .dtv2-client-table td:first-child {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-bright);
+}
+
+/* Status reads as a labelled chip: dot plus uppercase letter-spaced text.
+   The dot colours themselves are untouched (ok/warn/offline semantics). */
+.desktop-view .dt-pane-sync .dtv2-client-table td.dtv2-status {
+  font-size: var(--dt-label);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.desktop-view .dt-pane-sync .dtv2-client-table .dt-dot {
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+}
+
+/* Rows get a hover transition; offline rows stay the faded ones. */
+.desktop-view .dt-pane-sync .dtv2-client-table tbody tr {
+  transition: background 0.12s ease;
+}
+
+.desktop-view .dt-pane-sync .dtv2-client-table tbody tr.offline td {
+  opacity: 0.45;
+}
