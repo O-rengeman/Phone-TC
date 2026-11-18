@@ -1,6 +1,12 @@
+import { useEffect, useState } from 'react';
 import { useLTC } from '../../LTCSyncContext';
 import { DesktopPanel, DesktopSection } from './DesktopPanel';
 import { MarkerSyncBadge } from '../MarkerSyncBadge';
+import { MarkerTimeline } from '../MarkerTimeline';
+import { FPS_OPTIONS } from '../../constants';
+
+// Playhead refresh — the live TC lives in refs by design, so poll lazily.
+const PLAYHEAD_POLL_MS = 500;
 
 /**
  * The take log: markers laid down during a shot, the metadata that ends up in
@@ -13,11 +19,25 @@ import { MarkerSyncBadge } from '../MarkerSyncBadge';
 export function MarkersPane() {
   const {
     markers, removeMarker, updateMarkerComment, exportToEDL, exportToALE,
-    exportToFCPXML, exportToResolve, exportToCSV,
+    exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO,
+    recallTimecode, fpsIndex, isRunning, engineRef, currentTcRef,
     defaultReelName, setDefaultReelName, sceneName, setSceneName,
     userBits, setUserBits, autoUserBits, setAutoUserBits,
     tr,
   } = useLTC();
+
+  const [playheadTc, setPlayheadTc] = useState('');
+  useEffect(() => {
+    const tick = () => {
+      const engine = engineRef.current;
+      setPlayheadTc(isRunning ? currentTcRef.current : (engine ? engine.getTimecodeString() : ''));
+    };
+    tick();
+    const id = window.setInterval(tick, PLAYHEAD_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [isRunning, engineRef, currentTcRef]);
+
+  const fpsOption = FPS_OPTIONS[fpsIndex];
 
   return (
     <div className="dt-pane dt-pane-markers">
@@ -75,6 +95,7 @@ export function MarkersPane() {
             <button type="button" className="dt-btn" onClick={exportToFCPXML} disabled={markers.length === 0}>FCPXML</button>
             <button type="button" className="dt-btn" onClick={exportToResolve} disabled={markers.length === 0}>Resolve</button>
             <button type="button" className="dt-btn" onClick={exportToCSV} disabled={markers.length === 0}>CSV</button>
+            <button type="button" className="dt-btn" onClick={exportToOTIO} disabled={markers.length === 0}>OTIO</button>
           </div>
           <p className="dt-hint">{tr('dt.hint.reelScene')}</p>
         </DesktopSection>
@@ -86,6 +107,14 @@ export function MarkersPane() {
         grow
         scroll
       >
+        <MarkerTimeline
+          markers={markers}
+          fps={fpsOption.value}
+          drop={fpsOption.drop}
+          onRecall={recallTimecode}
+          tr={tr}
+          currentTc={playheadTc}
+        />
         {markers.length === 0 ? (
           <div className="dt-empty">
             <strong>{tr('markers.none')}</strong>

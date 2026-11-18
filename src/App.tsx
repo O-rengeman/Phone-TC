@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useCallback, useEffect, useState, lazy, Suspense } from 'react';
 import { LTCSyncProvider, useLTC } from './LTCSyncContext';
 import { FPS_OPTIONS } from './constants';
 import { VideoPlayer } from './VideoPlayer';
@@ -12,6 +12,7 @@ import { HelpButton } from './components/HelpButton';
 import { FooterControls } from './components/FooterControls';
 import { MarkerList } from './components/MarkerList';
 import { ClientList } from './components/ClientList';
+import { PresetsPanel } from './components/PresetsPanel';
 import { PwaRegister } from './components/PwaRegister';
 import { LivePreflightScreen } from './components/PreflightScreen';
 import './App.css';
@@ -72,7 +73,8 @@ function MainApp() {
     updateMarkerComment,
     exportToEDL,
     exportToALE,
-    exportToFCPXML, exportToResolve, exportToCSV,
+    exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO,
+    recallTimecode,
     handleSlateClick,
     handleStartStop,
     handlePause,
@@ -80,7 +82,17 @@ function MainApp() {
     cancelStopHold,
     handleManualResync,
     holdStoppedRef,
+    engineRef,
+    currentTcRef,
   } = useLTC();
+
+  // Live TC for the marker-timeline playhead — same source VideoPlayer uses:
+  // the worklet-fed ref while running, the engine's TC while idle.
+  const getCurrentTc = useCallback(() => {
+    const engine = engineRef.current;
+    if (!engine) return '';
+    return isRunning ? currentTcRef.current : engine.getTimecodeString();
+  }, [isRunning, engineRef, currentTcRef]);
 
   const handleOutputModeChange = (mode: 'stereo' | 'mono-l') => {
     setOutputMode(mode);
@@ -292,6 +304,8 @@ function MainApp() {
               </div>
             </section>
 
+            <PresetsPanel />
+
             <MarkerList
               markers={markers}
               addMarker={addMarker}
@@ -302,6 +316,10 @@ function MainApp() {
               exportToFCPXML={exportToFCPXML}
               exportToResolve={exportToResolve}
               exportToCSV={exportToCSV}
+              exportToOTIO={exportToOTIO}
+              recallTimecode={recallTimecode}
+              fpsIndex={fpsIndex}
+              getCurrentTc={getCurrentTc}
               isMobile={isMobile}
               tr={tr}
             />

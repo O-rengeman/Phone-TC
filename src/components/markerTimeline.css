@@ -1,0 +1,105 @@
+/*
+ * MarkerTimeline — horizontal take-log strip.
+ *
+ * Self-contained styles with the `mtl-` prefix: the app's global sheets
+ * (App.css / index.css / desktop.css) are shared with other features, so this
+ * component owns its styling here. Works in both the mobile tools tab and the
+ * desktop console — the `.desktop-view` rules only tighten the strip for the
+ * denser 1080p console; everything else inherits the app's dark tokens.
+ */
+
+.mtl {
+  padding: 2px 4px 8px;
+}
+
+.mtl-track {
+  position: relative;
+  height: 56px;
+}
+
+/* The rail the dots sit on. */
+.mtl-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  border-radius: 1px;
+  background: var(--border-strong, rgba(255, 255, 255, 0.15));
+}
+
+/*
+ * Each dot is a transparent button whose visible centre is the coloured
+ * .mtl-dot-fill span — the button itself stays ~32px so the touch target
+ * clears 24px on phones while the dot stays small enough to read position.
+ */
+.mtl-dot {
+  position: absolute;
+  top: 50%;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mtl-dot-fill {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.55),
+    0 1px 4px rgba(0, 0, 0, 0.6);
+  transition: transform 0.12s ease;
+}
+
+.mtl-dot:hover .mtl-dot-fill,
+.mtl-dot:focus-visible .mtl-dot-fill {
+  transform: scale(1.25);
+}
+
+.mtl-dot:focus-visible {
+  outline: 2px solid var(--primary, #ffffff);
+  outline-offset: -2px;
+  border-radius: 50%;
+}
+
+/* Live-TC playhead: a thin vertical rule above the rail. */
+.mtl-playhead {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: var(--primary, #ffffff);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+}
+
+/* Desktop console: the strip lives inside a scrolling panel, so keep it a
+   touch shorter and let it sit flush with the panel padding. */
+.desktop-view .mtl {
+  padding: 0 0 6px;
+}
+
+.desktop-view .mtl-track {
+  height: 44px;
+}
+
+.desktop-view .mtl-dot {
+  width: 28px;
+  height: 28px;
+}
+
+.desktop-view .mtl-dot-fill {
+  width: 11px;
+  height: 11px;
+}

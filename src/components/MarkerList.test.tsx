@@ -36,6 +36,9 @@ describe('MarkerList', () => {
     exportToFCPXML: vi.fn(),
     exportToResolve: vi.fn(),
     exportToCSV: vi.fn(),
+    exportToOTIO: vi.fn(),
+    recallTimecode: vi.fn(),
+    fpsIndex: 2,
     isMobile: false,
     tr: (key: string, vars?: Record<string, string | number>) =>
       key === 'marker.sceneTake' ? `Sc.${vars?.scene} Tk.${vars?.take}` : key,
@@ -93,12 +96,12 @@ describe('MarkerList', () => {
     const aleBtn = screen.getByText('ALE').closest('button');
     expect(edlBtn?.getAttribute('disabled')).not.toBeNull();
     expect(aleBtn?.getAttribute('disabled')).not.toBeNull();
-    for (const label of ['FCPXML', 'Resolve', 'CSV']) {
+    for (const label of ['FCPXML', 'Resolve', 'CSV', 'OTIO']) {
       expect(screen.getByText(label).closest('button')?.disabled).toBe(true);
     }
   });
 
-  it.each(['FCPXML', 'Resolve', 'CSV'] as const)('exports %s', label => {
+  it.each(['FCPXML', 'Resolve', 'CSV', 'OTIO'] as const)('exports %s', label => {
     const callback = vi.fn();
     render(<MarkerList {...baseProps} markers={[makeMarker()]} {...{ [`exportTo${label}`]: callback }} />);
     fireEvent.click(screen.getByText(label));

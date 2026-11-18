@@ -123,4 +123,17 @@ function resolveTurnConfig(): TurnConfigInput | null {
   };
 }
 
-export const ICE_SERVERS: RTCIceServer[] = buildIceServers(resolveTurnConfig());
+/**
+ * Resolves the ICE server list at call time. PeerSync calls this each time it
+ * constructs a Peer, so a TURN override saved from the app's Advanced panel
+ * takes effect on the next P2P connect without an app reload.
+ */
+export function getIceServers(): RTCIceServer[] {
+  return buildIceServers(resolveTurnConfig());
+}
+
+/**
+ * Snapshot taken at module load — kept for consumers that want the list once.
+ * New code should prefer getIceServers() so storage edits are picked up.
+ */
+export const ICE_SERVERS: RTCIceServer[] = getIceServers();

@@ -1,6 +1,7 @@
 import { useLTC } from '../../LTCSyncContext';
 import { FPS_OPTIONS } from '../../constants';
 import { DesktopPanel, DesktopSection } from './DesktopPanel';
+import { PresetsPanel } from '../PresetsPanel';
 
 interface TimecodePaneProps {
   onOutputModeChange: (mode: 'stereo' | 'mono-l') => void;
@@ -133,6 +134,10 @@ export function TimecodePane({ onOutputModeChange }: TimecodePaneProps) {
             <span className="dt-readout">{userBits}{autoUserBits ? ' · AUTO' : ''}</span>
           </div>
           <p className="dt-hint">{tr('dt.hint.startTc')}</p>
+        </DesktopSection>
+
+        <DesktopSection title={tr('preset.title')}>
+          <PresetsPanel />
         </DesktopSection>
 
         <p className="dt-hint dt-hint-keys">{tr('dt.hint.transport')}</p>
