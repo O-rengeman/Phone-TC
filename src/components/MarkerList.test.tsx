@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MarkerList } from './MarkerList';
 import type { Marker } from '../utils/export';
 
@@ -176,5 +176,19 @@ describe('MarkerList', () => {
     );
     expect(document.querySelector('.mobile-pager')).toBeNull();
     expect(screen.getByText('01:00:01:00')).toBeTruthy();
+  });
+
+  it('polls getCurrentTc for the playhead once on mount and on each interval', () => {
+    vi.useFakeTimers();
+    try {
+      const getCurrentTc = vi.fn(() => '01:00:00:00');
+      render(<MarkerList {...baseProps} getCurrentTc={getCurrentTc} />);
+      expect(getCurrentTc).toHaveBeenCalledTimes(1);
+
+      act(() => { vi.advanceTimersByTime(1000); });
+      expect(getCurrentTc.mock.calls.length).toBeGreaterThanOrEqual(8);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

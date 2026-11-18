@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { markerTimelineLayout, parseTcFrame } from './markerTimeline';
+import {
+  LIVE_TIMELINE_FUTURE_SECONDS,
+  LIVE_TIMELINE_PAST_SECONDS,
+  liveMarkerTimelineLayout,
+  markerTimelineLayout,
+  parseTcFrame,
+} from './markerTimeline';
 import { FPS_OPTIONS } from '../constants';
 import type { Marker } from './export';
 
@@ -119,5 +125,108 @@ describe('markerTimelineLayout', () => {
     // Drop-frame labels skip frames: 00:01:00;02 → 1800, 00:02:00;02 → 3598.
     expect(layout.items.map(i => i.frame)).toEqual([1800, 3598]);
     expect(layout.items[0].leftPct).toBeLessThan(layout.items[1].leftPct);
+  });
+});
+
+describe('liveMarkerTimelineLayout', () => {
+  it('anchors the playhead ~75% with default windows around currentFrame at 24fps', () => {
+    const currentFrame = 24 * 200; // 4800
+    const layout = liveMarkerTimelineLayout([], FPS_24.value, FPS_24.drop, currentFrame);
+    const pastFrames = Math.round(LIVE_TIMELINE_PAST_SECONDS * FPS_24.value); // 2880
+    const futureFrames = Math.round(LIVE_TIMELINE_FUTURE_SECONDS * FPS_24.value); // 960
+    expect(layout.viewMinFrame).toBe(currentFrame - pastFrames);
+    expect(layout.viewMaxFrame).toBe(currentFrame + futureFrames);
+    expect(layout.playheadPct).toBeCloseTo(75, 5);
+    expect(layout.items).toEqual([]);
+    expect(layout.skippedCount).toBe(0);
+    expect(layout.outsideCount).toBe(0);
+  });
+
+  it('positions in-window markers monotonically within (0,100)', () => {
+    const currentFrame = 24 * 10; // 240 — window [-2640, 1200]
+    const markers = [
+      makeMarker({ id: 3, tc: '00:00:20:00' }), // 480
+      makeMarker({ id: 1, tc: '00:00:05:00' }), // 120
+      makeMarker({ id: 2, tc: '00:00:10:00' }), // 240
+    ];
+    const layout = liveMarkerTimelineLayout(markers, FPS_24.value, FPS_24.drop, currentFrame);
+    expect(layout.items.map(i => i.marker.id)).toEqual([1, 2, 3]);
+    const pcts = layout.items.map(i => i.leftPct);
+    for (let i = 1; i < pcts.length; i += 1) {
+      expect(pcts[i]).toBeGreaterThan(pcts[i - 1]);
+    }
+    for (const pct of pcts) {
+      expect(pct).toBeGreaterThan(0);
+      expect(pct).toBeLessThan(100);
+    }
+    expect(layout.outsideCount).toBe(0);
+  });
+
+  it('excludes markers outside the window and counts them in outsideCount', () => {
+    const currentFrame = 24 * 10; // 240 — window [-2640, 1200]
+    const markers = [
+      makeMarker({ id: 1, tc: '00:00:05:00' }), // 120 — inside
+      makeMarker({ id: 2, tc: '00:03:00:00' }), // 4320 — outside (future)
+      makeMarker({ id: 3, tc: '01:00:00:00' }), // 86400 — outside (future)
+    ];
+    const layout = liveMarkerTimelineLayout(markers, FPS_24.value, FPS_24.drop, currentFrame);
+    expect(layout.items.map(i => i.marker.id)).toEqual([1]);
+    expect(layout.outsideCount).toBe(2);
+  });
+
+  it('slides the window with currentFrame: same marker, new leftPct, same playheadPct', () => {
+    const markers = [makeMarker({ id: 1, tc: '00:00:10:00' })]; // frame 240
+    const before = liveMarkerTimelineLayout(markers, FPS_24.value, FPS_24.drop, 240);
+    const after = liveMarkerTimelineLayout(markers, FPS_24.value, FPS_24.drop, 2400);
+    expect(before.items).toHaveLength(1);
+    expect(after.items).toHaveLength(1);
+    expect(after.items[0].leftPct).not.toBeCloseTo(before.items[0].leftPct, 5);
+    expect(after.playheadPct).toBeCloseTo(before.playheadPct, 5);
+    // The window itself moved by exactly the currentFrame delta.
+    expect(after.viewMinFrame - before.viewMinFrame).toBe(2160);
+    expect(after.viewMaxFrame - before.viewMaxFrame).toBe(2160);
+  });
+
+  it('counts unparseable TCs in skippedCount with a warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const markers = [
+      makeMarker({ id: 2, tc: 'bogus' }),
+      makeMarker({ id: 1, tc: '00:00:05:00' }),
+    ];
+    const layout = liveMarkerTimelineLayout(markers, FPS_24.value, FPS_24.drop, 240);
+    expect(layout.items).toHaveLength(1);
+    expect(layout.skippedCount).toBe(1);
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it('honours custom pastFrames/futureFrames for the playhead anchor and window', () => {
+    const layout = liveMarkerTimelineLayout([], FPS_24.value, FPS_24.drop, 1000, {
+      pastFrames: 100,
+      futureFrames: 100,
+    });
+    expect(layout.playheadPct).toBeCloseTo(50, 5);
+    expect(layout.viewMinFrame).toBe(900);
+    expect(layout.viewMaxFrame).toBe(1100);
+    const asymmetric = liveMarkerTimelineLayout([], FPS_24.value, FPS_24.drop, 1000, {
+      pastFrames: 300,
+      futureFrames: 100,
+    });
+    expect(asymmetric.playheadPct).toBeCloseTo(75, 5);
+  });
+
+  it('handles drop-frame rates using the drop flag', () => {
+    const markers = [
+      makeMarker({ id: 2, tc: '00:02:00;02' }), // 3598
+      makeMarker({ id: 1, tc: '00:01:00;02' }), // 1800
+      makeMarker({ id: 3, tc: '01:00:00;00' }), // far future — outside
+    ];
+    const layout = liveMarkerTimelineLayout(markers, FPS_2997DF.value, FPS_2997DF.drop, 3598);
+    const pastFrames = Math.round(LIVE_TIMELINE_PAST_SECONDS * FPS_2997DF.value);
+    const futureFrames = Math.round(LIVE_TIMELINE_FUTURE_SECONDS * FPS_2997DF.value);
+    expect(layout.viewMinFrame).toBe(3598 - pastFrames);
+    expect(layout.viewMaxFrame).toBe(3598 + futureFrames);
+    expect(layout.items.map(i => i.frame)).toEqual([1800, 3598]);
+    expect(layout.items[0].leftPct).toBeLessThan(layout.items[1].leftPct);
+    expect(layout.outsideCount).toBe(1);
   });
 });
