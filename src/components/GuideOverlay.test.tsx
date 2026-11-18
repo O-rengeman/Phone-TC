@@ -73,4 +73,13 @@ describe('GuideOverlay', () => {
       expect(baseProps.setShowGuide).not.toHaveBeenCalled();
     }
   });
+
+  it('adds the v2 sheet classes only on mobile', () => {
+    const { container, rerender } = render(<GuideOverlay {...baseProps} />);
+    expect(container.querySelector('.guide-overlay-v2')).toBeNull();
+    expect(container.querySelector('.guide-card-v2')).toBeNull();
+    rerender(<GuideOverlay {...baseProps} isMobile />);
+    expect(container.querySelector('.guide-overlay-v2')).toBeTruthy();
+    expect(container.querySelector('.guide-card-v2')).toBeTruthy();
+  });
 });

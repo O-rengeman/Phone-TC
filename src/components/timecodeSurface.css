@@ -1,0 +1,389 @@
+/* ============================================================
+   Mobile timecode-surface / transport / VU / slate refresh (v2).
+   Every selector is scoped to `.mobile-view` + a v2 class, so the
+   rules win on specificity even though this file loads before
+   App.css, and the desktop layout is never touched.
+
+   Color semantics are unchanged: timecode stays white, REC/stop
+   red, start green, preparing amber, markers red/blue/green/
+   yellow, VU green → amber → red. Only shape, size, spacing,
+   opacity, borders, shadows, and typography are new.
+   ============================================================ */
+
+/* ── Hero timecode card ── */
+.mobile-view .timecode-card-pro.tc-card-v2 {
+  aspect-ratio: 4 / 1.4;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008)),
+    #050505;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 14px 34px rgba(0, 0, 0, 0.45);
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-view .timecode-card-pro.tc-card-v2 {
+    aspect-ratio: auto;
+    min-height: 96px;
+    max-height: 116px;
+    border-radius: 14px;
+  }
+}
+
+/* Info strip: labelled chips instead of one bare text row. */
+.mobile-view .info-strip-pro.info-strip-v2 {
+  bottom: 7px;
+  gap: 6px;
+  padding: 0 8px;
+  opacity: 1;
+}
+
+.mobile-view .info-strip-v2 .v2-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  text-shadow: none;
+  min-width: 0;
+}
+
+.mobile-view .info-strip-v2 .v2-k {
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #8a8a8a;
+}
+
+.mobile-view .info-strip-v2 .v2-v {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* The drift chip keeps the ok/warn semantics: .v2-k/.v2-v carry explicit
+   colours that would otherwise mask the .info-label.ok/.warn colour the
+   chip inherits from App.css. */
+.mobile-view .info-strip-v2 .v2-chip.ok .v2-k,
+.mobile-view .info-strip-v2 .v2-chip.ok .v2-v {
+  color: var(--success);
+}
+
+.mobile-view .info-strip-v2 .v2-chip.warn .v2-k,
+.mobile-view .info-strip-v2 .v2-chip.warn .v2-v {
+  color: var(--danger);
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-view .info-strip-pro.info-strip-v2 {
+    bottom: 4px;
+    gap: 4px;
+  }
+  .mobile-view .info-strip-v2 .v2-chip {
+    padding: 2px 6px;
+  }
+  .mobile-view .info-strip-v2 .v2-v {
+    font-size: 0.62rem;
+  }
+  .mobile-view .info-strip-v2 .v2-k {
+    font-size: 0.46rem;
+  }
+}
+
+/* ── Transport bar (START / HOLD TO STOP / PAUSE / MARK) ── */
+.mobile-view .fixed-footer.transport-v2 {
+  padding: 10px 12px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
+    var(--bg);
+}
+
+.mobile-view .transport-v2 .footer-buttons {
+  gap: 10px;
+  align-items: stretch;
+}
+
+.mobile-view .transport-v2 .footer-left {
+  gap: 8px;
+}
+
+.mobile-view .transport-v2 .footer-right {
+  gap: 6px;
+  justify-content: center;
+}
+
+.mobile-view .transport-v2 .mark-label {
+  font-size: 0.6rem;
+  letter-spacing: 3px;
+  color: #8a8a8a;
+}
+
+/* 44px-class primary targets with a readable label. */
+.mobile-view .transport-v2 .btn-main-action {
+  min-height: 56px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  gap: 12px;
+}
+
+.mobile-view .transport-v2 .btn-main-action.pause {
+  min-height: 46px;
+  padding: 10px 16px;
+  border-radius: 14px;
+}
+
+.mobile-view .transport-v2 .btn-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.mobile-view .transport-v2 .btn-text {
+  font-size: 0.95rem;
+  letter-spacing: 2.5px;
+}
+
+/* Hold-to-stop progress: same red, clearer leading edge. */
+.mobile-view .transport-v2 .stop-hold-fill {
+  background: linear-gradient(90deg, rgba(255, 59, 113, 0.5), rgba(255, 59, 113, 0.28));
+  border-right: 2px solid rgba(255, 59, 113, 0.8);
+}
+
+/* Marker cluster: 2×2 labelled colour tiles, 44px-class. */
+.mobile-view .transport-v2 .mark-colors-container {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 6px;
+}
+
+.mobile-view .transport-v2 .btn-mark-color {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: rgba(0, 0, 0, 0.72);
+  box-shadow:
+    0 3px 10px rgba(0, 0, 0, 0.45),
+    inset 0 1px 1px rgba(255, 255, 255, 0.25);
+}
+
+.mobile-view .transport-v2 .btn-mark-color::after {
+  display: none;
+}
+
+.mobile-view .transport-v2 .btn-mark-color:active {
+  transform: scale(0.9);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25), 0 3px 10px rgba(0, 0, 0, 0.45);
+}
+
+/* Landscape: keep the slim single-row transport, still readable. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-view .fixed-footer.transport-v2 {
+    padding: 4px 8px;
+    padding-bottom: calc(4px + env(safe-area-inset-bottom));
+  }
+  .mobile-view .transport-v2 .footer-buttons {
+    gap: 8px;
+    align-items: center;
+  }
+  .mobile-view .transport-v2 .footer-left {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .mobile-view .transport-v2 .footer-right {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+  .mobile-view .transport-v2 .mark-label {
+    display: none;
+  }
+  .mobile-view .transport-v2 .mark-colors-container {
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: 1fr;
+    gap: 6px;
+  }
+  .mobile-view .transport-v2 .btn-mark-color {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    font-size: 0.8rem;
+  }
+  .mobile-view .transport-v2 .btn-main-action {
+    min-height: 38px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    gap: 8px;
+  }
+  .mobile-view .transport-v2 .btn-main-action.pause {
+    min-height: 38px;
+    padding: 8px 12px;
+  }
+  .mobile-view .transport-v2 .btn-text {
+    font-size: 0.75rem;
+    letter-spacing: 1.5px;
+  }
+  .mobile-view .transport-v2 .btn-icon {
+    width: 11px;
+    height: 11px;
+  }
+}
+
+/* Narrow portrait: the 4-colour MARK tiles are primary targets, so they
+   stay 44px-class — squeeze the surrounding gaps and the action column
+   instead. */
+@media (max-width: 360px) {
+  .mobile-view .transport-v2 .mark-colors-container {
+    gap: 4px;
+  }
+  .mobile-view .transport-v2 .footer-left {
+    gap: 6px;
+  }
+  .mobile-view .transport-v2 .footer-buttons {
+    gap: 8px;
+  }
+  .mobile-view .transport-v2 .btn-main-action {
+    padding: 12px 10px;
+    gap: 8px;
+  }
+  .mobile-view .transport-v2 .btn-text {
+    font-size: 0.82rem;
+    letter-spacing: 1.5px;
+  }
+}
+
+/* ── Mono-L VU meter ── */
+.mobile-view .vu-meter-row.vu-v2 {
+  gap: 10px;
+}
+
+.mobile-view .vu-v2 .vu-meter-track {
+  height: 12px;
+  border-radius: 6px;
+  background: #0d0d0d;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Hairline at the amber hand-off (~70%) so level zones read at a glance. */
+.mobile-view .vu-v2 .vu-meter-track::after {
+  content: "";
+  position: absolute;
+  left: 70%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.15);
+  pointer-events: none;
+}
+
+.mobile-view .vu-v2 .vu-bar-fill {
+  background: linear-gradient(90deg, #22cc55 0%, #f5a623 70%, #ff3b30 95%);
+  border-radius: 5px;
+  box-shadow: 0 0 8px rgba(34, 204, 85, 0.35);
+}
+
+.mobile-view .vu-v2 .vu-clip-badge {
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  box-shadow: 0 0 10px rgba(255, 59, 48, 0.55);
+}
+
+/* ── Visual slate (full-screen clap overlay) ── */
+.mobile-view .visual-slate-overlay.slate-v2 {
+  padding:
+    env(safe-area-inset-top)
+    env(safe-area-inset-right)
+    env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+.mobile-view .slate-v2 .slate-content {
+  padding: 0 14px;
+  max-height: 100%;
+}
+
+.mobile-view .slate-v2 .slate-tc {
+  font-size: min(16.5vw, 26vh);
+  text-shadow: 0 0 60px rgba(255, 255, 255, 0.25);
+}
+
+/* REEL / SCENE / TAKE as chips under the timecode. */
+.mobile-view .slate-v2 .slate-metadata-row {
+  gap: 8px 14px;
+  margin: 18px 0 10px;
+}
+
+.mobile-view .slate-v2 .slate-metadata-row > div {
+  font-family: var(--font-mono);
+  font-size: clamp(0.85rem, 4vw, 1.5rem);
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  padding: 5px 12px;
+  white-space: nowrap;
+}
+
+.mobile-view .slate-v2 .slate-info {
+  margin-top: min(14px, 1.5vh);
+  font-size: 3.2vw;
+  letter-spacing: 3px;
+  color: #8a8a8a;
+}
+
+.mobile-view .slate-v2 .slate-qr {
+  margin-top: min(34px, 3.5vh);
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 0 60px rgba(255, 255, 255, 0.12);
+}
+
+.mobile-view .slate-v2 .slate-qr canvas {
+  display: block;
+  /* qrcode.react paints an inline `style="height:256px;width:256px"` on the
+     canvas — only !important beats it, so the viewport clamp below actually
+     applies (the bitmap itself stays 256px and downscales cleanly). */
+  width: min(52vw, 26vh) !important;
+  height: auto !important;
+  image-rendering: pixelated;
+}
+
+/* "TAP ANYWHERE TO CLAP" sits in the flow under the QR. */
+.mobile-view .slate-v2 .slate-close {
+  position: static;
+  margin-top: min(28px, 3vh);
+  font-size: 0.72rem;
+  letter-spacing: 4px;
+  opacity: 0.55;
+}
+
+/* 48px close target in the top corner, clear of the TC. */
+.mobile-view .slate-v2 .slate-close-btn {
+  width: 48px;
+  height: 48px;
+  top: calc(10px + env(safe-area-inset-top));
+  right: calc(10px + env(safe-area-inset-right));
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 50%;
+  background: rgba(10, 10, 10, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-size: 1.5rem;
+  line-height: 1;
+}

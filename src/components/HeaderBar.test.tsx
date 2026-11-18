@@ -71,4 +71,24 @@ describe('HeaderBar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'preflight.open' }));
     expect(onOpenPreflight).toHaveBeenCalledOnce();
   });
+
+  it('renders the compact v2 chrome on mobile', () => {
+    const { container } = render(<HeaderBar {...baseProps} isMobile />);
+    expect(container.querySelector('header.header-v2')).toBeTruthy();
+    expect(container.querySelector('.hdr-v2-tray')).toBeTruthy();
+    // FPS·MODE meta and the divider are dropped from the mobile bar.
+    expect(container.querySelector('.status-meta')).toBeNull();
+    expect(container.querySelector('.hdr-divider')).toBeNull();
+    expect(screen.getByText('status.ready')).toBeTruthy();
+  });
+
+  it('keeps the same callbacks in the mobile chrome', () => {
+    const setShowGuide = vi.fn();
+    const onOpenPreflight = vi.fn();
+    render(<HeaderBar {...baseProps} isMobile setShowGuide={setShowGuide} onOpenPreflight={onOpenPreflight} />);
+    fireEvent.click(screen.getByText('?'));
+    fireEvent.click(screen.getByRole('button', { name: 'preflight.open' }));
+    expect(setShowGuide).toHaveBeenCalledOnce();
+    expect(onOpenPreflight).toHaveBeenCalledOnce();
+  });
 });

@@ -1,0 +1,492 @@
+/*
+ * mobileTools.css — mobile refresh for the TOOLS tab
+ * (Quick Mark, take log, exports, marker timeline, presets, clients).
+ *
+ * Imported from MarkerList.tsx, which lands in the bundle BEFORE App.css —
+ * so every rule here is gated on `.mobile-view` plus a package-owned `*-v2`
+ * class. The extra class keeps specificity above the legacy `.mobile-view .x`
+ * selectors in App.css (source order would otherwise defeat equal-specificity
+ * overrides) and guarantees zero bleed into `.desktop-view`.
+ *
+ * Colour distribution is preserved: Quick Mark keeps the red/blue/green/
+ * yellow marker hues, client presence stays green=online / muted=offline,
+ * and drift warnings keep var(--danger). Only geometry, opacity, shape,
+ * spacing, shadows and typography were reworked.
+ */
+
+/* ─────────────────────────────────────────────────────────────
+   Quick Mark — four large tinted cards, one per marker colour.
+   ───────────────────────────────────────────────────────────── */
+.mobile-view .tool-section-shell.quick-marks-v2 {
+  gap: 8px;
+}
+
+/* `.tool-section-shell` in the chain beats App.css's
+   `.mobile-view .tool-section-shell-marks .marker-buttons-grid` (equal
+   specificity would lose to its later source order). */
+.mobile-view .tool-section-shell.quick-marks-v2 .marker-buttons-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 0;
+}
+
+.mobile-view .quick-marks-v2 .btn-mark-large {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 66px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  font-size: 0.92rem;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-align: left;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 6px 16px rgba(0, 0, 0, 0.35);
+  transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.mobile-view .quick-marks-v2 .btn-mark-large .qmk-swatch {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+}
+
+.mobile-view .quick-marks-v2 .btn-mark-large .qmk-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Same marker hues as before, re-expressed as dark tinted cards:
+   coloured swatch + border + label on the elevated panel surface. */
+.mobile-view .quick-marks-v2 .btn-mark-large.red {
+  color: #ff6b8e;
+  border-color: rgba(255, 59, 113, 0.45);
+  background: rgba(255, 59, 113, 0.10);
+}
+.mobile-view .quick-marks-v2 .btn-mark-large.blue {
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.10);
+}
+.mobile-view .quick-marks-v2 .btn-mark-large.green {
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.10);
+}
+.mobile-view .quick-marks-v2 .btn-mark-large.yellow {
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.10);
+}
+
+.mobile-view .quick-marks-v2 .btn-mark-large.red .qmk-swatch {
+  background: #ff3b71;
+  box-shadow: 0 0 10px rgba(255, 59, 113, 0.55);
+}
+.mobile-view .quick-marks-v2 .btn-mark-large.blue .qmk-swatch {
+  background: #3b82f6;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.55);
+}
+.mobile-view .quick-marks-v2 .btn-mark-large.green .qmk-swatch {
+  background: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.55);
+}
+.mobile-view .quick-marks-v2 .btn-mark-large.yellow .qmk-swatch {
+  background: #f59e0b;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.55);
+}
+
+.mobile-view .quick-marks-v2 .btn-mark-large:active {
+  transform: scale(0.97);
+}
+.mobile-view .quick-marks-v2 .btn-mark-large.red:active    { background: rgba(255, 59, 113, 0.22); }
+.mobile-view .quick-marks-v2 .btn-mark-large.blue:active   { background: rgba(59, 130, 246, 0.22); }
+.mobile-view .quick-marks-v2 .btn-mark-large.green:active  { background: rgba(16, 185, 129, 0.22); }
+.mobile-view .quick-marks-v2 .btn-mark-large.yellow:active { background: rgba(245, 158, 11, 0.22); }
+
+/* ─────────────────────────────────────────────────────────────
+   Take log header — label on top, export chips in a single
+   horizontally-scrollable row so narrow widths never crush them.
+   ───────────────────────────────────────────────────────────── */
+.mobile-view .tool-section-shell.take-log-v2 {
+  gap: 10px;
+}
+
+.mobile-view .take-log-v2 .take-log-head-v2 {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin-bottom: 0;
+}
+
+.mobile-view .take-log-v2 .export-chips-v2 {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin-top: 0;
+  padding-bottom: 2px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.mobile-view .take-log-v2 .export-chips-v2::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-view .take-log-v2 .export-chips-v2 .btn-export-pro {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 8px 15px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  letter-spacing: 0.8px;
+  background: var(--panel-elevated);
+}
+.mobile-view .take-log-v2 .export-chips-v2 .btn-export-pro:active {
+  border-color: var(--primary);
+  color: var(--text-bright);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Marker timeline — bigger dots and playhead for touch.
+   (markerTimeline.css loads before this file; `.mtl-v2` keeps the
+   overrides strictly on the mobile mount.)
+   ───────────────────────────────────────────────────────────── */
+.mobile-view .mtl-v2 .mtl {
+  padding: 2px 0 10px;
+}
+
+.mobile-view .mtl-v2 .mtl-track {
+  height: 66px;
+  margin: 0 8px;             /* keeps edge dots inside the shell padding */
+}
+
+.mobile-view .mtl-v2 .mtl-dot {
+  width: 44px;
+  height: 44px;
+}
+
+.mobile-view .mtl-v2 .mtl-dot-fill {
+  width: 16px;
+  height: 16px;
+  box-shadow:
+    0 0 0 3px rgba(0, 0, 0, 0.55),
+    0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.mobile-view .mtl-v2 .mtl-dot:active .mtl-dot-fill {
+  transform: scale(1.3);
+}
+
+.mobile-view .mtl-v2 .mtl-playhead {
+  width: 3px;
+  top: 2px;
+  bottom: 2px;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Marker rows — each take is a card: colour dot + TC over take on
+   the left, wall-clock time + delete on the right, sync badge and
+   comment input beneath. The scroll region stays bounded.
+   ───────────────────────────────────────────────────────────── */
+
+/* Neutral outside the v2 rows: the wrapper adds no box of its own. */
+.m-id-block {
+  display: contents;
+}
+
+/* `.marker-scroll` in the chain beats App.css's
+   `.mobile-view .tool-section-shell .marker-scroll` (0-3-0, later order). */
+.mobile-view .take-log-v2 .marker-scroll.marker-scroll-v2 {
+  height: auto;
+  min-height: 110px;
+  max-height: min(320px, 36dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.mobile-view .take-log-v2 .empty-msg {
+  padding: 30px 16px;
+}
+
+/* `.marker-row-pro` in the chain beats App.css's `.mobile-view
+   .marker-row-pro` (equal 0-2-0 would lose to its later source order). */
+.mobile-view .marker-row-pro.marker-row-v2 {
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel-elevated);
+}
+.mobile-view .marker-row-pro.marker-row-v2:last-child {
+  border-bottom: 1px solid var(--border);
+}
+
+.mobile-view .marker-row-v2 .marker-row-left {
+  gap: 10px;
+}
+
+.mobile-view .marker-row-v2 .color-dot {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  font-size: 0.66rem;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4);
+}
+
+.mobile-view .marker-row-v2 .m-id-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.mobile-view .marker-row-v2 .m-tc {
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.mobile-view .marker-row-v2 .m-take {
+  margin-left: 0;
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+.mobile-view .marker-row-v2 .marker-row-right {
+  gap: 10px;
+}
+
+.mobile-view .marker-row-v2 .m-time {
+  font-size: 0.62rem;
+  padding-top: 2px;
+  align-self: flex-start;
+}
+
+.mobile-view .marker-row-v2 .btn-delete-marker {
+  width: 32px;
+  height: 32px;
+  font-size: 1rem;
+  border-radius: 8px;
+}
+
+.mobile-view .marker-row-v2 .m-comment-v2 {
+  display: flex;
+  flex-wrap: wrap;             /* badge drops above the input when tight */
+  align-items: center;
+  gap: 6px;
+  margin-top: 0;
+}
+
+.mobile-view .marker-row-v2 .m-comment-v2 .marker-comment-input {
+  flex: 1 1 160px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.mobile-view .take-log-v2 .marker-sync-badge {
+  font-size: 0.6rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Presets — taller save row and roomier apply/delete targets.
+   ───────────────────────────────────────────────────────────── */
+.mobile-view .preset-panel-v2 .preset-save-row {
+  gap: 8px;
+}
+
+.mobile-view .preset-panel-v2 .preset-name-input {
+  height: 44px;
+  padding: 0 14px;
+  font-size: 0.9rem;
+  border-radius: var(--radius-md);
+}
+
+.mobile-view .preset-panel-v2 .preset-save-btn {
+  min-height: 44px;
+  padding: 10px 18px;
+  font-size: 0.7rem;
+}
+
+.mobile-view .preset-panel-v2 .preset-list {
+  gap: 8px;
+  max-height: min(300px, 32dvh);
+}
+
+.mobile-view .preset-panel-v2 .preset-empty {
+  padding: 24px 12px;
+}
+
+.mobile-view .preset-panel-v2 .preset-row {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--panel-elevated);
+}
+
+.mobile-view .preset-panel-v2 .preset-row-name {
+  font-size: 0.82rem;
+}
+
+.mobile-view .preset-panel-v2 .preset-row-meta {
+  font-size: 0.6rem;
+}
+
+.mobile-view .preset-panel-v2 .preset-apply {
+  min-height: 38px;
+  padding: 8px 16px;
+  font-size: 0.66rem;
+  color: var(--text-bright);
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.mobile-view .preset-panel-v2 .preset-delete {
+  min-height: 38px;
+  padding: 8px 12px;
+  font-size: 0.66rem;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Connected clients — presence dot + chip stats; offline keeps the
+   grayscale fade, drift keeps the existing var(--danger) styling.
+   ───────────────────────────────────────────────────────────── */
+.mobile-view .clients-v2 .clients-grid {
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 10px;
+  margin-top: 0;
+}
+
+.mobile-view .client-card-v2 {
+  padding: 12px;
+  gap: 8px;
+  border-radius: var(--radius-lg);
+  background: var(--panel-elevated);
+}
+
+.mobile-view .client-card-v2 .client-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mobile-view .client-card-v2 .client-presence {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+.mobile-view .client-card-v2 .client-presence.on {
+  background: #36d399;
+  box-shadow: 0 0 6px rgba(54, 211, 153, 0.55);
+}
+.mobile-view .client-card-v2 .client-presence.off {
+  background: var(--text-muted);
+}
+
+.mobile-view .client-card-v2 .client-id {
+  font-size: 0.78rem;
+}
+
+.mobile-view .client-card-v2 .client-stats {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mobile-view .client-card-v2 .client-stats .stat {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+
+.mobile-view .client-card-v2 .client-stats .stat.drift-warn {
+  color: var(--danger);
+  font-weight: 800;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ClientList is only mounted on mobile today; if it ever lands on the
+   desktop console the presence chrome must collapse to the old layout. */
+.desktop-view .client-card-head {
+  display: contents;
+}
+.desktop-view .client-presence {
+  display: none;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Compact variants — short landscape phones and very narrow screens.
+   ───────────────────────────────────────────────────────────── */
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-view .quick-marks-v2 .btn-mark-large {
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: 0.78rem;
+    gap: 8px;
+  }
+  .mobile-view .quick-marks-v2 .btn-mark-large .qmk-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+  }
+  .mobile-view .take-log-v2 .marker-scroll.marker-scroll-v2 {
+    max-height: 44dvh;
+    min-height: 84px;
+  }
+  .mobile-view .mtl-v2 .mtl-track {
+    height: 46px;
+  }
+  .mobile-view .mtl-v2 .mtl-dot {
+    width: 36px;
+    height: 36px;
+  }
+  .mobile-view .preset-panel-v2 .preset-name-input,
+  .mobile-view .preset-panel-v2 .preset-save-btn {
+    min-height: 0;
+    height: 38px;
+  }
+}
+
+@media (max-width: 360px) {
+  .mobile-view .quick-marks-v2 .btn-mark-large {
+    min-height: 58px;
+    padding: 10px;
+    gap: 8px;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+  }
+  .mobile-view .quick-marks-v2 .btn-mark-large .qmk-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+  }
+  .mobile-view .clients-v2 .clients-grid {
+    grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  }
+}

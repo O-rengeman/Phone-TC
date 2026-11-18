@@ -70,9 +70,9 @@ export function HelpButton({ topic, tr, variant = 'panel' }: HelpButtonProps) {
       </button>
 
       {open && createPortal(
-        <div className="fhelp-overlay" onClick={() => setOpen(false)} role="presentation">
+        <div className="fhelp-overlay fhelp-overlay-v2" onClick={() => setOpen(false)} role="presentation">
           <div
-            className="fhelp-sheet"
+            className="fhelp-sheet fhelp-sheet-v2"
             onClick={event => event.stopPropagation()}
             role="dialog"
             aria-modal="true"

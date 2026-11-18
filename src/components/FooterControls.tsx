@@ -1,3 +1,5 @@
+import './timecodeSurface.css';
+
 interface FooterControlsProps {
   isRunning: boolean;
   isPreparing: boolean;
@@ -37,7 +39,7 @@ export function FooterControls({
   const hint = (label: string, key: string) => (isMobile ? label : `${label} [${key}]`);
 
   return (
-    <footer className="fixed-footer">
+    <footer className={isMobile ? "fixed-footer transport-v2" : "fixed-footer"}>
       <div className="footer-buttons">
         <div className="footer-left">
           <button

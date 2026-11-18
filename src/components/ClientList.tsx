@@ -17,7 +17,7 @@ export function ClientList({
   if (!isHost || Object.keys(clients).length === 0) return null;
 
   return (
-    <section className="tool-section-shell clients-list-section">
+    <section className="tool-section-shell clients-list-section clients-v2">
       <div className="tool-section-head">
         <label className="section-label">{tr('clients.title', { count: Object.keys(clients).length })}</label>
       </div>
@@ -26,8 +26,14 @@ export function ClientList({
           const isOffline = isClientOffline(stats, nowTick);
           const drifting = isClientDrifting(stats.drift);
           return (
-            <div key={id} className={`client-card ${isOffline ? 'offline' : ''}`}>
-              <div className="client-id">{id}</div>
+            <div key={id} className={`client-card client-card-v2 ${isOffline ? 'offline' : ''}`}>
+              <div className="client-card-head">
+                <span
+                  className={`client-presence ${isOffline ? 'off' : 'on'}`}
+                  aria-hidden="true"
+                />
+                <div className="client-id">{id}</div>
+              </div>
               <div className="client-stats">
                 <span className="stat">RTT: {stats.rtt.toFixed(0)}ms</span>
                 <span className={`stat ${drifting ? 'drift-warn' : ''}`}>

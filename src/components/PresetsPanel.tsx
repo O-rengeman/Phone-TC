@@ -22,6 +22,7 @@ import './presets.css';
 export function PresetsPanel() {
   const {
     isRunning,
+    isMobile,
     fpsIndex, volume, outputLevel, outputMode, outputOffset,
     autoUserBits, userBits, defaultReelName, sceneName, syncMode,
     setFpsIndex, setVolume, setOutputLevel, setOutputMode, setOutputOffset,
@@ -89,7 +90,7 @@ export function PresetsPanel() {
   };
 
   return (
-    <section className="tool-section-shell preset-panel">
+    <section className={`tool-section-shell preset-panel${isMobile ? ' preset-panel-v2' : ''}`}>
       <div className="tool-section-head preset-head">
         <label className="section-label">{tr('preset.title')}</label>
       </div>

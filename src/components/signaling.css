@@ -162,3 +162,61 @@
 .desktop-view .sig-btn {
   padding: 6px 8px;
 }
+
+/* ── Mobile-only geometry ─────────────────────────────────────────────
+ * `.mobile-view` additions for the same shared panel: touch-sized inputs
+ * (~44px), roomier groups and readable labels. Desktop rules above are
+ * unchanged; colours still come from the shared theme variables. */
+.mobile-view .sig-advanced-body {
+  gap: 14px;
+  padding: 12px 2px 2px;
+}
+
+.mobile-view .sig-group {
+  gap: 10px;
+  padding: 12px;
+}
+
+.mobile-view .sig-group-label {
+  font-size: 0.6rem;
+  letter-spacing: 1.8px;
+}
+
+.mobile-view .sig-field-label {
+  font-size: 0.62rem;
+}
+
+.mobile-view .sig-input {
+  min-height: 44px;
+  padding: 11px 12px;
+  font-size: 0.85rem;
+  /* Long TURN URLs / hostnames ellipsis instead of pushing layout wide. */
+  text-overflow: ellipsis;
+}
+
+.mobile-view .sig-check {
+  min-height: 44px;
+  gap: 10px;
+  font-size: 0.75rem;
+}
+
+.mobile-view .sig-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.mobile-view .sig-hint {
+  font-size: 0.6rem;
+}
+
+.mobile-view .sig-actions {
+  gap: 10px;
+}
+
+.mobile-view .sig-btn {
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
