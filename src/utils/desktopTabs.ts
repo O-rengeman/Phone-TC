@@ -6,7 +6,7 @@ import { STORAGE_KEYS } from './storage';
 // tabs exist and which one is selected are unit-testable on their own, and so
 // the shell component stays a layout concern rather than a policy one.
 
-export type DesktopTabId = 'timecode' | 'sync' | 'markers';
+export type DesktopTabId = 'timecode' | 'sync' | 'markers' | 'activity';
 
 export interface DesktopTabDef {
   id: DesktopTabId;
@@ -22,6 +22,7 @@ export const DESKTOP_TABS: readonly DesktopTabDef[] = [
   { id: 'timecode', labelKey: 'dtab.timecode', hotkey: '1' },
   { id: 'sync', labelKey: 'dtab.sync', hotkey: '2' },
   { id: 'markers', labelKey: 'dtab.markers', hotkey: '3' },
+  { id: 'activity', labelKey: 'dtab.activity', hotkey: '4' },
 ];
 
 export const DEFAULT_DESKTOP_TAB: DesktopTabId = 'timecode';
