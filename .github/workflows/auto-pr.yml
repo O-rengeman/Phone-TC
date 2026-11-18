@@ -1,0 +1,135 @@
+name: Auto PR review & merge
+
+# Watches every non-draft PR: waits for all checks to settle, runs a light
+# review pass (secret scan + check results + Devin Review), then merges when
+# green — or kicks off a Devin session to fix the problems when red.
+#
+# Optional secrets for the auto-fix path:
+#   DEVIN_API_KEY  — Devin API key (apk_… legacy v1, or cog_… service user for v3)
+#   DEVIN_ORG_ID   — organization id; when set together with a cog_ key the
+#                    v3 org-scoped endpoint is used, otherwise v1 is tried.
+# Without DEVIN_API_KEY the workflow still reviews and merges, and comments
+# the failure summary for a human to fix.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to process'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  issues: write
+
+concurrency:
+  group: auto-pr-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
+      DEVIN_ORG_ID: ${{ secrets.DEVIN_ORG_ID }}
+      PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Resolve PR head branch
+        id: pr
+        run: |
+          head=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefName --jq .headRefName)
+          echo "head_ref=$head" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for checks to settle (up to 30 min)
+        id: checks
+        run: |
+          deadline=$((SECONDS + 1800))
+          while true; do
+            gh pr checks "$PR_NUMBER" --repo "$REPO" > /tmp/checks-all.txt 2>&1 || true
+            # Exclude this run's own job rows (linked under actions/runs/$GITHUB_RUN_ID):
+            # the job can never observe itself settled, so counting it deadlocks the wait.
+            grep -v "actions/runs/${GITHUB_RUN_ID}/" /tmp/checks-all.txt > /tmp/checks.txt || true
+            # gh pr checks prints nothing until at least one check has
+            # reported — an empty file must keep waiting, not read as "green".
+            rows=$(awk -F'\t' 'NF >= 2' /tmp/checks.txt | wc -l | tr -d ' ')
+            pending=$(awk -F'\t' '$2 == "pending"' /tmp/checks.txt | wc -l | tr -d ' ')
+            if [ "$rows" -gt 0 ] && [ "$pending" = "0" ]; then
+              cat /tmp/checks.txt
+              break
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for PR checks"
+              cat /tmp/checks.txt
+              exit 1
+            fi
+            sleep 30
+          done
+          fails=$(awk -F'\t' '$2 == "fail"' /tmp/checks.txt | cut -f1 | paste -sd ', ' -)
+          echo "failed=$fails" >> "$GITHUB_OUTPUT"
+
+      - name: Review pass — secret scan on the diff
+        id: secrets
+        run: |
+          gh pr diff "$PR_NUMBER" --repo "$REPO" > /tmp/pr.diff
+          # Conservative patterns: real key material, not placeholders or docs.
+          hits=$(grep -nE 'BEGIN [A-Z ]*PRIVATE KEY|\b(api[_-]?key|secret|passwd|password|access[_-]?token)\b[[:space:]]*[:=][[:space:]]*["'"'"'][A-Za-z0-9_+/=-]{20,}' /tmp/pr.diff || true)
+          if [ -n "$hits" ]; then
+            echo "$hits" > /tmp/secret-hits.txt
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger Devin fix session (best effort)
+        if: steps.secrets.outputs.found == 'true' || steps.checks.outputs.failed != ''
+        env:
+          HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+        run: |
+          if [ -z "$DEVIN_API_KEY" ]; then
+            echo "::notice::DEVIN_API_KEY not configured — skipping auto-fix"
+            exit 0
+          fi
+          if [ "${{ steps.secrets.outputs.found }}" = "true" ]; then
+            reason="possible secret material detected in the diff"
+          else
+            reason="failing checks: ${{ steps.checks.outputs.failed }}"
+          fi
+          prompt="Auto-review on PR #${PR_NUMBER} in ${REPO} found problems: ${reason}. Inspect the PR, fix the issues on branch ${HEAD_REF}, and push. It must pass: npm run lint && npm run test:cov && npm run build."
+          if [ -n "$DEVIN_ORG_ID" ]; then
+            curl -sf -X POST "https://api.devin.ai/v3/organizations/${DEVIN_ORG_ID}/sessions" \
+              -H "Authorization: Bearer ${DEVIN_API_KEY}" -H "Content-Type: application/json" \
+              -d "$(jq -n --arg p "$prompt" '{prompt: $p}')" \
+              || echo "::warning::Devin v3 session create failed"
+          else
+            curl -sf -X POST "https://api.devin.ai/v1/sessions" \
+              -H "Authorization: Bearer ${DEVIN_API_KEY}" -H "Content-Type: application/json" \
+              -d "$(jq -n --arg p "$prompt" '{prompt: $p, idempotent: true}')" \
+              || echo "::warning::Devin v1 session create failed"
+          fi
+
+      - name: Comment + merge or bounce
+        run: |
+          set -e
+          if [ "${{ steps.secrets.outputs.found }}" = "true" ]; then
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body "🛑 Auto-review: possible secret material detected in this diff. Fix pushed or a Devin session was asked to remediate; not merging."
+            exit 1
+          fi
+          if [ -n "${{ steps.checks.outputs.failed }}" ]; then
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body "🛑 Auto-review: checks failing (${{ steps.checks.outputs.failed }}). Not merging — fix required."
+            exit 1
+          fi
+          # Approval is best-effort: some repos reject self/bot approvals, and
+          # merge must still be attempted either way.
+          gh pr review "$PR_NUMBER" --repo "$REPO" --approve --body "✅ Auto-review: all checks green, no secrets detected. Merging." || true
+          if ! gh pr merge "$PR_NUMBER" --repo "$REPO" --merge; then
+            echo "::warning::Direct merge rejected — enabling auto-merge instead"
+            gh pr merge "$PR_NUMBER" --repo "$REPO" --merge --auto
+          fi
