@@ -13,6 +13,7 @@ export type ActivityKind =
   | 'transportStart'
   | 'transportStop'
   | 'transportPause'
+  | 'transportResume'
   | 'marker'
   | 'p2p'
   | 'syncMode'
