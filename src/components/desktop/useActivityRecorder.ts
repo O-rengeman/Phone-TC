@@ -47,10 +47,15 @@ export function useActivityRecorder(): void {
     // Transport transitions. Pause lands as isPaused rising while the engine
     // is already stopped, so it is checked before the plain stop case.
     if (!prev.isRunning && isRunning) {
-      logActivity('transportStart');
+      // Rising out of pause is a resume, not a fresh start.
+      logActivity(prev.isPaused ? 'transportResume' : 'transportStart');
     } else if (prev.isRunning && !isRunning && isPaused && !prev.isPaused) {
       logActivity('transportPause');
     } else if (prev.isRunning && !isRunning && !isPaused) {
+      logActivity('transportStop');
+    } else if (prev.isPaused && !isPaused && !isRunning) {
+      // Stop from pause: the engine was already halted, so there is no
+      // isRunning edge for the branches above to see — record it here.
       logActivity('transportStop');
     }
 
