@@ -21,12 +21,7 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: write
-  actions: write
-  pull-requests: write
-  checks: read
-  issues: write
+permissions: {}
 
 concurrency:
   group: auto-pr-${{ github.event.pull_request.number || inputs.pr_number }}
@@ -34,7 +29,15 @@ concurrency:
 
 jobs:
   review:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    # Fork PRs are skipped: the job holds write permissions and secrets, and
+    # a fork's head branch cannot be pushed to by the auto-fix path anyway.
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository)
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: write
+      checks: read
+      issues: write
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -48,6 +51,8 @@ jobs:
         run: |
           head=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefName --jq .headRefName)
           echo "head_ref=$head" >> "$GITHUB_OUTPUT"
+          sha=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid --jq .headRefOid)
+          echo "head_sha=$sha" >> "$GITHUB_OUTPUT"
 
       - name: Wait for checks to settle (up to 30 min)
         id: checks
@@ -93,15 +98,20 @@ jobs:
         if: steps.secrets.outputs.found == 'true' || steps.checks.outputs.failed != ''
         env:
           HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+          # Step outputs reach the script through env, never through ${{ }}
+          # interpolation in run: — check names are attacker-influenced text
+          # and would otherwise be executed as shell.
+          SECRET_FOUND: ${{ steps.secrets.outputs.found }}
+          FAILED_CHECKS: ${{ steps.checks.outputs.failed }}
         run: |
           if [ -z "$DEVIN_API_KEY" ]; then
             echo "::notice::DEVIN_API_KEY not configured — skipping auto-fix"
             exit 0
           fi
-          if [ "${{ steps.secrets.outputs.found }}" = "true" ]; then
+          if [ "$SECRET_FOUND" = "true" ]; then
             reason="possible secret material detected in the diff"
           else
-            reason="failing checks: ${{ steps.checks.outputs.failed }}"
+            reason="failing checks: ${FAILED_CHECKS}"
           fi
           prompt="Auto-review on PR #${PR_NUMBER} in ${REPO} found problems: ${reason}. Inspect the PR, fix the issues on branch ${HEAD_REF}, and push. It must pass: npm run lint && npm run test:cov && npm run build."
           if [ -n "$DEVIN_ORG_ID" ]; then
@@ -117,22 +127,28 @@ jobs:
           fi
 
       - name: Comment + merge or bounce
+        env:
+          SECRET_FOUND: ${{ steps.secrets.outputs.found }}
+          FAILED_CHECKS: ${{ steps.checks.outputs.failed }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
           set -e
-          if [ "${{ steps.secrets.outputs.found }}" = "true" ]; then
+          if [ "$SECRET_FOUND" = "true" ]; then
             gh pr comment "$PR_NUMBER" --repo "$REPO" --body "🛑 Auto-review: possible secret material detected in this diff. Fix pushed or a Devin session was asked to remediate; not merging."
             exit 1
           fi
-          if [ -n "${{ steps.checks.outputs.failed }}" ]; then
-            gh pr comment "$PR_NUMBER" --repo "$REPO" --body "🛑 Auto-review: checks failing (${{ steps.checks.outputs.failed }}). Not merging — fix required."
+          if [ -n "$FAILED_CHECKS" ]; then
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body "🛑 Auto-review: checks failing (${FAILED_CHECKS}). Not merging — fix required."
             exit 1
           fi
           # Approval is best-effort: some repos reject self/bot approvals, and
           # merge must still be attempted either way.
           gh pr review "$PR_NUMBER" --repo "$REPO" --approve --body "✅ Auto-review: all checks green, no secrets detected. Merging." || true
-          if ! gh pr merge "$PR_NUMBER" --repo "$REPO" --merge; then
+          # Pin the merge to the head SHA that was reviewed, so a push racing
+          # the review cannot slip unreviewed commits into the merge.
+          if ! gh pr merge "$PR_NUMBER" --repo "$REPO" --merge --match-head-commit "$HEAD_SHA"; then
             echo "::warning::Direct merge rejected — enabling auto-merge instead"
-            gh pr merge "$PR_NUMBER" --repo "$REPO" --merge --auto
+            gh pr merge "$PR_NUMBER" --repo "$REPO" --merge --auto --match-head-commit "$HEAD_SHA"
           fi
 
       # Merges made by this workflow's GITHUB_TOKEN do not fire `push`
