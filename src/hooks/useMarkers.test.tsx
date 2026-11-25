@@ -278,6 +278,15 @@ describe('useMarkers', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('dropped'));
   });
 
+  it('preserves the raw payload under a backup key when stored markers are corrupt', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    localStorage.setItem('ltc-markers', '{not json');
+    const { result } = renderHook(() => useMarkers(makeParams()));
+    expect(result.current.markers).toEqual([]);
+    // The unreadable payload must survive the persist effect's overwrite.
+    expect(localStorage.getItem('ltc-markers-corrupt-backup')).toBe('{not json');
+  });
+
   it('assigns unique sequential ids and takes to rapid successive adds', () => {
     const { result } = renderHook(() => useMarkers(makeParams()));
     act(() => {
@@ -293,15 +302,15 @@ describe('useMarkers', () => {
     expect(result.current.markers.map(m => m.id)).toEqual([3, 2, 1]);
   });
 
-  it('shows an error toast instead of throwing when an export builder fails', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('exports FCPXML by skipping a marker whose TC cannot parse at the current fps', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     const addToast = vi.fn();
-    // An engine that reports an unparseable TC makes buildFcpxml throw.
+    // An engine that reports an unparseable TC: the marker is skipped
+    // (buildOtio's tolerance) instead of failing the whole export.
     const { result } = renderHook(() => useMarkers(makeParams({ engineRef: makeEngineRef('bogus'), addToast })));
     act(() => result.current.addMarker('Red'));
     expect(() => act(() => result.current.exportToFCPXML())).not.toThrow();
-    expect(addToast).toHaveBeenCalledWith(expect.any(String), 'error');
-    expect(writeFile).not.toHaveBeenCalled();
+    expect(addToast).not.toHaveBeenCalledWith(expect.any(String), 'error');
   });
 
   it('includes a date and time stamp in export filenames so same-day exports do not collide', async () => {

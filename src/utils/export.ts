@@ -94,9 +94,30 @@ function xml(value: string): string {
   })[c]!);
 }
 
+/**
+ * Parses a marker TC under the export rate, or returns null. A marker
+ * recorded under a different fps (e.g. frame 29, or a DF ';' label) cannot
+ * exist at the current rate — skipping it (like buildOtio does) keeps one
+ * stale marker from failing the entire export.
+ */
+function tryFrameCount(tc: string, fpsValue: number, drop: boolean): number | null {
+  try {
+    return Timecode(tc, fpsValue, drop).frameCount;
+  } catch {
+    return null;
+  }
+}
+
 export function buildFcpxml(markers: Marker[], fps: ExportFrameRate, isDropFrame = fps.drop): string {
-  const ordered = [...markers].reverse();
-  const frames = ordered.map(m => Timecode(m.tc, fps.value, isDropFrame).frameCount);
+  const ordered = [...markers].reverse().flatMap(m => {
+    const frame = tryFrameCount(m.tc, fps.value, isDropFrame);
+    if (frame === null) {
+      console.warn(`buildFcpxml: skipping marker ${m.id} with TC "${m.tc}" unparseable at ${fps.value}fps`);
+      return [];
+    }
+    return [{ marker: m, frame }];
+  });
+  const frames = ordered.map(o => o.frame);
   const first = frames.length ? Math.min(...frames) : 0;
   const duration = frames.length ? Math.max(...frames) - first + 1 : 1;
   // Canonical FCPXML rational time; a zero numerator renders as "0s".
@@ -106,7 +127,7 @@ export function buildFcpxml(markers: Marker[], fps: ExportFrameRate, isDropFrame
   // marker written as start=F lands at gap-position F-first — its own absolute
   // frame. Gap-relative values (F-first) would shift every marker `first`
   // frames early and clip them before the gap origin.
-  const entries = ordered.map((m, i) => `            <marker start="${time(frames[i])}" duration="${time(1)}" value="${xml(`Scene ${m.sceneName} Take ${m.take}`)}" note="${xml(m.comment)}"/>`).join('\n');
+  const entries = ordered.map((o, i) => `            <marker start="${time(frames[i])}" duration="${time(1)}" value="${xml(`Scene ${o.marker.sceneName} Take ${o.marker.take}`)}" note="${xml(o.marker.comment)}"/>`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE fcpxml>
 <fcpxml version="1.9">
@@ -132,11 +153,21 @@ ${entries}
 
 export function buildResolveMarkers(markers: Marker[], fps: ExportFrameRate): string {
   let edl = `TITLE: Logged Takes\nFCM: ${fps.drop ? 'DROP FRAME' : 'NON-DROP FRAME'}\n\n`;
-  [...markers].reverse().forEach((m, i) => {
-    const start = Timecode(m.tc, fps.value, fps.drop);
+  let index = 0;
+  [...markers].reverse().forEach((m) => {
+    // Same skip-don't-fail rule as buildFcpxml/buildOtio: a TC recorded
+    // under another fps must not take the whole export down with it.
+    let start: ReturnType<typeof Timecode>;
+    try {
+      start = Timecode(m.tc, fps.value, fps.drop);
+    } catch {
+      console.warn(`buildResolveMarkers: skipping marker ${m.id} with TC "${m.tc}" unparseable at ${fps.value}fps`);
+      return;
+    }
+    index += 1;
     const end = Timecode(start.frameCount + 1, fps.value, fps.drop).toString();
     const name = sanitize(`Scene ${m.sceneName} Take ${sanitize(String(m.take))}${m.comment ? ` - ${m.comment}` : ''}`);
-    edl += `${String(i + 1).padStart(3, '0')}  ${sanitize(m.reelName || 'AX').substring(0, 8).padEnd(8)} V     C        ${start.toString()} ${end} ${start.toString()} ${end}\n`;
+    edl += `${String(index).padStart(3, '0')}  ${sanitize(m.reelName || 'AX').substring(0, 8).padEnd(8)} V     C        ${start.toString()} ${end} ${start.toString()} ${end}\n`;
     edl += ` |C:ResolveColor${sanitize(m.color)} |M:${name} |D:1\n\n`;
   });
   return edl;
@@ -157,7 +188,9 @@ export function buildCsv(markers: Marker[]): string {
   // beginning with =, +, - or @ (standard CSV-injection mitigation).
   const cell = (value: string | number) => {
     const text = String(value);
-    const guarded = /^[=+\-@]/.test(text) ? `'${text}` : text;
+    // Check the first NON-whitespace character: some spreadsheet apps strip
+    // leading spaces/tabs and would otherwise evaluate "  =…" as a formula.
+    const guarded = /^\s*[=+\-@]/.test(text) ? `'${text}` : text;
     return `"${guarded.replace(/"/g, '""')}"`;
   };
   return [CSV_COLUMNS.map(c => cell(c.header)).join(','), ...[...markers].reverse().map(m =>

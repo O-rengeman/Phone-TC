@@ -133,6 +133,39 @@ describe('LtcEngine frame-rate math', () => {
   });
 });
 
+describe('LtcEngine Date start (TOD)', () => {
+  it('computes 23.976 TOD at the exact 24000/1001 rate, not the library-rounded 23.98', () => {
+    // Noon at 24000/1001: 43,200 s × 24000/1001 = 1,035,764 frames elapsed
+    // since midnight, whose label is 11:59:16:20. The smpte-timecode Date
+    // path (rate rounded to 23.98) lands ~172 frames later (11:59:24:00).
+    const noon = new Date(2026, 0, 1, 12, 0, 0, 0);
+    const engine = new LtcEngine({ ...settings, fps: 23.976, isDropFrame: false }, noon);
+    expect(engine.getTimecodeString()).toBe('11:59:16:20');
+  });
+
+  it('keeps 25 fps TOD aligned to wall clock', () => {
+    const noon = new Date(2026, 0, 1, 12, 0, 0, 0);
+    const engine = new LtcEngine({ ...settings, fps: 25, isDropFrame: false }, noon);
+    expect(engine.getTimecodeString()).toBe('12:00:00:00');
+  });
+});
+
+describe('LtcEngine midnight wrap', () => {
+  it('signedFrameDiffTo wraps across 24:00:00', () => {
+    const engine = new LtcEngine(settings);
+    engine.setManualTimecode('23:59:59:29');
+    expect(engine.signedFrameDiffTo('00:00:00:01')).toBe(2);
+    engine.setManualTimecode('00:00:00:01');
+    expect(engine.signedFrameDiffTo('23:59:59:29')).toBe(-2);
+  });
+
+  it('getDiffSeconds wraps across 24:00:00', () => {
+    const engine = new LtcEngine(settings);
+    engine.setManualTimecode('23:59:59:29');
+    expect(engine.getDiffSeconds('00:00:00:01')).toBeCloseTo(2 / 30, 5);
+  });
+});
+
 describe('LtcEngine misc setters', () => {
   it('setUserBits pads, truncates and upper-cases without throwing', () => {
     const engine = new LtcEngine(settings);

@@ -51,7 +51,11 @@ const LTC_PROCESSOR_CLASS_SOURCE = `
               this.sampleOffset = 0;
               this.pendingNudge = 0;
             } else if (d.type === 'nudge') {
-              this.pendingNudge += (d.dir > 0 ? 1 : -1);
+              // frames carries the correction magnitude (older senders omit
+              // it and mean a single frame).
+              const frames = (typeof d.frames === 'number' && Number.isFinite(d.frames) && d.frames > 0)
+                ? Math.floor(d.frames) : 1;
+              this.pendingNudge += (d.dir > 0 ? 1 : -1) * frames;
             } else if (d.type === 'config') {
               if (typeof d.volume === 'number') this.settings.volume = d.volume;
               if (typeof d.ubit === 'string') this.settings.ubit = d.ubit;
@@ -97,7 +101,14 @@ const LTC_PROCESSOR_CLASS_SOURCE = `
             this.settings.framesPerSec,
           );
           this.hours = next.hours; this.minutes = next.minutes; this.seconds = next.seconds; this.frames = next.frames;
+          // No TC report here: the report belongs to the frame whose audio
+          // is generated (see process()), not to the advance. Reporting here
+          // used to publish the NEXT frame's label while the current frame's
+          // audio was playing — a systematic +1 frame on every consumer
+          // (display, P2P heartbeat/sync-response, drift comparisons).
+        }
 
+        reportCurrentFrame() {
           this.port.postMessage({
             tc: \`\${String(this.hours).padStart(2, '0')}:\${String(this.minutes).padStart(2, '0')}:\${String(this.seconds).padStart(2, '0')}:\${String(this.frames).padStart(2, '0')}\`
           });
@@ -117,6 +128,8 @@ const LTC_PROCESSOR_CLASS_SOURCE = `
                 this.settings.ubit,
                 this.settings.framesPerSec,
               );
+              // This is the frame whose audio is about to play — report it.
+              this.reportCurrentFrame();
               const sr = sampleRate;
               const nextEnd = Math.floor((this.frameCount + 1) * sr * this.settings.fpsDen / this.settings.fpsNum);
               const curStart = Math.floor(this.frameCount * sr * this.settings.fpsDen / this.settings.fpsNum);

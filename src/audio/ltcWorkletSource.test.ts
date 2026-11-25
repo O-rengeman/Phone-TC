@@ -44,6 +44,7 @@ interface FakeProcessor {
   minutes: number;
   seconds: number;
   frames: number;
+  pendingNudge: number;
   port: FakePort;
   process(inputs: unknown, outputs: Float32Array[][]): boolean;
 }
@@ -150,6 +151,26 @@ describe('LTC worklet source', () => {
       fps: 30, fpsNum: 30000, fpsDen: 1000, framesPerSec: 30, isDrop: false,
     });
     expect(p.frames).toBe(7);
+  });
+
+  it('reports the TC of the frame being generated, not the next frame', () => {
+    const p = loadProcessor();
+    const out: Float32Array[] = [new Float32Array(128), new Float32Array(128)];
+    p.process([], [out]);
+    // First generated frame is the start TC (00:00:00:00). Reporting the
+    // post-advance label here was a systematic +1 frame for every consumer.
+    expect(p.port.sent).toEqual([{ tc: '00:00:00:00' }]);
+  });
+
+  it('nudge with a frames magnitude accumulates the full correction', () => {
+    const p = loadProcessor();
+    p.port.emit({ type: 'nudge', dir: 1, frames: 3 });
+    expect(p.pendingNudge).toBe(3);
+    const out: Float32Array[] = [new Float32Array(128), new Float32Array(128)];
+    p.process([], [out]);
+    // One frame period consumes one pending frame: normal advance + 1 extra.
+    expect(p.frames).toBe(2);
+    expect(p.pendingNudge).toBe(2);
   });
 
   it('keeps producing output after a mid-run rate change', () => {

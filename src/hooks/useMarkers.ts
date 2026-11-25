@@ -9,7 +9,10 @@ import type { Marker, MarkerColor } from '../utils/export';
 import { t as translate } from '../utils/i18n';
 import type { Lang } from '../utils/i18n';
 import { FPS_OPTIONS } from '../constants';
-import { STORAGE_KEYS, readStored, writeStoredString } from '../utils/storage';
+import { STORAGE_KEYS, readStoredString, writeStoredString } from '../utils/storage';
+
+/** Where the raw markers payload is preserved when it fails to load cleanly. */
+const CORRUPT_MARKERS_BACKUP_KEY = 'ltc-markers-corrupt-backup';
 import type { SyncMode } from '../LTCSyncContext';
 import type { DriftMonitor } from '../utils/DriftMonitor';
 import type { MarkerSync } from '../utils/export';
@@ -159,11 +162,32 @@ export function useMarkers({
 }: UseMarkersParams): UseMarkersResult {
   const syncRef = useRef({ syncMode, driftMonitorRef, p2pDriftSeconds, p2pLastSyncRef, fpsIndex });
   useEffect(() => { syncRef.current = { syncMode, driftMonitorRef, p2pDriftSeconds, p2pLastSyncRef, fpsIndex }; }, [syncMode, driftMonitorRef, p2pDriftSeconds, p2pLastSyncRef, fpsIndex]);
-  const [markers, setMarkers] = useState<Marker[]>(() =>
-    readStored(STORAGE_KEYS.markers, [] as Marker[], raw => {
+  const [markers, setMarkers] = useState<Marker[]>(() => {
+    const raw = readStoredString(STORAGE_KEYS.markers);
+    if (raw === null) return [];
+    // Preserve the raw payload BEFORE the persist effect can overwrite it:
+    // a partially corrupted save used to be replaced by the sanitized (or
+    // empty) list on this very launch, making the loss permanent and
+    // unrecoverable even though the original string was still readable.
+    const preserveRaw = () => {
+      writeStoredString(CORRUPT_MARKERS_BACKUP_KEY, raw);
+      console.warn('useMarkers: preserved unreadable markers payload to', CORRUPT_MARKERS_BACKUP_KEY);
+    };
+    try {
       const parsed: unknown = JSON.parse(raw);
-      return sanitizeMarkers(parsed);
-    }));
+      const clean = sanitizeMarkers(parsed);
+      if (clean === undefined) {
+        preserveRaw();
+        return [];
+      }
+      if (Array.isArray(parsed) && clean.length !== parsed.length) preserveRaw();
+      return clean;
+    } catch {
+      preserveRaw();
+      return [];
+    }
+  });
+  const storageWarnedRef = useRef(false);
   const [markerFlash, setMarkerFlash] = useState<MarkerFlash>(null);
   const markerFlashTimerRef = useRef<number | null>(null);
   const backupTimerRef = useRef<number | null>(null);
@@ -190,7 +214,13 @@ export function useMarkers({
   }, []);
 
   useEffect(() => {
-    writeStoredString(STORAGE_KEYS.markers, JSON.stringify(markers));
+    const saved = writeStoredString(STORAGE_KEYS.markers, JSON.stringify(markers));
+    if (!saved && !storageWarnedRef.current) {
+      // Quota exceeded / storage unavailable: markers now exist only in
+      // memory and will vanish on restart. Warn once (not per keystroke).
+      storageWarnedRef.current = true;
+      addToast(translate('toast.storageFull', langRef.current), 'error');
+    }
     if (backupTimerRef.current !== null) clearTimeout(backupTimerRef.current);
     backupTimerRef.current = window.setTimeout(() => {
       void backupMarkers(markers);
@@ -198,7 +228,7 @@ export function useMarkers({
     return () => {
       if (backupTimerRef.current !== null) clearTimeout(backupTimerRef.current);
     };
-  }, [markers, backupMarkers]);
+  }, [markers, backupMarkers, addToast, langRef]);
 
   // Flush the latest markers to the native backup on unmount so a pending
   // debounced write isn't lost when the app is backgrounded/killed.
