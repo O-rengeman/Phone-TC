@@ -215,9 +215,14 @@ export function useMarkers({
 
   useEffect(() => {
     const saved = writeStoredString(STORAGE_KEYS.markers, JSON.stringify(markers));
-    if (!saved && !storageWarnedRef.current) {
+    if (saved) {
+      // Re-arm the warning: a failure after storage recovers must warn again.
+      storageWarnedRef.current = false;
+    } else if (markers.length > 0 && !storageWarnedRef.current) {
       // Quota exceeded / storage unavailable: markers now exist only in
-      // memory and will vanish on restart. Warn once (not per keystroke).
+      // memory and will vanish on restart. Warn once (not per keystroke),
+      // and only when there is actually something to lose — the mount-time
+      // write of an empty list must not cry wolf on storage-less setups.
       storageWarnedRef.current = true;
       addToast(translate('toast.storageFull', langRef.current), 'error');
     }
@@ -347,10 +352,19 @@ export function useMarkers({
     void exportFile(content, `PHONE_TC_${exportStamp()}${suffix}`);
   };
 
+  /** Warns when the frame-based exporters had to skip markers (see #56). */
+  const warnIfExportSkipped = () => {
+    const fps = FPS_OPTIONS[fpsIndex];
+    const skipped = markers.filter(m => parseTcFrame(m.tc, fps.value, fps.drop) === null).length;
+    if (skipped > 0) {
+      addToast(translate('toast.exportSkipped', langRef.current, { count: skipped }), 'warn');
+    }
+  };
+
   const exportToEDL = () => exportToFile(() => buildEdl(markers, FPS_OPTIONS[fpsIndex].drop), '.edl');
   const exportToALE = () => exportToFile(() => buildAle(markers, FPS_OPTIONS[fpsIndex].label), '.ale');
-  const exportToFCPXML = () => exportToFile(() => buildFcpxml(markers, FPS_OPTIONS[fpsIndex]), '.fcpxml');
-  const exportToResolve = () => exportToFile(() => buildResolveMarkers(markers, FPS_OPTIONS[fpsIndex]), '_resolve_markers.edl');
+  const exportToFCPXML = () => { exportToFile(() => buildFcpxml(markers, FPS_OPTIONS[fpsIndex]), '.fcpxml'); warnIfExportSkipped(); };
+  const exportToResolve = () => { exportToFile(() => buildResolveMarkers(markers, FPS_OPTIONS[fpsIndex]), '_resolve_markers.edl'); warnIfExportSkipped(); };
   const exportToCSV = () => exportToFile(() => String.fromCharCode(0xFEFF) + buildCsv(markers), '.csv');
   const exportToOTIO = () => exportToFile(() => buildOtio(markers, FPS_OPTIONS[fpsIndex]), '.otio');
 
