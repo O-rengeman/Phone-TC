@@ -63,6 +63,7 @@ export function MobileToolsPane() {
     recallTimecode,
     engineRef,
     currentTcRef,
+    requestBackupRestore,
   } = useLTC();
 
   const [requestedSection, setRequestedSection] = useState<ToolsSection>('marks');
@@ -127,6 +128,9 @@ export function MobileToolsPane() {
         {section === 'takes' && (
           <div className="mobile-pane-view tools-view-takes" role="tabpanel">
             <MarkerList {...markerListProps} mobileView="log" />
+            <div style={{ padding: '8px 12px' }}>
+              <button type="button" onClick={requestBackupRestore}>{tr('backup.restoreButton')}</button>
+            </div>
           </div>
         )}
 

@@ -67,6 +67,20 @@ describe('useMarkers', () => {
     expect(result.current.backupRestore).toBeNull();
   });
 
+  it('manual restore request offers the backup even when local markers exist (Issue #60)', async () => {
+    isNativePlatform.mockReturnValue(true);
+    localStorage.setItem('ltc-markers', JSON.stringify([{ id: 1, tc: '00:00:01:00', color: 'Blue', take: 1, comment: '' }]));
+    readFile.mockResolvedValue({ data: JSON.stringify([{ id: 7, tc: '01:02:03:04', color: 'Red', take: 1, comment: '' }]) });
+    const { result } = renderHook(() => useMarkers(makeParams()));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(result.current.backupRestore).toBeNull();
+    await act(async () => { result.current.requestBackupRestore(); await Promise.resolve(); await Promise.resolve(); });
+    expect(result.current.backupRestore?.count).toBe(1);
+    expect(result.current.backupRestore?.manual).toBe(true);
+    act(() => result.current.restoreFromBackup());
+    expect(result.current.markers[0].tc).toBe('01:02:03:04');
+  });
+
   it('does not offer a backup restore when local markers already exist', async () => {
     isNativePlatform.mockReturnValue(true);
     localStorage.setItem('ltc-markers', JSON.stringify([{ id: 1, tc: '00:00:01:00', color: 'Blue', take: 1, comment: '' }]));

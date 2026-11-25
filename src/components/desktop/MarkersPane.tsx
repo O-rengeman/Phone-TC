@@ -20,6 +20,7 @@ export function MarkersPane() {
     markers, removeMarker, updateMarkerComment, exportToEDL, exportToALE,
     exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO,
     recallTimecode, fpsIndex, isRunning, engineRef, currentTcRef,
+    requestBackupRestore,
     defaultReelName, setDefaultReelName, sceneName, setSceneName,
     userBits, setUserBits, autoUserBits, setAutoUserBits,
     tr,
@@ -97,6 +98,9 @@ export function MarkersPane() {
             <button type="button" className="dt-btn" onClick={exportToResolve} disabled={markers.length === 0}>Resolve</button>
             <button type="button" className="dt-btn" onClick={exportToCSV} disabled={markers.length === 0}>CSV</button>
             <button type="button" className="dt-btn" onClick={exportToOTIO} disabled={markers.length === 0}>OTIO</button>
+          </div>
+          <div className="dt-export-row">
+            <button type="button" className="dt-btn" onClick={requestBackupRestore}>{tr('backup.restoreButton')}</button>
           </div>
           <p className="dt-hint">{tr('dt.hint.reelScene')}</p>
         </DesktopSection>
