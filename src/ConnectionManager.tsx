@@ -227,7 +227,7 @@ export function ConnectionManager() {
             maxLength={8}
             onChange={e => setTargetId(e.target.value.toUpperCase())}
           />
-          <button className="cm-v2-link" onClick={joinSession}>{tr('p2p.link')}</button>
+          <button className="cm-v2-link" onClick={joinSession} disabled={isP2PSetupPending}>{tr('p2p.link')}</button>
         </div>
       )}
       <div className={`p2p-status-mini cm-v2-status ${p2pStatus.includes('ERROR') ? 'error' : ''}`}>{formatP2pStatus(p2pStatus, lang)}</div>
