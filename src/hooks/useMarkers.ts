@@ -13,6 +13,7 @@ import { STORAGE_KEYS, readStoredString, writeStoredString } from '../utils/stor
 
 /** Where the raw markers payload is preserved when it fails to load cleanly. */
 const CORRUPT_MARKERS_BACKUP_KEY = 'ltc-markers-corrupt-backup';
+const MARKER_BACKUP_FILE = 'ltc_sync_pro_backup.json';
 import type { SyncMode } from '../LTCSyncContext';
 import type { DriftMonitor } from '../utils/DriftMonitor';
 import type { MarkerSync } from '../utils/export';
@@ -141,6 +142,10 @@ interface UseMarkersResult {
   exportToResolve: () => void;
   exportToCSV: () => void;
   exportToOTIO: () => void;
+  /** Pending backup-restore offer (Issue #60): set when local storage was empty but the native backup file holds markers. */
+  backupRestore: { count: number; markers: Marker[] } | null;
+  restoreFromBackup: () => void;
+  dismissBackupRestore: () => void;
 }
 
 /**
@@ -188,11 +193,54 @@ export function useMarkers({
     }
   });
   const storageWarnedRef = useRef(false);
+  // Issue #60: the native backup file (Documents/ltc_sync_pro_backup.json)
+  // used to be write-only. When local storage comes up EMPTY on a native
+  // build (WebView storage eviction is the known cause), offer the backup's
+  // markers back — as a prompt, never a silent restore, so an operator who
+  // deliberately cleared markers isn't haunted by their return.
+  const [backupRestore, setBackupRestore] = useState<{ count: number; markers: Marker[] } | null>(null);
+  const backupCheckedRef = useRef(false);
+
+  const restoreFromBackup = useCallback(() => {
+    if (!backupRestore) return;
+    setMarkers(backupRestore.markers);
+    addToast(translate('toast.backupRestored', langRef.current, { count: backupRestore.count }));
+    setBackupRestore(null);
+  }, [backupRestore, addToast, langRef]);
+
+  const dismissBackupRestore = useCallback(() => setBackupRestore(null), []);
   const [markerFlash, setMarkerFlash] = useState<MarkerFlash>(null);
   const markerFlashTimerRef = useRef<number | null>(null);
   const backupTimerRef = useRef<number | null>(null);
   const markersRef = useRef(markers);
   useEffect(() => { markersRef.current = markers; }, [markers]);
+
+  useEffect(() => {
+    if (backupCheckedRef.current) return;
+    backupCheckedRef.current = true;
+    if (!Capacitor.isNativePlatform()) return;
+    if (markersRef.current.length > 0) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await Filesystem.readFile({
+          path: MARKER_BACKUP_FILE,
+          directory: Directory.Documents,
+          encoding: Encoding.UTF8,
+        });
+        const text = typeof res.data === 'string' ? res.data : await res.data.text();
+        const clean = sanitizeMarkers(JSON.parse(text) as unknown);
+        // Re-check emptiness at resolve time: a marker added while the
+        // file read was in flight must not be offered an overwrite.
+        if (!cancelled && markersRef.current.length === 0 && clean && clean.length > 0) {
+          setBackupRestore({ count: clean.length, markers: clean });
+        }
+      } catch {
+        // No backup file yet (or unreadable) — nothing to offer.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => () => {
     if (markerFlashTimerRef.current !== null) clearTimeout(markerFlashTimerRef.current);
@@ -202,7 +250,7 @@ export function useMarkers({
     try {
       if (Capacitor.isNativePlatform()) {
         await Filesystem.writeFile({
-          path: 'ltc_sync_pro_backup.json',
+          path: MARKER_BACKUP_FILE,
           data: JSON.stringify(m, null, 2),
           directory: Directory.Documents,
           encoding: Encoding.UTF8
@@ -368,5 +416,5 @@ export function useMarkers({
   const exportToCSV = () => exportToFile(() => String.fromCharCode(0xFEFF) + buildCsv(markers), '.csv');
   const exportToOTIO = () => exportToFile(() => buildOtio(markers, FPS_OPTIONS[fpsIndex]), '.otio');
 
-  return { markers, setMarkers, markerFlash, addMarker, removeMarker, updateMarkerComment, exportToEDL, exportToALE, exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO };
+  return { markers, setMarkers, markerFlash, addMarker, removeMarker, updateMarkerComment, exportToEDL, exportToALE, exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO, backupRestore, restoreFromBackup, dismissBackupRestore };
 }

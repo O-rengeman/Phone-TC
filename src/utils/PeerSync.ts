@@ -14,6 +14,12 @@ interface MasterSyncFields {
   isDropFrame: boolean;
   isRunning: boolean;
   isPaused?: boolean;
+  /**
+   * Proof that the sender knows the session PIN (set only when the master
+   * enabled one). Stamped by PeerSync on send, verified by PIN-carrying
+   * clients on receive — see PeerSyncOptions.sessionPin.
+   */
+  authProof?: string;
 }
 
 interface SyncMessageBase {
@@ -79,7 +85,8 @@ function hasMasterFields(m: Record<string, unknown>): boolean {
     // isPaused is optional on the wire (older peers may omit it — receivers
     // treat absent as false), but when present it must be a real boolean:
     // a truthy string like "false" must not pass validation.
-    && (m.isPaused === undefined || typeof m.isPaused === 'boolean');
+    && (m.isPaused === undefined || typeof m.isPaused === 'boolean')
+    && (m.authProof === undefined || typeof m.authProof === 'string');
 }
 
 /**
@@ -121,6 +128,18 @@ export interface PeerSyncOptions {
    * instead of staying open to inject or siphon messages. Defaults to true.
    */
   acceptInboundConnections?: boolean;
+  /**
+   * Optional session PIN (operator-chosen, e.g. 4-8 digits). When set:
+   * - a master only accepts inbound connections whose PeerJS metadata
+   *   carries a valid client proof for this peer id, and stamps its own
+   *   proof onto every heartbeat/sync-response;
+   * - a client sends that proof when dialing and DROPS master messages
+   *   whose proof is missing or wrong, so a stranger who squats the room
+   *   id cannot impersonate the master.
+   * Proofs are SHA-256 over (pin, role, peer id) — the PIN itself never
+   * crosses the wire. Empty/undefined disables PIN auth entirely.
+   */
+  sessionPin?: string;
   /**
    * Reports DataConnection lifecycle per remote peer: `true` when a
    * connection to `peerId` opens, `false` when the last open connection to
@@ -167,6 +186,28 @@ export const PEER_ID_RETRY_LIMIT = 5;
  */
 export const SIGNALING_RECONNECT_LIMIT = 8;
 
+/**
+ * Abuse guard on simultaneous DataConnections — deliberately FAR above any
+ * real set (browsers run out of RTCPeerConnection resources long before
+ * this). Multi-device sync is the point of the app, so the cap exists only
+ * to stop a flood from exhausting the master, never to ration legit use.
+ */
+export const MAX_CONNECTIONS = 512;
+
+/** Per-connection inbound message budget (rolling window) — see below. */
+export const RATE_LIMIT_WINDOW_MS = 1000;
+export const RATE_LIMIT_MAX_MESSAGES = 120;
+
+async function sha256Hex(input: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** PIN proof for one role/peer pair. Exported for tests. */
+export async function sessionPinProof(pin: string, role: 'client' | 'master', peerId: string): Promise<string> {
+  return sha256Hex(`ltc-sync-pro:pin:v1:${role}:${pin}:${peerId}`);
+}
+
 export class PeerSync {
   private peer: Peer | null = null;
   private connections: DataConnection[] = [];
@@ -187,6 +228,17 @@ export class PeerSync {
   // limbo must not emit a phantom close to observers that never saw its
   // `true`.
   private openedConns = new Set<DataConnection>();
+  private sessionPin: string;
+  // PIN proofs, computed lazily/async (SHA-256) and cached. The client
+  // proof depends on the TARGET id, so it is computed per dial; the master
+  // proofs depend on OUR id, known only after 'open'.
+  private ownId: string | null = null;
+  private masterProof: string | null = null;
+  private expectedClientProof: string | null = null;
+  private expectedMasterProof: string | null = null;
+  private masterAuthFailed = false;
+  private dialInFlight = new Set<string>();
+  private rateBuckets = new Map<DataConnection, { windowStart: number; count: number }>();
 
   constructor(
     onMessage: (msg: SyncMessage) => void,
@@ -199,6 +251,37 @@ export class PeerSync {
     this.peerFactory = peerFactory;
     this.options = options;
     this.acceptInboundConnections = options.acceptInboundConnections ?? true;
+    this.sessionPin = options.sessionPin ?? '';
+  }
+
+  /**
+   * Sets/replaces the session PIN after construction. The client flow needs
+   * this: the operator types the PIN after the client peer already exists,
+   * and joinSession applies it right before dialing.
+   */
+  public setSessionPin(pin: string): void {
+    const next = pin.trim();
+    if (next === this.sessionPin) return;
+    this.sessionPin = next;
+    this.masterProof = null;
+    this.expectedClientProof = null;
+    this.expectedMasterProof = null;
+    this.masterAuthFailed = false;
+    if (next && this.ownId) void this.prepareMasterProofs(this.ownId);
+  }
+
+  /** Precompute the proofs that depend on our own peer id. */
+  private async prepareMasterProofs(ownId: string): Promise<void> {
+    if (!this.sessionPin) return;
+    const pin = this.sessionPin;
+    const [master, client] = await Promise.all([
+      sessionPinProof(pin, 'master', ownId),
+      sessionPinProof(pin, 'client', ownId),
+    ]);
+    // A PIN change mid-flight must not install stale proofs.
+    if (this.sessionPin !== pin) return;
+    this.masterProof = master;
+    this.expectedClientProof = client;
   }
 
   private generateShortId(): string {
@@ -255,6 +338,8 @@ export class PeerSync {
 
       peer.on('open', (id: string) => {
         opened = true;
+        this.ownId = id;
+        if (this.sessionPin) void this.prepareMasterProofs(id);
         // Reached on the initial connect and again after every successful
         // signaling reconnect, so this is also where the backoff resets.
         this.clearReconnectTimer();
@@ -270,6 +355,36 @@ export class PeerSync {
           // stranger inject messages into the sync handler.
           debug(`Rejecting inbound connection from ${conn.peer} (dial-out only)`);
           try { conn.close(); } catch { /* already gone */ }
+          return;
+        }
+        if (this.connections.length >= MAX_CONNECTIONS) {
+          debug(`Rejecting inbound connection from ${conn.peer} (connection cap)`);
+          try { conn.close(); } catch { /* already gone */ }
+          return;
+        }
+        if (this.sessionPin) {
+          // Authenticate BEFORE wiring the message handler: the dialer must
+          // prove PIN knowledge in the connection metadata. Verification is
+          // async (SHA-256); a conn that fails is closed unopened, so no
+          // sync-request from it is ever answered.
+          void (async () => {
+            if (!this.expectedClientProof && this.ownId) {
+              await this.prepareMasterProofs(this.ownId);
+            }
+            const presented = (conn as { metadata?: unknown }).metadata;
+            const proof = isRecord(presented) && typeof presented.pinProof === 'string'
+              ? presented.pinProof
+              : null;
+            if (proof === null || proof !== this.expectedClientProof) {
+              debug(`Rejecting connection from ${conn.peer} (PIN auth failed)`);
+              this.onStatusCallback('AUTH REJECTED');
+              try { conn.close(); } catch { /* already gone */ }
+              return;
+            }
+            if (this.isDestroyed) return;
+            this.onStatusCallback(`CONNECTED TO CLIENT: ${conn.peer}`);
+            this.handleConnection(conn);
+          })();
           return;
         }
         this.onStatusCallback(`CONNECTED TO CLIENT: ${conn.peer}`);
@@ -392,11 +507,40 @@ export class PeerSync {
       debug(`connect(${peerId}) skipped — connection already exists`);
       return;
     }
-    const conn = this.peer.connect(peerId, {
-      reliable: false // Use unreliable (UDP-style) for low latency TC
-    });
-    this.onStatusCallback(`CONNECTING TO ${peerId}...`);
-    this.handleConnection(conn);
+    if (this.dialInFlight.has(peerId)) {
+      debug(`connect(${peerId}) skipped — dial already in flight`);
+      return;
+    }
+    this.dialInFlight.add(peerId);
+    void (async () => {
+      try {
+        // With a session PIN, the dial carries our client proof in the
+        // connection metadata and we precompute the master's proof so its
+        // heartbeats can be verified from the first message on.
+        let metadata: { pinProof: string } | undefined;
+        if (this.sessionPin && this.peer) {
+          const pin = this.sessionPin;
+          const [clientProof, masterProof] = await Promise.all([
+            sessionPinProof(pin, 'client', peerId),
+            sessionPinProof(pin, 'master', peerId),
+          ]);
+          if (this.sessionPin !== pin) return;
+          metadata = { pinProof: clientProof };
+          this.expectedMasterProof = masterProof;
+          this.masterAuthFailed = false;
+        }
+        if (!this.peer || this.isDestroyed) return;
+        if (this.connections.some(c => c.peer === peerId)) return;
+        const conn = this.peer.connect(peerId, {
+          reliable: false, // Use unreliable (UDP-style) for low latency TC
+          ...(metadata ? { metadata } : {}),
+        });
+        this.onStatusCallback(`CONNECTING TO ${peerId}...`);
+        this.handleConnection(conn);
+      } finally {
+        this.dialInFlight.delete(peerId);
+      }
+    })();
   }
 
   private handleConnection(conn: DataConnection) {
@@ -422,6 +566,35 @@ export class PeerSync {
         debug('Discarding malformed P2P message:', data);
         return;
       }
+      // Per-connection rate limit: a legit peer sends a handful of messages
+      // per second (heartbeats at 10Hz are the hottest stream); anything
+      // far above that is a flood, and dropping it here keeps a hostile or
+      // buggy peer from driving the master's sync handler at full tilt.
+      const now = Date.now();
+      let bucket = this.rateBuckets.get(conn);
+      if (!bucket || now - bucket.windowStart >= RATE_LIMIT_WINDOW_MS) {
+        bucket = { windowStart: now, count: 0 };
+        this.rateBuckets.set(conn, bucket);
+      }
+      bucket.count += 1;
+      if (bucket.count > RATE_LIMIT_MAX_MESSAGES) {
+        debug(`Rate-limiting messages from ${conn.peer}`);
+        return;
+      }
+      // Session PIN: master-carried messages must prove the sender knows
+      // the PIN. A squatter who grabbed the room id after the real master
+      // dropped cannot produce the proof, so its timecode is dropped here
+      // instead of silently taking over every client on the set.
+      if (this.sessionPin && this.expectedMasterProof
+        && (data.type === 'sync-response' || data.type === 'heartbeat')) {
+        if (data.authProof !== this.expectedMasterProof) {
+          if (!this.masterAuthFailed) {
+            this.masterAuthFailed = true;
+            this.onStatusCallback('ERROR: MASTER AUTH FAILED');
+          }
+          return;
+        }
+      }
       // Stamp the sender id from the transport, then hand off — the master
       // answers sync-requests inside the message handler itself.
       this.onMessageCallback({ ...data, clientId: conn.peer });
@@ -434,6 +607,7 @@ export class PeerSync {
       // 'P2P RESET'/new-session status and phantom-flap connVersion).
       this.connections = this.connections.filter(c => c !== conn);
       this.pendingSince.delete(conn);
+      this.rateBuckets.delete(conn);
       const wasOpen = this.openedConns.delete(conn);
       if (this.isDestroyed) return;
       this.onStatusCallback('CONNECTION CLOSED');
@@ -456,10 +630,24 @@ export class PeerSync {
     return this.lossRate;
   }
 
+  /**
+   * Attaches our PIN proof to master-carried messages when a session PIN
+   * is set, so PIN-carrying clients can verify the master. The proof is
+   * precomputed at 'open'; the first heartbeat racing that computation
+   * goes out unstamped and is simply dropped by verifying clients (the
+   * next one, 100ms later, carries it).
+   */
+  private stampAuth(msg: SyncMessage): SyncMessage {
+    if (!this.sessionPin || !this.masterProof) return msg;
+    if (msg.type !== 'sync-response' && msg.type !== 'heartbeat') return msg;
+    return { ...msg, authProof: this.masterProof };
+  }
+
   public send(msg: SyncMessage) {
+    const stamped = this.stampAuth(msg);
     this.connections.forEach(conn => {
       if (conn.open && Math.random() >= this.lossRate) {
-        void conn.send(msg);
+        void conn.send(stamped);
       }
     });
   }
@@ -470,9 +658,10 @@ export class PeerSync {
    * client a response whose clientTimestamp belongs to a different requester.
    */
   public sendTo(peerId: string, msg: SyncMessage) {
+    const stamped = this.stampAuth(msg);
     this.connections.forEach(conn => {
       if (conn.peer === peerId && conn.open && Math.random() >= this.lossRate) {
-        void conn.send(msg);
+        void conn.send(stamped);
       }
     });
   }
@@ -487,6 +676,8 @@ export class PeerSync {
     this.reconnectAttempt = 0;
     this.pendingSince.clear();
     this.openedConns.clear();
+    this.rateBuckets.clear();
+    this.dialInFlight.clear();
     this.peer?.destroy();
   }
 }

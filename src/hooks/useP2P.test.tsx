@@ -6,11 +6,12 @@ import type { Lang } from '../utils/i18n';
 // vi.mock factories are hoisted above regular const declarations, so any
 // mock fn referenced inside must itself be created via vi.hoisted() —
 // otherwise the factory closes over stale/undefined bindings.
-const { initialize, connect, destroy, setLossRate, peerSyncInstances } = vi.hoisted(() => ({
+const { initialize, connect, destroy, setLossRate, setSessionPin, peerSyncInstances } = vi.hoisted(() => ({
   initialize: vi.fn<() => Promise<string>>().mockResolvedValue('PEER123'),
   connect: vi.fn<(id: string) => void>(),
   destroy: vi.fn<() => void>(),
   setLossRate: vi.fn<(rate: number) => void>(),
+  setSessionPin: vi.fn<(pin: string) => void>(),
   // Every `new PeerSync(...)` pushes one entry here so tests can reach that
   // instance's constructor options (onConnectionChange) and per-instance
   // spies — the shared spies above still record calls across instances.
@@ -19,8 +20,10 @@ const { initialize, connect, destroy, setLossRate, peerSyncInstances } = vi.hois
     connect: ReturnType<typeof vi.fn>;
     destroy: ReturnType<typeof vi.fn>;
     setLossRate: ReturnType<typeof vi.fn>;
+    setSessionPin: ReturnType<typeof vi.fn>;
     options?: {
       acceptInboundConnections?: boolean;
+      sessionPin?: string;
       onConnectionChange?: (connected: boolean, peerId: string) => void;
     };
   }>,
@@ -36,6 +39,7 @@ vi.mock('../utils/PeerSync', () => ({
     _peerFactory: unknown,
     options?: {
       acceptInboundConnections?: boolean;
+      sessionPin?: string;
       onConnectionChange?: (connected: boolean, peerId: string) => void;
     },
   ) {
@@ -44,6 +48,7 @@ vi.mock('../utils/PeerSync', () => ({
       connect: vi.fn((id: string) => connect(id)),
       destroy: vi.fn(() => destroy()),
       setLossRate: vi.fn((rate: number) => setLossRate(rate)),
+      setSessionPin: vi.fn((pin: string) => setSessionPin(pin)),
       options,
     };
     peerSyncInstances.push(inst);
@@ -82,6 +87,7 @@ beforeEach(() => {
   connect.mockClear();
   destroy.mockClear();
   setLossRate.mockClear();
+  setSessionPin.mockClear();
   peerSyncInstances.length = 0;
 });
 
@@ -427,5 +433,32 @@ describe('useP2P — PeerSync role options', () => {
     const { result } = renderHook(() => useP2P(makeParams()));
     await act(async () => { await result.current.setupP2PMaster(); });
     expect(lastPeerSync()?.options?.acceptInboundConnections).toBe(true);
+  });
+});
+
+describe('useP2P — session PIN and client pruning (Issue #59)', () => {
+  it('passes the PIN to the master PeerSync and applies it again on join', async () => {
+    const { result } = renderHook(() => useP2P(makeParams()));
+    act(() => result.current.setSessionPin('1234'));
+    await act(async () => { await result.current.setupP2PMaster(); });
+    expect(lastPeerSync()?.options?.sessionPin).toBe('1234');
+
+    const { result: client } = renderHook(() => useP2P(makeParams()));
+    act(() => client.current.setSessionPin('9876'));
+    await act(async () => { await client.current.setupP2PClient(); });
+    act(() => client.current.setTargetId('WXYZ'));
+    act(() => client.current.joinSession());
+    expect(setSessionPin).toHaveBeenCalledWith('9876');
+    expect(connect).toHaveBeenCalledWith('WXYZ');
+  });
+
+  it('prunes a client from the roster when its connection closes', async () => {
+    const { result } = renderHook(() => useP2P(makeParams()));
+    await act(async () => { await result.current.setupP2PMaster(); });
+    act(() => result.current.setClients({ CL1: { rtt: 10, drift: 0, lastSeen: 1 }, CL2: { rtt: 20, drift: 0, lastSeen: 1 } }));
+    act(() => emitConnChange(true, 'CL1'));
+    expect(Object.keys(result.current.clients)).toEqual(['CL1', 'CL2']);
+    act(() => emitConnChange(false, 'CL1'));
+    expect(Object.keys(result.current.clients)).toEqual(['CL2']);
   });
 });
