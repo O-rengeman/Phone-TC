@@ -8,9 +8,10 @@ import { DriftMonitor } from '../utils/DriftMonitor';
 // vi.mock factories are hoisted above regular const declarations — anything
 // referenced inside one must be created via vi.hoisted() or the factory
 // closes over a stale/undefined binding.
-const { isNativePlatform, writeFile } = vi.hoisted(() => ({
+const { isNativePlatform, writeFile, readFile } = vi.hoisted(() => ({
   isNativePlatform: vi.fn(() => false),
   writeFile: vi.fn<(...args: unknown[]) => Promise<undefined>>(() => Promise.resolve(undefined)),
+  readFile: vi.fn<(...args: unknown[]) => Promise<{ data: string }>>(() => Promise.reject(new Error('no file'))),
 }));
 
 vi.mock('@capacitor/core', () => ({
@@ -18,7 +19,7 @@ vi.mock('@capacitor/core', () => ({
 }));
 
 vi.mock('@capacitor/filesystem', () => ({
-  Filesystem: { writeFile: (...args: unknown[]) => writeFile(...args) },
+  Filesystem: { writeFile: (...args: unknown[]) => writeFile(...args), readFile: (...args: unknown[]) => readFile(...args) },
   Directory: { Documents: 'DOCUMENTS' },
   Encoding: { UTF8: 'utf8' },
 }));
@@ -43,6 +44,8 @@ beforeEach(() => {
   localStorage.clear();
   isNativePlatform.mockReturnValue(false);
   writeFile.mockClear();
+  readFile.mockClear();
+  readFile.mockRejectedValue(new Error('no file'));
 });
 
 afterEach(() => {
@@ -50,6 +53,30 @@ afterEach(() => {
 });
 
 describe('useMarkers', () => {
+  it('offers backup markers for restore when native storage starts empty, and restores on demand (Issue #60)', async () => {
+    isNativePlatform.mockReturnValue(true);
+    const saved = [{ id: 7, tc: '01:02:03:04', color: 'Red', take: 1, comment: 'take 1' }];
+    readFile.mockResolvedValue({ data: JSON.stringify(saved) });
+    const { result } = renderHook(() => useMarkers(makeParams()));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(result.current.backupRestore?.count).toBe(1);
+    expect(result.current.markers).toHaveLength(0); // offered, not auto-restored
+    act(() => result.current.restoreFromBackup());
+    expect(result.current.markers).toHaveLength(1);
+    expect(result.current.markers[0].tc).toBe('01:02:03:04');
+    expect(result.current.backupRestore).toBeNull();
+  });
+
+  it('does not offer a backup restore when local markers already exist', async () => {
+    isNativePlatform.mockReturnValue(true);
+    localStorage.setItem('ltc-markers', JSON.stringify([{ id: 1, tc: '00:00:01:00', color: 'Blue', take: 1, comment: '' }]));
+    readFile.mockResolvedValue({ data: JSON.stringify([{ id: 7, tc: '01:02:03:04', color: 'Red', take: 1, comment: '' }]) });
+    const { result } = renderHook(() => useMarkers(makeParams()));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(result.current.backupRestore).toBeNull();
+    expect(result.current.markers).toHaveLength(1);
+  });
+
   it.each(['exportToFCPXML', 'exportToResolve', 'exportToCSV', 'exportToOTIO'] as const)('%s saves, skips empty logs and reports save failures', async action => {
     isNativePlatform.mockReturnValue(true);
     const addToast = vi.fn();

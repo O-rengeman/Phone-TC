@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { PeerSync, PEER_ID_RETRY_LIMIT, SIGNALING_RECONNECT_LIMIT } from './PeerSync';
+import { PeerSync, PEER_ID_RETRY_LIMIT, SIGNALING_RECONNECT_LIMIT, sessionPinProof, RATE_LIMIT_MAX_MESSAGES } from './PeerSync';
 import type { SyncMessage } from './PeerSync';
 import type { Peer } from 'peerjs';
 
@@ -30,7 +30,7 @@ function makeConn(opts: { open?: boolean; peer?: string; label?: string } = {}) 
 class FakePeer {
   private handlers: Record<string, Handler[]> = {};
   lastConn: ReturnType<typeof makeConn> | null = null;
-  connectCalls: Array<{ id: string; options?: { label?: string; reliable?: boolean } }> = [];
+  connectCalls: Array<{ id: string; options?: { label?: string; reliable?: boolean; metadata?: { pinProof?: string } } }> = [];
   destroyed = false;
   // Mirrors real PeerJS: `disconnected` flips true when the signaling socket
   // drops, and reconnect() re-dials it with the same id.
@@ -38,7 +38,7 @@ class FakePeer {
   reconnectCalls = 0;
   on(event: string, cb: Handler) { (this.handlers[event] ||= []).push(cb); }
   emit(event: string, ...args: unknown[]) { (this.handlers[event] || []).forEach(h => h(...args)); }
-  connect(id: string, options?: { label?: string; reliable?: boolean }) {
+  connect(id: string, options?: { label?: string; reliable?: boolean; metadata?: { pinProof?: string } }) {
     this.connectCalls.push({ id, options });
     // Mirrors real PeerJS: a freshly-created DataConnection isn't `.open`
     // until its 'open' event fires.
@@ -413,5 +413,97 @@ describe('PeerSync error handling', () => {
   it('rejects initialize when the factory throws', async () => {
     const ps = new PeerSync(() => {}, () => {}, () => { throw new Error('no peerjs'); });
     await expect(ps.initialize()).rejects.toThrow('no peerjs');
+  });
+});
+
+
+/** Flush pending microtasks (async PIN proof computation / dial). */
+async function flushAsync() {
+  await new Promise(r => setTimeout(r, 0));
+  await new Promise(r => setTimeout(r, 0));
+}
+
+async function setupPinPeer(pin: string) {
+  const fake = new FakePeer();
+  const statuses: string[] = [];
+  const messages: SyncMessage[] = [];
+  const ps = new PeerSync(
+    (msg) => messages.push(msg),
+    (status) => statuses.push(status),
+    () => fake as unknown as Peer,
+    { sessionPin: pin },
+  );
+  const ready = ps.initialize();
+  fake.emit('open', 'ABCD');
+  await ready;
+  await flushAsync();
+  return { ps, fake, statuses, messages };
+}
+
+describe('PeerSync session PIN (Issue #59)', () => {
+  it('rejects an inbound connection without a valid PIN proof', async () => {
+    const { fake, messages } = await setupPinPeer('1234');
+    const conn = makeConn({ open: true });
+    (conn as { metadata?: unknown }).metadata = { pinProof: 'deadbeef' };
+    fake.emit('connection', conn);
+    await flushAsync();
+    expect(conn.close).toHaveBeenCalled();
+    conn.emit('data', { type: 'sync-request', clientTimestamp: 1 });
+    expect(messages).toHaveLength(0);
+  });
+
+  it('accepts an inbound connection carrying the correct PIN proof', async () => {
+    const { fake, messages } = await setupPinPeer('1234');
+    const conn = makeConn({ open: true });
+    (conn as { metadata?: unknown }).metadata = { pinProof: await sessionPinProof('1234', 'client', 'ABCD') };
+    fake.emit('connection', conn);
+    await flushAsync();
+    expect(conn.close).not.toHaveBeenCalled();
+    conn.emit('open');
+    conn.emit('data', { type: 'sync-request', clientTimestamp: 1 });
+    expect(messages).toHaveLength(1);
+    expect(messages[0].type).toBe('sync-request');
+  });
+
+  it('client dials with a PIN proof and only trusts master messages carrying the master proof', async () => {
+    const { ps, fake, statuses, messages } = await setupPinPeer('1234');
+    ps.connect('WXYZ');
+    await flushAsync();
+    expect(fake.connectCalls).toHaveLength(1);
+    expect(fake.connectCalls[0].options?.metadata?.pinProof).toBe(await sessionPinProof('1234', 'client', 'WXYZ'));
+    const conn = fake.lastConn!;
+    conn.emit('open');
+    // No proof -> dropped (possible squatter on the room id).
+    conn.emit('data', { ...mockMsg });
+    expect(messages).toHaveLength(0);
+    expect(statuses.some(x => x.includes('MASTER AUTH FAILED'))).toBe(true);
+    // Correct master proof -> delivered.
+    conn.emit('data', { ...mockMsg, authProof: await sessionPinProof('1234', 'master', 'WXYZ') });
+    expect(messages).toHaveLength(1);
+  });
+
+  it('stamps the master proof onto heartbeats when a PIN is set', async () => {
+    const { ps, fake } = await setupPinPeer('1234');
+    const conn = makeConn({ open: true });
+    (conn as { metadata?: unknown }).metadata = { pinProof: await sessionPinProof('1234', 'client', 'ABCD') };
+    fake.emit('connection', conn);
+    await flushAsync();
+    conn.emit('open');
+    ps.send(mockMsg);
+    const sent = (conn.send as ReturnType<typeof vi.fn>).mock.calls[0][0] as { authProof?: string };
+    expect(sent.authProof).toBe(await sessionPinProof('1234', 'master', 'ABCD'));
+  });
+});
+
+describe('PeerSync rate limit (Issue #59)', () => {
+  it('drops messages beyond the per-connection budget', async () => {
+    const { fake, messages } = await setupOpenPeer();
+    const conn = makeConn({ open: true });
+    fake.emit('connection', conn);
+    conn.emit('open');
+    for (let i = 0; i < RATE_LIMIT_MAX_MESSAGES + 25; i++) {
+      conn.emit('data', { type: 'report', rtt: 5 });
+    }
+    expect(messages.length).toBe(RATE_LIMIT_MAX_MESSAGES);
   });
 });

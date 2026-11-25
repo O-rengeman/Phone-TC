@@ -67,6 +67,8 @@ export function ConnectionManager() {
     targetId,
     setTargetId,
     joinSession,
+    sessionPin,
+    setSessionPin,
     p2pStatus,
     isP2PSetupPending,
     packetLossRate,
@@ -163,6 +165,22 @@ export function ConnectionManager() {
   // one cm-v3 view, on desktop it sits inside the v2 section under the label.
   const sessionBlock = !p2pRole ? (
     <div className="p2p-init-pro cm-v2-role-cards">
+      {/* Optional session PIN (Issue #59) — one field for both roles: set
+          it before CREATE to protect the session you host, or before JOIN
+          to authenticate to (and verify) the master you connect to. */}
+      <div className="cm-v2-pin">
+        <label className="cm-v2-field-label" htmlFor="cm-session-pin">{tr('p2p.pinLabel')}</label>
+        <input
+          id="cm-session-pin"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder={tr('p2p.pinPlaceholder')}
+          value={sessionPin}
+          maxLength={8}
+          onChange={e => setSessionPin(e.target.value.replace(/[^0-9]/g, ''))}
+        />
+        {sessionPin && <p className="cm-v2-pin-hint">{tr('p2p.pinHint')}</p>}
+      </div>
       {/* Disabled while a setup initialize() is in flight — a second
           tap used to spawn a parallel PeerSync whose late resolution
           installed a ghost peer over the live one. */}

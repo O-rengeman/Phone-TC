@@ -42,6 +42,8 @@ interface UseP2PResult {
   clients: ClientStats;
   setClients: React.Dispatch<React.SetStateAction<ClientStats>>;
   packetLossRate: number;
+  sessionPin: string;
+  setSessionPin: React.Dispatch<React.SetStateAction<string>>;
   setPacketLossRate: React.Dispatch<React.SetStateAction<number>>;
   /** True while a setupP2P* initialize() is in flight — gates CREATE/JOIN UI. */
   isP2PSetupPending: boolean;
@@ -95,6 +97,12 @@ export function useP2P({
   const [masterDrift, setMasterDrift] = useState<number | null>(null);
   const [clients, setClients] = useState<ClientStats>({});
   const [packetLossRate, setPacketLossRate] = useState(0);
+  // Optional session PIN (Issue #59). One field, role-dependent meaning:
+  // the master sets it before CREATE (clients must prove it to connect),
+  // a client sets it before LINK (it is applied to its PeerSync in
+  // joinSession). Kept across resetP2P — it is an operator preference for
+  // the shoot, not per-connection state.
+  const [sessionPin, setSessionPin] = useState('');
   const [isP2PSetupPending, setIsP2PSetupPending] = useState(false);
 
   const peerSyncRef = useRef<PeerSync | null>(null);
@@ -127,8 +135,21 @@ export function useP2P({
   const setupEpochRef = useRef(0);
 
   const handleConnChange = useCallback((connected: boolean, peer: string) => {
-    if (connected) openPeerIdsRef.current.add(peer);
-    else openPeerIdsRef.current.delete(peer);
+    if (connected) {
+      openPeerIdsRef.current.add(peer);
+    } else {
+      openPeerIdsRef.current.delete(peer);
+      // Prune the departed client from the stats map: entries used to live
+      // forever (lastSeen just went stale), so a long shoot with churning
+      // devices accumulated ghosts and the client list lied about who was
+      // actually on the session.
+      setClients(prev => {
+        if (!(peer in prev)) return prev;
+        const next = { ...prev };
+        delete next[peer];
+        return next;
+      });
+    }
     setConnVersion(v => v + 1);
   }, []);
 
@@ -179,6 +200,7 @@ export function useP2P({
           // Master accepts inbound client connections; it never dials out.
           acceptInboundConnections: true,
           onConnectionChange: handleConnChange,
+          ...(sessionPin.trim() ? { sessionPin: sessionPin.trim() } : {}),
         },
       );
       const id = await ps.initialize();
@@ -217,6 +239,7 @@ export function useP2P({
           // DataConnections so a stranger can't inject sync messages.
           acceptInboundConnections: false,
           onConnectionChange: handleConnChange,
+          ...(sessionPin.trim() ? { sessionPin: sessionPin.trim() } : {}),
         },
       );
       const id = await ps.initialize();
@@ -356,6 +379,9 @@ export function useP2P({
 
   const joinSession = () => {
     if (!peerSyncRef.current || !targetId) return;
+    // Apply the PIN as currently typed — the field stays editable after
+    // the client peer is set up, and the dial must carry the latest value.
+    peerSyncRef.current.setSessionPin(sessionPin);
     connectAttemptedForRef.current = targetId;
     try {
       peerSyncRef.current.connect(targetId);
@@ -377,6 +403,7 @@ export function useP2P({
     peerId, targetId, setTargetId, p2pStatus, setP2pStatus, isHost,
     masterDrift, setMasterDrift, clients, setClients,
     packetLossRate, setPacketLossRate, isP2PSetupPending,
+    sessionPin, setSessionPin,
     peerSyncRef, messageHandlerRef, rttHistoryRef, lastSyncTimeRef, lastP2pSyncTimeRef, lastMasterContactTimeRef,
     connectAttemptedForRef,
     resetP2P, setupP2PMaster, setupP2PClient, joinSession,

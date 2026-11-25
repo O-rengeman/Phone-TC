@@ -113,6 +113,9 @@ interface LTCStateType {
   outputOffset: number;
   setOutputOffset: React.Dispatch<React.SetStateAction<number>>;
   peerId: string;
+  sessionPin: string;
+  setSessionPin: React.Dispatch<React.SetStateAction<string>>;
+  backupRestore: { count: number; markers: Marker[] } | null;
   targetId: string;
   setTargetId: React.Dispatch<React.SetStateAction<string>>;
   p2pStatus: string;
@@ -176,6 +179,8 @@ interface LTCActionsType {
   setupP2PMaster: () => Promise<void>;
   setupP2PClient: (autoJoinId?: string) => Promise<void>;
   joinSession: () => void;
+  restoreFromBackup: () => void;
+  dismissBackupRestore: () => void;
   handleStartStop: () => Promise<void>;
   handlePause: () => void;
   beginStopHold: () => void;
@@ -314,6 +319,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     peerId, targetId, setTargetId, p2pStatus, setP2pStatus, isHost,
     masterDrift, setMasterDrift, clients, setClients,
     packetLossRate, setPacketLossRate,
+    sessionPin, setSessionPin,
     peerSyncRef, messageHandlerRef, rttHistoryRef, lastSyncTimeRef, lastP2pSyncTimeRef, lastMasterContactTimeRef,
     connectAttemptedForRef,
     isP2PSetupPending,
@@ -492,6 +498,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
   const {
     markers, setMarkers, markerFlash,
+    backupRestore, restoreFromBackup, dismissBackupRestore,
     addMarker, removeMarker, updateMarkerComment,
     exportToEDL, exportToALE, exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO,
   } = useMarkers({ engineRef, fpsIndex, defaultReelName, sceneName, langRef, addToast,
@@ -750,6 +757,14 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     masterDriftRef.current = masterDrift;
   }, [masterDrift]);
 
+  // Same ref treatment for the client roster: the heartbeat interval reads
+  // its size to step the broadcast cadence down at scale, without the
+  // interval being recreated on every client report.
+  const clientsRef = useRef(clients);
+  useEffect(() => {
+    clientsRef.current = clients;
+  }, [clients]);
+
   useEffect(() => {
     if (!peerSyncRef.current) return;
 
@@ -778,7 +793,15 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
     let hbInterval: ReturnType<typeof setInterval> | undefined;
     if (isHost) {
+      let hbTick = 0;
       hbInterval = setInterval(() => {
+        // Scale-out: with dozens of clients, a 10Hz broadcast to every
+        // connection is the master's main cost. Past 32 clients the
+        // heartbeat steps down to ~3.3Hz — clients still resync on drift
+        // threshold / max-interval, just with a coarser cadence — so the
+        // session can grow instead of melting the master device.
+        hbTick += 1;
+        if (Object.keys(clientsRef.current).length >= 32 && hbTick % 3 !== 0) return;
         peerSyncRef.current?.broadcast({
           type: 'heartbeat',
           masterTimecode: getUnshiftedTc(isRunning ? currentTcRef.current : engineRef.current!.getTimecodeString()),
@@ -830,6 +853,8 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     outputLevel, setOutputLevel,
     outputOffset, setOutputOffset,
     peerId,
+    sessionPin, setSessionPin,
+    backupRestore,
     targetId, setTargetId,
     p2pStatus,
     isHost,
@@ -853,14 +878,14 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     isRunning, fpsIndex, volume, syncStatus, syncMode, isPreparing, isP2PSetupPending, manualTimecode, p2pRole,
     activeTab, isMobile, outputMode, autoUserBits, isVisualSlate, isSlateFlashing,
     userBits, markers, defaultReelName, outputLevel, outputOffset,
-    peerId, targetId, p2pStatus, isHost, driftStatus, isPaused, stopHoldPct, p2pSyncSource,
+    peerId, sessionPin, backupRestore, targetId, p2pStatus, isHost, driftStatus, isPaused, stopHoldPct, p2pSyncSource,
     showGuide,
     isResyncing, lang, batteryLevel, isCharging, batteryEta, wakeLockStatus, markerFlash, clients,
     packetLossRate, sceneName, nowTick,
     setIsRunning, setFpsIndex, setVolume, setSyncModeGuarded, setManualTimecode, setActiveTab, setOutputMode,
     setAutoUserBits, setIsVisualSlate, setUserBits, setMarkers, setDefaultReelName,
     setOutputLevel, setOutputOffset, setTargetId, setP2pSyncSource, setShowGuide,
-    setLang, setPacketLossRate, setSceneName,
+    setLang, setPacketLossRate, setSceneName, setSessionPin,
   ]);
 
   const actionsValue = useMemo<LTCActionsType>(() => ({
@@ -887,6 +912,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     setupP2PMaster,
     setupP2PClient,
     joinSession,
+    restoreFromBackup, dismissBackupRestore,
     handleStartStop,
     handlePause,
     beginStopHold,
@@ -897,7 +923,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     analyserRef, canvasRef, engineRef, currentTcRef, isVisualSlateRef, slateTimeRef,
     holdStoppedRef, stopHoldStartRef, stopHoldRafRef,
     tr, addToast, setSlateTime, addMarker, removeMarker, updateMarkerComment, exportToEDL,
-    exportToALE, exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO, handleSlateClick, resetP2P, setupP2PMaster, setupP2PClient, joinSession,
+    exportToALE, exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO, handleSlateClick, resetP2P, setupP2PMaster, setupP2PClient, joinSession, restoreFromBackup, dismissBackupRestore,
     handleStartStop, handlePause, beginStopHold, cancelStopHold, handleManualResync, recallTimecode,
   ]);
 
