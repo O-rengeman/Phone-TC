@@ -242,17 +242,23 @@ export function useP2P({
     }
   };
 
-  // Auto-join a P2P session if a `?join=<id>` query param is present at mount.
+  // Load a P2P session ID from a `?join=<id>` query param at mount — but
+  // do NOT dial it automatically. A link must never connect (and hand this
+  // device's LTC output/transport over to a master) without the operator's
+  // own action: the ID is prefilled and the client peer is set up, and the
+  // operator presses LINK to actually connect.
   // Placed after setupP2PClient's declaration so the reference is not used
   // before it is textually assigned (react-hooks/immutability).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const joinId = params.get('join');
     if (joinId) {
-      // One-time mount action equivalent to a user clicking "join" — not a
-      // reactive state sync, so the resulting setState calls are intentional.
+      // One-time mount action — not a reactive state sync, so the resulting
+      // setState calls are intentional.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      void setupP2PClient(joinId);
+      void setupP2PClient();
+      setTargetId(joinId);
+      addToast(translate('toast.p2pJoinLinkLoaded', langRef.current, { id: joinId }), 'info');
       window.history.replaceState({}, document.title, window.location.pathname);
     }
     // Mount-only by design: re-running on every setupP2PClient identity

@@ -421,7 +421,11 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
       } else {
         const frameDiff = engine.signedFrameDiffTo(corrected);
         if (frameDiff !== 0) {
-          node.port.postMessage({ type: 'nudge', dir: frameDiff > 0 ? 1 : -1 });
+          // Send the full magnitude: the worklet accumulates pendingNudge
+          // and consumes one frame per frame period. Sending only dir used
+          // to cap correction at 1 frame per resync (1 frame / 30 s on the
+          // network path), leaving multi-frame offsets in place for minutes.
+          node.port.postMessage({ type: 'nudge', dir: frameDiff > 0 ? 1 : -1, frames: Math.abs(frameDiff) });
         }
       }
     } else {

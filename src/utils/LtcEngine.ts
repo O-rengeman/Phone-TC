@@ -37,11 +37,48 @@ export class LtcEngine {
       ...settings,
       userBits: settings.userBits || '00000000'
     };
-    this.currentTimecode = Timecode(startTime, settings.fps, settings.isDropFrame);
-
-    // Use exact rational FPS if provided, else derive from float
+    // Use exact rational FPS if provided, else derive from float. Resolved
+    // BEFORE the start timecode: Date starts go through timecodeFromDate(),
+    // which needs the rational rate.
     this.fpsNum = settings.fpsNum || this.deriveNumerator(settings.fps);
     this.fpsDen = settings.fpsDen || this.deriveDenominator(settings.fps);
+    this.currentTimecode = startTime instanceof Date
+      ? this.timecodeFromDate(startTime)
+      : Timecode(startTime, settings.fps, settings.isDropFrame);
+  }
+
+  /**
+   * Builds a timecode from a wall-clock Date at the exact rational rate.
+   *
+   * Delegating this to `Timecode(Date, fps)` is wrong for fractional rates:
+   * smpte-timecode rounds the rate to 2 decimals internally (23.976 → 23.98)
+   * before `frameCount = elapsedMs * rate / 1000`, so a 23.976 TOD timecode
+   * starts ~7 s fast by noon (and 29.97 ~1 frame fast). Computing the frame
+   * count here with fpsNum/fpsDen and constructing from the count keeps the
+   * label on the true 24000/1001 (resp. 30000/1001) rate. Wall-clock
+   * components (not Date subtraction) are used so DST transitions don't
+   * shift the label.
+   */
+  private timecodeFromDate(date: Date): TimecodeInstance {
+    const elapsedMs = (((date.getHours() * 60 + date.getMinutes()) * 60 + date.getSeconds()) * 1000)
+      + date.getMilliseconds();
+    const frameCount = Math.round(elapsedMs * this.fpsNum / (1000 * this.fpsDen));
+    return Timecode(frameCount, [this.fpsNum, this.fpsDen], this.settings.isDropFrame);
+  }
+
+  /** Frames in a 24 h day at the nominal (label) rate, for diff wrapping. */
+  private framesPerDay(): number {
+    const nominal = Math.round(this.fpsNum / this.fpsDen);
+    return nominal * 86400 - (this.settings.isDropFrame ? 2 * (1440 - 144) * (nominal >= 60 ? 2 : 1) : 0);
+  }
+
+  /** Wraps a raw frame difference into ±half a day (midnight rollover). */
+  private wrapFrameDiff(diff: number): number {
+    const day = this.framesPerDay();
+    let d = diff % day;
+    if (d > day / 2) d -= day;
+    if (d < -day / 2) d += day;
+    return d;
   }
 
   /**
@@ -93,7 +130,7 @@ export class LtcEngine {
   }
 
   public syncWithOffset(offset: number) {
-    this.currentTimecode = Timecode(this.dateForOffset(offset), this.settings.fps, this.settings.isDropFrame);
+    this.currentTimecode = this.timecodeFromDate(this.dateForOffset(offset));
   }
 
   /** Returns the NTP-corrected wall-clock date for a given offset in milliseconds. */
@@ -103,7 +140,7 @@ export class LtcEngine {
 
   /** Returns the timecode string for a given NTP offset without mutating internal state. */
   public getTimecodeForOffset(offsetMs: number): string {
-    return Timecode(this.dateForOffset(offsetMs), this.settings.fps, this.settings.isDropFrame).toString();
+    return this.timecodeFromDate(this.dateForOffset(offsetMs)).toString();
   }
 
   public setManualTimecode(tcStr: string) {
@@ -150,7 +187,7 @@ export class LtcEngine {
   public signedFrameDiffTo(targetTcStr: string): number {
     try {
       const targetTc = Timecode(targetTcStr, this.settings.fps, this.settings.isDropFrame);
-      return targetTc.frameCount - this.currentTimecode.frameCount;
+      return this.wrapFrameDiff(targetTc.frameCount - this.currentTimecode.frameCount);
     } catch {
       return 0;
     }
@@ -164,7 +201,7 @@ export class LtcEngine {
       const targetTc = Timecode(targetTcStr, this.settings.fps, this.settings.isDropFrame);
       const currentFrames = this.currentTimecode.frameCount;
       const targetFrames = targetTc.frameCount;
-      const diffFrames = Math.abs(currentFrames - targetFrames);
+      const diffFrames = Math.abs(this.wrapFrameDiff(targetFrames - currentFrames));
       return diffFrames * this.fpsDen / this.fpsNum;
     } catch {
       return Infinity; // If parsing fails, always sync

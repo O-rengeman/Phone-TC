@@ -203,9 +203,19 @@ export class PeerSync {
 
   private generateShortId(): string {
     const chars = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // Confusion-prone I, O removed
+    // CSPRNG, not Math.random(): the ID is the session's only credential,
+    // so its unpredictability is the whole defence against guessing.
+    // Rejection sampling keeps the distribution uniform over the alphabet.
+    const limit = Math.floor(256 / chars.length) * chars.length;
     let result = '';
-    for (let i = 0; i < PEER_ID_LENGTH; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    while (result.length < PEER_ID_LENGTH) {
+      const bytes = new Uint8Array(PEER_ID_LENGTH);
+      crypto.getRandomValues(bytes);
+      for (const b of bytes) {
+        if (b >= limit) continue;
+        result += chars.charAt(b % chars.length);
+        if (result.length === PEER_ID_LENGTH) break;
+      }
     }
     return result;
   }

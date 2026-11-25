@@ -37,11 +37,18 @@ export function readStoredString(key: StorageKey | (string & {})): string | null
   }
 }
 
-/** Safe write; silently ignored when storage is unavailable or full. */
-export function writeStoredString(key: StorageKey | (string & {}), value: string): void {
+/**
+ * Safe write; never throws. Returns false when storage is unavailable or
+ * full so callers holding irreplaceable data (markers) can warn the user
+ * instead of letting the loss stay silent until the next restart.
+ */
+export function writeStoredString(key: StorageKey | (string & {}), value: string): boolean {
   try {
     localStorage.setItem(key, value);
-  } catch { /* storage unavailable or quota exceeded */ }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

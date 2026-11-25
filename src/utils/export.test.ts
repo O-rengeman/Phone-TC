@@ -82,10 +82,24 @@ describe('editor exports', () => {
     expect(buildCsv([]).split('\r\n')).toHaveLength(2);
   });
 
-  it('rejects invalid timecodes rather than generating corrupt timeline positions', () => {
+  it('skips markers whose TC cannot exist at the export fps instead of failing the whole export', () => {
+    // Frame 29 recorded at 29.97 cannot exist at 25fps (FPS_OPTIONS[2]).
+    // The valid marker must still export; the stale one is skipped (same
+    // tolerance as buildOtio), not exported at a corrupt position.
+    const mixed = [{ ...markers[0], tc: '00:00:10:29' }, markers[1]];
+    const doc = parse(buildFcpxml(mixed, FPS_OPTIONS[2]));
+    expect(doc.querySelectorAll('marker')).toHaveLength(1);
+    const edl = buildResolveMarkers(mixed, FPS_OPTIONS[2]);
+    expect(edl).toContain('001 ');
+    expect(edl).not.toContain('002 ');
     const invalid = [{ ...markers[0], tc: 'invalid' }];
-    expect(() => buildFcpxml(invalid, FPS_OPTIONS[2])).toThrow();
-    expect(() => buildResolveMarkers(invalid, FPS_OPTIONS[2])).toThrow();
+    expect(parse(buildFcpxml(invalid, FPS_OPTIONS[2])).querySelectorAll('marker')).toHaveLength(0);
+    expect(buildResolveMarkers(invalid, FPS_OPTIONS[2])).toBe('TITLE: Logged Takes\nFCM: NON-DROP FRAME\n\n');
+  });
+
+  it('guards formula-leading cells even after leading whitespace', () => {
+    const csv = buildCsv([{ ...markers[0], comment: '  =1+1' }]);
+    expect(csv).toContain(`"'  =1+1"`);
   });
 
   it('prefixes formula-leading cells to block spreadsheet injection', () => {
