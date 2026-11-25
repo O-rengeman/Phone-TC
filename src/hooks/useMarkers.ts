@@ -143,9 +143,10 @@ interface UseMarkersResult {
   exportToCSV: () => void;
   exportToOTIO: () => void;
   /** Pending backup-restore offer (Issue #60): set when local storage was empty but the native backup file holds markers. */
-  backupRestore: { count: number; markers: Marker[] } | null;
+  backupRestore: { count: number; markers: Marker[]; manual: boolean } | null;
   restoreFromBackup: () => void;
   dismissBackupRestore: () => void;
+  requestBackupRestore: () => void;
 }
 
 /**
@@ -198,7 +199,7 @@ export function useMarkers({
   // build (WebView storage eviction is the known cause), offer the backup's
   // markers back — as a prompt, never a silent restore, so an operator who
   // deliberately cleared markers isn't haunted by their return.
-  const [backupRestore, setBackupRestore] = useState<{ count: number; markers: Marker[] } | null>(null);
+  const [backupRestore, setBackupRestore] = useState<{ count: number; markers: Marker[]; manual: boolean } | null>(null);
   const backupCheckedRef = useRef(false);
 
   const restoreFromBackup = useCallback(() => {
@@ -215,32 +216,45 @@ export function useMarkers({
   const markersRef = useRef(markers);
   useEffect(() => { markersRef.current = markers; }, [markers]);
 
+  // Reads the native backup file and, when it holds markers, raises the
+  // restore offer. `requireEmpty` is the launch path (only offer when local
+  // storage came up empty); the manual path offers regardless and lets the
+  // banner's confirm step guard the overwrite.
+  const loadBackupOffer = useCallback(async (requireEmpty: boolean, manual: boolean): Promise<boolean> => {
+    if (!Capacitor.isNativePlatform()) return false;
+    if (requireEmpty && markersRef.current.length > 0) return false;
+    try {
+      const res = await Filesystem.readFile({
+        path: MARKER_BACKUP_FILE,
+        directory: Directory.Documents,
+        encoding: Encoding.UTF8,
+      });
+      const text = typeof res.data === 'string' ? res.data : await res.data.text();
+      const clean = sanitizeMarkers(JSON.parse(text) as unknown);
+      if (!clean || clean.length === 0) return false;
+      if (requireEmpty && markersRef.current.length > 0) return false;
+      setBackupRestore({ count: clean.length, markers: clean, manual });
+      return true;
+    } catch {
+      return false; // No backup file yet (or unreadable) — nothing to offer.
+    }
+  }, []);
+
+  const requestBackupRestore = useCallback(() => {
+    void loadBackupOffer(false, true).then(found => {
+      if (!found) addToast(translate('toast.backupNotFound', langRef.current), 'info');
+    });
+  }, [loadBackupOffer, addToast, langRef]);
+
+
   useEffect(() => {
     if (backupCheckedRef.current) return;
     backupCheckedRef.current = true;
-    if (!Capacitor.isNativePlatform()) return;
-    if (markersRef.current.length > 0) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await Filesystem.readFile({
-          path: MARKER_BACKUP_FILE,
-          directory: Directory.Documents,
-          encoding: Encoding.UTF8,
-        });
-        const text = typeof res.data === 'string' ? res.data : await res.data.text();
-        const clean = sanitizeMarkers(JSON.parse(text) as unknown);
-        // Re-check emptiness at resolve time: a marker added while the
-        // file read was in flight must not be offered an overwrite.
-        if (!cancelled && markersRef.current.length === 0 && clean && clean.length > 0) {
-          setBackupRestore({ count: clean.length, markers: clean });
-        }
-      } catch {
-        // No backup file yet (or unreadable) — nothing to offer.
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    // Emptiness is re-checked when the read resolves (inside the loader):
+    // a marker added while the read was in flight must not be offered an
+    // overwrite.
+    void loadBackupOffer(true, false);
+  }, [loadBackupOffer]);
 
   useEffect(() => () => {
     if (markerFlashTimerRef.current !== null) clearTimeout(markerFlashTimerRef.current);
@@ -416,5 +430,5 @@ export function useMarkers({
   const exportToCSV = () => exportToFile(() => String.fromCharCode(0xFEFF) + buildCsv(markers), '.csv');
   const exportToOTIO = () => exportToFile(() => buildOtio(markers, FPS_OPTIONS[fpsIndex]), '.otio');
 
-  return { markers, setMarkers, markerFlash, addMarker, removeMarker, updateMarkerComment, exportToEDL, exportToALE, exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO, backupRestore, restoreFromBackup, dismissBackupRestore };
+  return { markers, setMarkers, markerFlash, addMarker, removeMarker, updateMarkerComment, exportToEDL, exportToALE, exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO, backupRestore, restoreFromBackup, dismissBackupRestore, requestBackupRestore };
 }

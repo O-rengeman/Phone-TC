@@ -115,7 +115,7 @@ interface LTCStateType {
   peerId: string;
   sessionPin: string;
   setSessionPin: React.Dispatch<React.SetStateAction<string>>;
-  backupRestore: { count: number; markers: Marker[] } | null;
+  backupRestore: { count: number; markers: Marker[]; manual: boolean } | null;
   targetId: string;
   setTargetId: React.Dispatch<React.SetStateAction<string>>;
   p2pStatus: string;
@@ -181,6 +181,7 @@ interface LTCActionsType {
   joinSession: () => void;
   restoreFromBackup: () => void;
   dismissBackupRestore: () => void;
+  requestBackupRestore: () => void;
   handleStartStop: () => Promise<void>;
   handlePause: () => void;
   beginStopHold: () => void;
@@ -498,7 +499,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
 
   const {
     markers, setMarkers, markerFlash,
-    backupRestore, restoreFromBackup, dismissBackupRestore,
+    backupRestore, restoreFromBackup, dismissBackupRestore, requestBackupRestore,
     addMarker, removeMarker, updateMarkerComment,
     exportToEDL, exportToALE, exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO,
   } = useMarkers({ engineRef, fpsIndex, defaultReelName, sceneName, langRef, addToast,
@@ -912,7 +913,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     setupP2PMaster,
     setupP2PClient,
     joinSession,
-    restoreFromBackup, dismissBackupRestore,
+    restoreFromBackup, dismissBackupRestore, requestBackupRestore,
     handleStartStop,
     handlePause,
     beginStopHold,
@@ -923,7 +924,7 @@ export function LTCSyncProvider({ children }: { children: React.ReactNode }) {
     analyserRef, canvasRef, engineRef, currentTcRef, isVisualSlateRef, slateTimeRef,
     holdStoppedRef, stopHoldStartRef, stopHoldRafRef,
     tr, addToast, setSlateTime, addMarker, removeMarker, updateMarkerComment, exportToEDL,
-    exportToALE, exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO, handleSlateClick, resetP2P, setupP2PMaster, setupP2PClient, joinSession, restoreFromBackup, dismissBackupRestore,
+    exportToALE, exportToFCPXML, exportToResolve, exportToCSV, exportToOTIO, handleSlateClick, resetP2P, setupP2PMaster, setupP2PClient, joinSession, restoreFromBackup, dismissBackupRestore, requestBackupRestore,
     handleStartStop, handlePause, beginStopHold, cancelStopHold, handleManualResync, recallTimecode,
   ]);
 

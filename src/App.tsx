@@ -167,7 +167,7 @@ function MainApp() {
 
       {backupRestore && (
         <div style={{ position: 'fixed', top: '64px', left: '50%', transform: 'translateX(-50%)', zIndex: 10600, background: '#222', color: '#fff', border: '1px solid #555', borderRadius: '10px', padding: '12px 16px', display: 'flex', gap: '12px', alignItems: 'center', maxWidth: '92vw', boxShadow: '0 6px 24px rgba(0,0,0,0.45)' }}>
-          <span style={{ fontSize: '13px', lineHeight: 1.5 }}>{tr('backup.restorePrompt', { count: backupRestore.count })}</span>
+          <span style={{ fontSize: '13px', lineHeight: 1.5 }}>{tr(backupRestore.manual ? 'backup.restorePromptManual' : 'backup.restorePrompt', { count: backupRestore.count })}</span>
           <button onClick={restoreFromBackup} style={{ whiteSpace: 'nowrap' }}>{tr('backup.restore')}</button>
           <button onClick={dismissBackupRestore} style={{ whiteSpace: 'nowrap' }}>{tr('backup.dismiss')}</button>
         </div>
